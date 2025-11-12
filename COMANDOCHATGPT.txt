@@ -1,0 +1,310 @@
+PS C:\Principia\principia-front\src\app> npx tree-cli -l 10
+
+Olá chat, estou criando um app, uma aplicação web semelhante ao Qconcursos e ao Estuda.com.
+Será um repositório de aulas para um curso de matemática e o depósito de questões.
+Estou usando Next (frontend) e Laravel (backend). Atualmente, já tenho pronto o login e alguns componentes da aplicação.
+Quero que me auxilie na criação do site. Está bem?
+
+Esta é minha pasta app:
+├── (auth)
+|  ├── cadastro
+|  |  ├── actions.ts
+|  |  └── page.tsx
+|  └── login
+|     ├── forgot
+|     |  ├── confirm
+|     |  |  └── page.tsx
+|     |  ├── expired
+|     |  |  └── page.tsx
+|     |  └── page.tsx
+|     └── page.tsx
+├── (inside)
+|  ├── conteudo
+|  |  ├── layout.tsx
+|  |  └── page.tsx
+|  ├── exercicios
+|  |  ├── layout.tsx
+|  |  └── page.tsx
+|  ├── forum
+|  |  ├── layout.tsx
+|  |  └── page.tsx
+|  ├── home
+|  |  ├── layout.tsx
+|  |  └── page.tsx
+|  └── perfil
+|     ├── layout.tsx
+|     └── page.tsx
+├── api
+|  └── auth
+|     └── [...nextauth]
+|        └── route.ts
+├── favicon.ico
+├── globals.css
+├── layout.tsx
+├── page.module.css
+└── page.tsx
+
+directory: 18 file: 25
+
+Quero alterar umas coisas, pois não me sinto satisfeito. Pra começar quero um dashboard que agrupe o layout de todas as rotas filhas, facilitando passar elementos fixos entre as páginas como o desing e o a barra de carregamento.
+
+Também já adiante elementos como: número de pessoas online globalmente pra um futuro cms. Quero um Skull loading em quase todos os elementos. E abaixo vou enviar as rotas que presumo serem as finais do site, opine e MONTE o que achar melhor.
+Se precisar, peça as telas de cada rota, pois todas já estão prontas no figma, e também peça quando quiser os códigos de qualquer arquivo.
+
+
+
+app/
+  (inside)/
+
+    (conteudo-aulas)
+        conteudo/
+          page.tsx
+        tv/
+            [slug]/		# /tv/1/matemamatica-basica	
+                [slug]/         # Pra escolher qual curso irá assistir
+                  page.tsx
+        modulos/
+            [slug]/		# /66/composicao-das-funcoes	
+                [slug]/         # Aqui já escolheu o módulo
+                  page.tsx    
+                    [slug]/		# /66/composicao-das-funcoes/[número da lista]/[título da lista]	
+                        [slug]/         # /66/composicao-das-funcoes/66/lista-de-questões-fundamentos-das-funcoes
+                          page.tsx
+    
+    forum/
+      page.tsx         
+      [slug]/
+        page.tsx # forum/912   # id da dúvida do sujeito, ou do número do fórum!  
+    home/
+      page.tsx
+    questoes/      
+        v/        # /questoes/s/artes-visuais/atualidades/biologia/educacao-artistica/educacao-fisica/espanhol/filosofia/fisica/geografia/1-lei-da-termodinamica/2-lei-da-termodinamica-ciclo-de-carnot-e-maquinas-termicas/a-consciencia-e-os-limites-do-conhecimento/campo-real/casper-libero/cederj/cesmac/encceja/enem/esamc/espm/fag/fagoc/fainor/2023/d9s3i11y?search=cursos&is=notAnswered&trkContext=all+questions+tab || Exemplo de busca no questões
+    perfil/
+      page.tsx
+        dados/
+          page.tsx
+        assinatura/
+          page.tsx
+components/
+  profile-card.tsx
+  profile-form.tsx
+
+
+
+/questoes/v/
+**usar params.slug e searchParams 
+?m=respostasCorretas || ?m=naoResolvi || ?m=respotasIncorretas || ?m=resolvi ||
+gabarito=true
+search=...
+
+
+
+roles
+
+admin, editor, professor, aluno
+
+
+
+
+Quero criar um CMS (painel administrativo) completo e moderno para um sistema educacional online,
+no subdomínio painel.meusite.com.br. 
+
+Contexto do projeto:
+- Backend em Laravel 11 (API REST centralizada).
+- Frontend do CMS será em Next.js (App Router).
+- Os usuários finais utilizam app.meusite.com.br, e o CMS é exclusivamente para administradores, professores e moderadores.
+- Banco de dados único para todos, com roles (admin, professor, editor, aluno).
+- Comunicação entre painel e backend por Axios.
+- WebSockets (Laravel Echo / Pusher ou Soketi) serão usados para estatísticas em tempo real.
+
+O CMS precisa ser EXCELENTE, então liste, estruture e sugira todas as funcionalidades e arquitetura necessárias. Quero um painel robusto que gerencie tudo no sistema educacional:
+
+FUNCIONALIDADES ESSENCIAIS:
+1. Gestão de Usuários
+   - CRUD completo
+   - Controle de papéis (RBAC)
+   - Histórico de login
+2. Gestão de Cursos, Módulos e Aulas
+   - CRUD de cursos e módulos
+   - Upload de vídeos e PDFs
+   - Editor rich text para materiais
+   - Drag-and-drop para ordenar módulos e aulas
+3. Gestão de Questões e Banco de Questões
+   - CRUD completo
+   - Tags, filtros, dificuldade
+   - Importação em massa (CSV/Excel)
+   - Associação de questões a módulos
+4. Simulados/Provas
+   - Montagem de provas a partir de questões
+   - Configuração de tempo
+   - Correção automática
+5. Monitoramento em tempo real
+   - Usuários online globalmente
+   - Usuários por aula
+   - Estatísticas de engajamento
+6. Analytics e Relatórios
+   - Gráficos de desempenho
+   - Engajamento por curso/módulo
+7. Gestão de Assinaturas e Pagamentos
+   - Planos (mensal, anual)
+   - Histórico de pagamentos
+   - Integração com gateways (Stripe/MercadoPago)
+8. Ferramentas de Moderação
+   - Moderação de posts do fórum
+   - Aprovação de conteúdos
+9. Configurações
+   - Avisos e banners
+   - E-mails automáticos
+   - Logs de atividades
+10. Recursos futuros
+    - A/B testing
+    - Integração com IA
+
+O que quero que você faça:
+- Planeje a arquitetura do CMS.
+- Sugira uma estrutura de pastas no Next.js App Router.
+- Sugira os componentes principais (sidebar, navbar, layout).
+- Liste os endpoints que o Laravel deve disponibilizar para suportar essas funcionalidades.
+- Dê sugestões de bibliotecas e práticas para deixar o CMS escalável e seguro.
+- Inclua suporte para loading states, skeletons e progressive bar.
+
+No fim, entregue também:
+1. Como integrar WebSockets para dados em tempo real.
+2. Como pensar a UX do CMS para administradores.
+3. Como organizar o código para facilitar manutenção futura.
+
+
+
+
+
+Quero criar a interface do aluno (app.meusite.com.br) em Next.js (App Router) 
+que consome os dados do CMS (painel.meusite.com.br) através da API Laravel.
+
+Contexto do projeto:
+- O backend e o CMS já estão planejados separadamente.
+- Este frontend é exclusivamente para os alunos e professores consumirem os conteúdos e interagirem.
+- Quero uma arquitetura bem organizada, com suporte a layouts aninhados, skeleton loading e barra de progresso.
+- O app será SPA-like (Next.js + React server components).
+
+FUNCIONALIDADES DO FRONTEND (APP):
+1. Login, cadastro, recuperação de senha
+2. Dashboard com estatísticas do aluno
+3. Aulas e módulos:
+   - Navegação clara: módulo → lista de aulas → player de vídeo → listas de questões
+   - Sidebar fixa dentro dos módulos
+4. Fórum:
+   - Visualização de posts
+   - Comentários e respostas
+5. Banco de Questões:
+   - Busca avançada
+   - Filtros dinâmicos na URL
+6. Perfil do aluno:
+   - Editar dados pessoais
+   - Gerenciar assinatura
+7. Notificações em tempo real
+   - Quantos estão online
+   - Mensagens ou alertas
+8. Skeleton loading:
+   - Implementado em quase todas as rotas internas
+9. Progressive bar:
+   - Mostrada na troca de rotas internas
+10. Suporte para dados em tempo real:
+    - Quantos estão assistindo a mesma aula
+    - Usuários online globalmente
+
+O que quero que você faça:
+- Planeje a estrutura de pastas do `app/` no Next.js para suportar:
+  - (auth) → login, cadastro
+  - (inside) → todas as rotas internas, com layout e loading compartilhados
+- Crie um layout.tsx genérico para o dashboard interno
+- Explique como integrar as chamadas do backend Laravel
+- Explique como trabalhar com searchParams e params para rotas dinâmicas (especialmente para questões e módulos)
+- Sugira bibliotecas e boas práticas para UI e estados globais (Zustand, Context)
+- Inclua exemplos de skeleton loading e Progressive bar
+- Mostre como integrar dados em tempo real (WebSockets)
+- Dê dicas para performance e segurança
+
+No fim:
+- Entregue exemplos de código para layout, loading.tsx, página de módulo com sidebar
+- Explique como esse app vai se comunicar com o CMS.
+
+
+
+app/
+  (inside)/
+    layout.tsx
+    loading.tsx
+    home/page.tsx
+    forum/
+      page.tsx
+      [slug]/page.tsx
+    perfil/
+      page.tsx
+      dados/page.tsx
+      assinatura/page.tsx
+    conteudo-aulas/
+      conteudo/page.tsx
+      tv/
+        [cursoId]/
+          [moduloSlug]/
+            [aulaId]/[aulaSlug]/page.tsx
+            [listaId]/[listaSlug]/page.tsx
+    modulos/
+      [moduloId]/
+        [moduloSlug]/
+          [aulaId]/[aulaSlug]/page.tsx
+          [listaId]/[listaSlug]/page.tsx
+    questoes/
+      v/
+        [[...slug]]/page.tsx
+
+https://www.youtube.com/embed/Mo2pLgSbc54?si=2Hr7Ni03r_l3I6V0"
+
+
+Courses
+bash
+Copiar
+Editar
+GET    /api/courses           -> index
+POST   /api/courses           -> store
+GET    /api/courses/{id}      -> show
+PUT    /api/courses/{id}      -> update
+DELETE /api/courses/{id}      -> destroy
+Fonts (pertencem a um course)
+bash
+Copiar
+Editar
+GET    /api/courses/{course}/fonts
+POST   /api/courses/{course}/fonts
+GET    /api/courses/{course}/fonts/{font}
+PUT    /api/courses/{course}/fonts/{font}
+DELETE /api/courses/{course}/fonts/{font}
+Modules (pertencem a uma font)
+bash
+Copiar
+Editar
+GET    /api/fonts/{font}/modules
+POST   /api/fonts/{font}/modules
+GET    /api/fonts/{font}/modules/{module}
+PUT    /api/fonts/{font}/modules/{module}
+DELETE /api/fonts/{font}/modules/{module}
+Contents (pertencem a um module)
+bash
+Copiar
+Editar
+GET    /api/modules/{module}/contents
+POST   /api/modules/{module}/contents
+GET    /api/modules/{module}/contents/{content}
+PUT    /api/modules/{module}/contents/{content}
+DELETE /api/modules/{module}/contents/{content}
+4. Criando os Controllers
+Você pode gerar cada controller usando:
+
+bash
+Copiar
+Editar
+php artisan make:controller CourseController --api
+php artisan make:controller CourseFontController --api
+php artisan make:controller CourseModuleController --api
+php artisan make:controller CourseContentController --api
+
