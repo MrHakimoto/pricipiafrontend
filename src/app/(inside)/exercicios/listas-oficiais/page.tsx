@@ -23,6 +23,12 @@ const cardVariants = {
   }),
 };
 
+type Lista = {
+  id: number;
+  name: string;
+  descricao?: string;
+};
+
 const cardHover = {
   scale: 1.03,
   boxShadow: "0px 10px 30px rgba(0, 0, 0, 0.5)",
@@ -32,7 +38,7 @@ const cardHover = {
 export default function ListaDeExercicios() {
   // CORREÇÃO: Ordem do useState corrigida e estados adicionados
   const [isLoading, setIsLoading] = useState(true);
-  const [allListas, setAllListas] = useState([]); // Guarda a lista original da API
+const [allListas, setAllListas] = useState<Lista[]>([]); // Guarda a lista original da API
   const [searchTerm, setSearchTerm] = useState('');
   const [error, setError] = useState<string | null>(null);
   const { data: session, status } = useSession();
