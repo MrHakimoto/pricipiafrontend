@@ -67,7 +67,7 @@ export default function ListaQuestionsPage() {
   const { data: session, status } = useSession();
 
   const [questoes, setQuestoes] = useState<Questao[]>([]);
-  const [listaInfo, setListaInfo] = useState<ListaCompleta | null>(null);
+  const [listaInfo, setListaInfo] = useState<ListaCompleta | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
