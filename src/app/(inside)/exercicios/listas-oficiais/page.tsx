@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useSession } from "next-auth/react";
-import { motion } from 'framer-motion';
+import { motion, easeInOut  } from 'framer-motion';
 import Image from 'next/image';
 import { Search, Compass, Loader2 } from 'lucide-react';
 import { ExercisesHeader } from "@/components/questions/ExercisesHeader";
@@ -18,7 +18,7 @@ const cardVariants = {
     transition: {
       delay: i * 0.05,
       duration: 0.3,
-      ease: 'easeInOut',
+      ease: easeInOut,
     },
   }),
 };
