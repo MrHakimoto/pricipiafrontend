@@ -148,11 +148,10 @@ export default function ConteudoPage({ params }: PageProps) {
       <div className="flex flex-col md:flex-row gap-3 mb-6">
         <button
           onClick={() => setTvTipo("curso")}
-          className={`cursor-pointer relative w-full md:w-2/3 flex items-center gap-2 px-4 py-3 border-b-2 transition font-semibold ${
-            tvTipo === "curso"
+          className={`cursor-pointer relative w-full md:w-2/3 flex items-center gap-2 px-4 py-3 border-b-2 transition font-semibold ${tvTipo === "curso"
               ? "border-[#0E00D0] text-white"
               : "border-transparent text-gray-300 hover:text-white"
-          }`}
+            }`}
         >
           <Video
             className={`${tvTipo === "curso" ? "text-white" : "text-gray-400"}`}
@@ -163,16 +162,14 @@ export default function ConteudoPage({ params }: PageProps) {
 
         <button
           onClick={() => setTvTipo("cronograma")}
-          className={`cursor-pointer flex items-center gap-2 px-4 py-3 border-b-2 transition font-semibold ${
-            tvTipo === "cronograma"
+          className={`cursor-pointer flex items-center gap-2 px-4 py-3 border-b-2 transition font-semibold ${tvTipo === "cronograma"
               ? "border-[#0E00D0] text-white"
               : "border-transparent text-gray-600 hover:text-white"
-          }`}
+            }`}
         >
           <CalendarDays
-            className={`${
-              tvTipo === "cronograma" ? "text-white" : "text-gray-600"
-            }`}
+            className={`${tvTipo === "cronograma" ? "text-white" : "text-gray-600"
+              }`}
             size={20}
           />
           <span>Cronograma</span>
@@ -184,7 +181,7 @@ export default function ConteudoPage({ params }: PageProps) {
         <div className="w-full max-w-5xl mx-auto space-y-5">
           {dataB.map((course) => {
             const totais = calcularTotaisFrente(course);
-            
+
             return (
               <div
                 key={course.id}
@@ -247,7 +244,9 @@ export default function ConteudoPage({ params }: PageProps) {
 
                       {/* Lista de módulos */}
                       <div
-                        ref={(el) => (containerRefs.current[course.id] = el)}
+                        ref={(el) => {
+                          containerRefs.current[course.id] = el;
+                        }}
                         className="overflow-x-hidden scroll-smooth scrollbar-hide px-4 py-4"
                       >
                         <motion.div
@@ -264,13 +263,13 @@ export default function ConteudoPage({ params }: PageProps) {
                             const aulasModulo = mod.contents?.filter(
                               (content: any) => content.content_type === "aula"
                             ).length || 0;
-                            
+
                             const listasModulo = mod.contents?.filter(
                               (content: any) => content.content_type === "lista"
                             ).length || 0;
-                            
+
                             const tempoModulo = Math.round(
-                              mod.contents?.reduce((total: number, content: any) => 
+                              mod.contents?.reduce((total: number, content: any) =>
                                 total + (content.estimated_time_minutes || 0), 0
                               ) / 60
                             );
@@ -313,11 +312,10 @@ export default function ConteudoPage({ params }: PageProps) {
                                       {[1, 2, 3, 4, 5].map((i) => (
                                         <div
                                           key={i}
-                                          className={`h-2 w-3 rounded-sm ${
-                                            i <= (mod.progresso || 0)
+                                          className={`h-2 w-3 rounded-sm ${i <= (mod.progresso || 0)
                                               ? "bg-green-500"
                                               : "bg-gray-600"
-                                          }`}
+                                            }`}
                                         />
                                       ))}
                                     </div>
