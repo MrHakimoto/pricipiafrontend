@@ -79,25 +79,24 @@ export default function ListaQuestionsPage() {
         try {
           setIsLoading(true);
           const token = session.laravelToken;
-          const id = Array.isArray(listaId) ? listaId[0] : listaId;
+          const idNumber = parseInt(Array.isArray(listaId) ? listaId[0] : listaId, 10);
+const response = await getListaById(idNumber, token);
 
-          console.log('Buscando lista com ID:', id);
-          
-          const response = await getListaById(id, token);
+
           console.log('Resposta da API:', response);
           
           if (Array.isArray(response)) {
             setQuestoes(response);
             setListaInfo({
-              id: parseInt(id),
-              nome: `Lista ${id}`,
+              id: idNumber,
+              nome: `Lista ${idNumber}`,
               descricao: 'Lista de exercícios'
             });
           } else if (response.data && Array.isArray(response.data)) {
             setQuestoes(response.data);
             setListaInfo({
-              id: parseInt(id),
-              nome: `Lista ${id}`,
+              id: idNumber,
+              nome: `Lista ${idNumber}`,
               descricao: 'Lista de exercícios'
             });
           } else {
