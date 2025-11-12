@@ -10,7 +10,7 @@ import { GabaritoQuestao } from "./feedback/gabarito";
 import { DuvidaQuestao } from "./feedback/duvida";
 import { EstatisticasQuestao } from "./feedback/estatisticas";
 import ReportarModal from "@/components/questions/ReportModal";
-import OpcoesQuestao from "@/components/questions/opcoesQuestao";
+import OpcoesQuestao from "@/components/questions/OpcoesQuestao";
 import { useSession } from "next-auth/react";
 
 type QuizOptionProps = {
