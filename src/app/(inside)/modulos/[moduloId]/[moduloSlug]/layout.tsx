@@ -94,23 +94,23 @@ export default function ModuloLayout({
   };
 
   // 🔥 VARIAÇÕES DE ANIMAÇÃO
-  const asideVariants = {
+const asideVariants = {
   open: {
     x: 0,
     opacity: 1,
     transition: {
-      type: "tween",
+      type: "tween" as const,
       duration: 0.4,
-      ease: "easeOut",
+      ease: "easeOut" as const,
     },
   },
   closed: {
     x: "100%",
     opacity: 0,
     transition: {
-      type: "tween",
+      type: "tween" as const,
       duration: 0.4,
-      ease: "easeIn",
+      ease: "easeIn" as const,
     },
   },
 };
