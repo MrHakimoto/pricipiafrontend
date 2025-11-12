@@ -95,24 +95,25 @@ export default function ModuloLayout({
 
   // 🔥 VARIAÇÕES DE ANIMAÇÃO
   const asideVariants = {
-    open: {
-      x: 0,
-      opacity: 1,
-      transition: {
-        stiffness: 300,
-        damping: 30
-      }
+  open: {
+    x: 0,
+    opacity: 1,
+    transition: {
+      type: "tween",
+      duration: 0.4,
+      ease: "easeOut",
     },
-    closed: {
-      x: "100%",
-      opacity: 0,
-      transition: {
-        type: "spring",
-        stiffness: 300,
-        damping: 30
-      }
-    }
-  };
+  },
+  closed: {
+    x: "100%",
+    opacity: 0,
+    transition: {
+      type: "tween",
+      duration: 0.4,
+      ease: "easeIn",
+    },
+  },
+};
 
   const overlayVariants = {
     open: {
