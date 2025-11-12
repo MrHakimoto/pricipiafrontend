@@ -149,8 +149,8 @@ export default function ConteudoPage({ params }: PageProps) {
         <button
           onClick={() => setTvTipo("curso")}
           className={`cursor-pointer relative w-full md:w-2/3 flex items-center gap-2 px-4 py-3 border-b-2 transition font-semibold ${tvTipo === "curso"
-              ? "border-[#0E00D0] text-white"
-              : "border-transparent text-gray-300 hover:text-white"
+            ? "border-[#0E00D0] text-white"
+            : "border-transparent text-gray-300 hover:text-white"
             }`}
         >
           <Video
@@ -163,8 +163,8 @@ export default function ConteudoPage({ params }: PageProps) {
         <button
           onClick={() => setTvTipo("cronograma")}
           className={`cursor-pointer flex items-center gap-2 px-4 py-3 border-b-2 transition font-semibold ${tvTipo === "cronograma"
-              ? "border-[#0E00D0] text-white"
-              : "border-transparent text-gray-600 hover:text-white"
+            ? "border-[#0E00D0] text-white"
+            : "border-transparent text-gray-600 hover:text-white"
             }`}
         >
           <CalendarDays
@@ -250,7 +250,9 @@ export default function ConteudoPage({ params }: PageProps) {
                         className="overflow-x-hidden scroll-smooth scrollbar-hide px-4 py-4"
                       >
                         <motion.div
-                          ref={(el) => (contentRefs.current[course.id] = el)}
+                          ref={(el) => {
+                            contentRefs.current[course.id] = el;
+                          }}
                           drag="x"
                           dragConstraints={{
                             left: dragLimits[course.id] ?? 0,
@@ -313,8 +315,8 @@ export default function ConteudoPage({ params }: PageProps) {
                                         <div
                                           key={i}
                                           className={`h-2 w-3 rounded-sm ${i <= (mod.progresso || 0)
-                                              ? "bg-green-500"
-                                              : "bg-gray-600"
+                                            ? "bg-green-500"
+                                            : "bg-gray-600"
                                             }`}
                                         />
                                       ))}
