@@ -232,7 +232,7 @@ export function NotificationsMenu({ hoverColor = "#0E00D0" }: { hoverColor?: str
             ) : (activeTab === 'unread' ? unreadNotifications : readNotifications).length > 0 ? (
               // Estado com Dados
               <div className="p-2 space-y-2">
-                {(activeTab === 'unread' ? unreadNotifications : readNotifications).map(notification => (
+                {(activeTab === 'unread' ? unreadNotifications : readNotifications).map((notification: ApiNotification) => (
                   <div
                     key={notification.id}
                     onClick={() => !notification.is_read && handleMarkAsRead(notification.id)} // Ação de clique
