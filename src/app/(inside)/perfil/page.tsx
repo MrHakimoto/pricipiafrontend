@@ -41,7 +41,7 @@ useEffect(() => {
 
       if (data) {
         // Formata a data (AAAA-MM-DD -> DD/MM/AAAA)
-        const formatarData = (dataISO) => {
+        const formatarData = (dataISO?: string | null) => {
           if (!dataISO) return "";
           
           const date = new Date(dataISO);
