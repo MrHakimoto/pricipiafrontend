@@ -52,7 +52,7 @@ useEffect(() => {
         };
 
         // Mapeia o gênero retornado
-        const mapeargender = (gender) => {
+        const mapeargender = (gender: string | null | undefined): string => {
           switch (gender?.toUpperCase()) {
             case "M":
               return "masculino";
