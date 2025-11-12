@@ -16,7 +16,7 @@ type ProfileForm = {
 
 type ErrorMap = Record<string, string>;
 
-export default function Profile(): JSX.Element {
+export default function Profile() {
   const [form, setForm] = useState<ProfileForm>({
     id: "",
     name: "",
