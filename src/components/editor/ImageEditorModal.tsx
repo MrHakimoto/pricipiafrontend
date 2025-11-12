@@ -15,9 +15,15 @@ import { RotateCcw, RotateCw, FlipHorizontal, FlipVertical, X } from "lucide-rea
  *  - onConfirm: (file) => void    // recebe o File final quando clicar em Salvar
  */
 
-const canvasToFile = (canvas, filename, mimeType = "image/png", quality = 0.95) =>
+const canvasToFile = (
+  canvas: HTMLCanvasElement,
+  filename: string,
+  mimeType: string = "image/png",
+  quality: number = 0.95
+): Promise<File> =>
   new Promise((resolve) => {
     canvas.toBlob((blob) => {
+      if (!blob) return;
       const file = new File(
         [blob],
         filename.replace(/\.[^.]+$/, "") + (mimeType === "image/png" ? ".png" : ".jpg"),
