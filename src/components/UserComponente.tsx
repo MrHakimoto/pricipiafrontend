@@ -14,9 +14,10 @@ interface UserMenuProps {
       email: string;
     };
   };
+  hoverColor?: string; // ✅ <-- adiciona isso
 }
 
-export function UserMenu({ mobile = false, session }: UserMenuProps) {
+export function UserMenu({ mobile = false, session, hoverColor = "#0E00D0" }: UserMenuProps) {
   const pathname = usePathname();
   const [mounted, setMounted] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
