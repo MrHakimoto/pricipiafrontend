@@ -71,7 +71,7 @@ export default function HomePage() {
           transition={{ delay: 0.2, duration: 0.6 }}
           className="mt-6"
         >
-          <UserCard nome={session?.user?.name} />
+          <UserCard nome={session?.user?.name ?? null} />
         </motion.div>
 
         <section className="mt-12 space-y-12">
