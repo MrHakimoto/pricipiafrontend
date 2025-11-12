@@ -29,7 +29,7 @@ interface ApiNotification {
 const UNREAD_COUNT_KEY = '/notifications/unread-count';
 const NOTIFICATIONS_LIST_KEY = '/notifications';
 
-export function NotificationsMenu() {
+export function NotificationsMenu({ hoverColor = "#0E00D0" }: { hoverColor?: string }) {
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'unread' | 'read'>('unread');
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -39,7 +39,7 @@ export function NotificationsMenu() {
 
   // --- CORREÇÃO DO TAILWIND ---
   // A cor não pode ser uma prop dinâmica, então definimos ela estaticamente
-  const hoverColor = "#0E00D0";
+  //const hoverColor = "#0E00D0";
 
   // --- LÓGICA DE DADOS (SWR) ---
 
