@@ -15,19 +15,19 @@ export default function ModuloLayout({
   const router = useRouter();
   const params = useParams();
   const { moduloId, moduloSlug } = params as { moduloId: string; moduloSlug: string; };
-  
-  const { 
-    contents, 
-    showAside, 
-    setShowAside, 
-    currentLink, 
+
+  const {
+    contents,
+    showAside,
+    setShowAside,
+    currentLink,
     currentContentId,
     loadedModuloId,
     setContents,
     setLoadedModuloId,
     setInitialLoading
   } = useModuloStore();
-  
+
   const [isMobile, setIsMobile] = useState(false);
   const { data: session, status } = useSession();
 
@@ -45,16 +45,16 @@ export default function ModuloLayout({
   useEffect(() => {
     const loadModuleData = async () => {
       if (status === 'authenticated' && moduloId) {
-        
+
         if (loadedModuloId !== moduloId || contents.length === 0) {
           console.log(`Layout: Buscando dados para módulo ${moduloId}...`);
           setInitialLoading(true);
-          
+
           try {
             const contentsData = await getModuloContents(moduloId, session.laravelToken);
             console.log("✅ Dados recebidos:", contentsData);
-            
-            setContents(contentsData); 
+
+            setContents(contentsData);
             setLoadedModuloId(moduloId);
 
           } catch (error) {
@@ -68,7 +68,7 @@ export default function ModuloLayout({
         }
       }
     };
-    
+
     if (status !== 'loading') {
       loadModuleData();
     }
@@ -99,7 +99,6 @@ export default function ModuloLayout({
       x: 0,
       opacity: 1,
       transition: {
-        type: "spring",
         stiffness: 300,
         damping: 30
       }
@@ -149,7 +148,7 @@ export default function ModuloLayout({
   };
 
   return (
-    <div className="bg-[#00091A] text-white flex flex-col overflow-hidden"> 
+    <div className="bg-[#00091A] text-white flex flex-col overflow-hidden">
       {/* 🔥 BOTÃO FIXO PARA ABRIR ASIDE - APENAS MOBILE */}
       {!showAside && isMobile && (
         <button
@@ -207,11 +206,10 @@ export default function ModuloLayout({
         <div className="flex flex-col lg:flex-row gap-6">
           {/* 🔥 CONTEÚDO PRINCIPAL - PROPORÇÃO DINÂMICA */}
           <div
-            className={`transition-all duration-300 ${
-              showAside && !isMobile
-                ? 'lg:w-3/4 w-full' 
+            className={`transition-all duration-300 ${showAside && !isMobile
+                ? 'lg:w-3/4 w-full'
                 : 'w-full'
-            }`}
+              }`}
           >
             {children}
           </div>
@@ -275,7 +273,7 @@ export default function ModuloLayout({
                       </button>
                     )}
 
-                    <motion.h4 
+                    <motion.h4
                       className="font-semibold text-lg pl-8"
                       initial={{ opacity: 0, x: -10 }}
                       animate={{ opacity: 1, x: 0 }}
@@ -283,7 +281,7 @@ export default function ModuloLayout({
                     >
                       Aulas
                     </motion.h4>
-                    <motion.div 
+                    <motion.div
                       className="flex items-center gap-2"
                       initial={{ opacity: 0, x: 10 }}
                       animate={{ opacity: 1, x: 0 }}
@@ -302,7 +300,7 @@ export default function ModuloLayout({
                         const minutes = Math.floor(totalSeconds / 60);
                         const seconds = totalSeconds % 60;
 
-                        
+
                         const formattedTime = `${minutes.toString().padStart(2, "0")}:${seconds
                           .toString()
                           .padStart(2, "0")}`;
@@ -346,7 +344,7 @@ export default function ModuloLayout({
                   </div>
 
                   {/* BARRA DE PROGRESSO COM ANIMAÇÃO */}
-                  <motion.div 
+                  <motion.div
                     className="w-full p-4 border-t border-gray-700"
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
