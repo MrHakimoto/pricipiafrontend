@@ -9,6 +9,20 @@ import { ModelQuestions } from "@/components/questions/ModelQuestions";
 import { getFilterOptionsByIds, getFilteredQuestions, getAssuntosByFrentes, getTopicosByAssuntos } from "@/lib/filtra";
 import { ExercisesHeader } from "@/components/questions/ExercisesHeader";
 
+export type FilterPanelProps = {
+  initialSelectedFronts?: any[];
+  initialSelectedExams?: any[];
+  initialSelectedSubjects?: any[];
+  initialSelectedTopics?: any[];
+  initialSelectedYears?: { id: number; nome: string }[];
+  initialWantsComments?: boolean;
+  initialQuestionStatus?: string;
+  initialCorrectStatus?: string;
+  subjectOptions?: any[];
+  topicOptions?: any[];
+};
+
+
 type FilterOption = { id: number; nome: string; };
 
 export default function SearchResultsPage() {
