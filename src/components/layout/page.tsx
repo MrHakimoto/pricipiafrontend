@@ -1,6 +1,6 @@
 import { ReactElement } from 'react';
 import styles from './layout.module.css';
-import { NavBar } from "@/components/NavBar/page";
+
 
 
 type Props = {
