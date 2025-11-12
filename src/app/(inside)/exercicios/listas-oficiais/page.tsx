@@ -32,7 +32,11 @@ type Lista = {
 const cardHover = {
   scale: 1.03,
   boxShadow: "0px 10px 30px rgba(0, 0, 0, 0.5)",
-  transition: { type: 'spring', stiffness: 400, damping: 17 }
+  transition: {
+    type: "spring" as const, // ✅ 'as const' garante que o TS entende como tipo literal
+    stiffness: 400,
+    damping: 17,
+  },
 };
 
 export default function ListaDeExercicios() {
