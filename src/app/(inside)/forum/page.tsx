@@ -3,9 +3,33 @@ import { useState } from "react";
 
 import messages from "@/store/messages";
 
+type Mensagem = {
+  id: number;
+  idQuestao: string;
+  name: string;
+  date: string;
+  hour: string;
+  message: string;
+  conteudoQuestao: string;
+  provaQuestao: string;
+  anoQuestao: string;
+  respostas?: {
+    id: number;
+    name: string;
+    date: string;
+    hour: string;
+    message: string;
+    comentarios?: {
+      id: number;
+      name: string;
+      message: string;
+    }[];
+  }[];
+};
+
 const Forum = () => {
   const [showCard, setShowCard] = useState(false);
-  const [selectedMsg, setSelectedMsg] = useState(null);
+const [selectedMsg, setSelectedMsg] = useState<Mensagem | null>(null);
 
   return (
     <div className="min-h-screen bg-[#00091A] text-white font-sans relative">
