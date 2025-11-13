@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { questions } from "@/utils/db";
+
 import { ModelQuestions } from "@/components/questions/ModelQuestions"
 import { FilterPanel } from "@/components/Panel/PanelFilter"
 import { ExercisesHeader } from "@/components/questions/ExercisesHeader"
