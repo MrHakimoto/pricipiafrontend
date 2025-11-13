@@ -5,14 +5,20 @@ import { motion, AnimatePresence } from "framer-motion";
 import { fetchMyProfile, saveMyProfile } from "@/lib/perfil/userData";
 import { useSession } from "next-auth/react";
 
-type ProfileForm = {
-  id: string;
-  name: string;
-  cpf: string;
-  birth_date: string;
-  gender: string;
+import type { UserProfile } from "@/lib/perfil/userData";
+
+type ProfileForm = UserProfile & {
   celular: string;
 };
+
+// type ProfileForm = {
+//   id: string;
+//   name: string;
+//   cpf: string;
+//   birth_date: string;
+//   gender: string;
+//   celular: string;
+// };
 
 type ErrorMap = Record<string, string>;
 

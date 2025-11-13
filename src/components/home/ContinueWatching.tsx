@@ -3,7 +3,17 @@
 import Link from 'next/link'
 import { motion } from 'framer-motion'
 
-export default function ContinueWatching({ items }) {
+interface Item {
+  id: string | number
+  name: string
+  content_avatar: string
+}
+
+interface ContinueWatchingProps {
+  items: Item[]
+}
+
+export default function ContinueWatching({ items }: ContinueWatchingProps) {
   return (
     <section className="mt-10">
       <h2 className="text-xl font-semibold mb-4 text-white">Continuar assistindo</h2>

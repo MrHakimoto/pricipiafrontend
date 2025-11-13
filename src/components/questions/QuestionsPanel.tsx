@@ -88,12 +88,12 @@ export const QuestionsPanel: React.FC<QuestionsPanelProps> = ({
     const [answeredQuestions, setAnsweredQuestions] = useState<Record<number, boolean>>({});
     const [showFeedback, setShowFeedback] = useState<Record<number, boolean>>({});
     const [activeTabs, setActiveTabs] = useState<Record<number, QuestaoTab>>({});
-      const [openReportModalId, setOpenReportModalId] = useState<number | null>(null);
-    
-      const [topicsVisible, setTopicsVisible] = useState(false);
+    const [openReportModalId, setOpenReportModalId] = useState<number | null>(null);
 
-        const { data: session, status } = useSession();
-        const userToken = session?.laravelToken 
+    const [topicsVisible, setTopicsVisible] = useState(false);
+
+    const { data: session, status } = useSession();
+    const userToken = session?.laravelToken
     const { updateQuestionStatus } = useNavigation();
 
     const handleSelectAnswer = (questionId: number, alternativaId: number) => {
@@ -134,13 +134,13 @@ export const QuestionsPanel: React.FC<QuestionsPanelProps> = ({
         }, 2000);
     };
 
-      const openReportModal = (questaoId: number) => {
-    setOpenReportModalId(questaoId);
-  };
+    const openReportModal = (questaoId: number) => {
+        setOpenReportModalId(questaoId);
+    };
 
-  const closeReportModal = () => {
-    setOpenReportModalId(null);
-  };
+    const closeReportModal = () => {
+        setOpenReportModalId(null);
+    };
 
     const toggleTab = (questionId: number, tab: QuestaoTab) => {
         setActiveTabs(prev => {
@@ -192,18 +192,16 @@ export const QuestionsPanel: React.FC<QuestionsPanelProps> = ({
 
     const renderActiveTabContent = (questao: Questao) => {
         const { data: session, status } = useSession();
-          
+
         const activeTab = activeTabs[questao.id];
 
         if (!activeTab) return null;
 
         const content = {
             gabarito: (
-                <GabaritoQuestao
-                    questaoId={questao.id}
-                    gabaritoVideo={questao.gabarito_video}
-                    gabaritoComentado={questao.gabarito_comentado_texto}
-                />
+                <GabaritoQuestao questaoId={questao.id} 
+                gabaritoVideo={questao.gabarito_video} 
+                gabaritoComentado={questao.gabarito_comentado_texto} />
             ),
             duvida: (
                 <DuvidaQuestao
@@ -268,7 +266,7 @@ export const QuestionsPanel: React.FC<QuestionsPanelProps> = ({
                                                                     className="absolute top-0 right-0 h-full bg-blue-900 text-white text-sm px-4 py-3 flex items-center gap-2 rounded-l-xl shadow-lg"
                                                                 >
                                                                     <div className="flex flex-wrap items-center gap-2">
-                                                                      
+
 
                                                                         {questao.topicos.map(t => (
                                                                             <span
@@ -348,16 +346,16 @@ export const QuestionsPanel: React.FC<QuestionsPanelProps> = ({
                                             </div>
 
                                             {/* Botão Responder */}
-                                            
-                                            
-                                                <button
-                                                    onClick={() => handleConfirmAnswer(questao.id, questao.alternativa_correta_id)}
-                                                    disabled={isQuestionAnswered(questao.id) || selectedAnswers[questao.id] == null}
-                                                    className=" cursor-pointer mt-8 ml-4 px-8 py-3 bg-[#0E00D0] text-white rounded-lg hover:bg-blue-600 transition duration-200 text-2xl font-bold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                                                >                                         
-                                                    Responder
-                                                </button>
-                                           
+
+
+                                            <button
+                                                onClick={() => handleConfirmAnswer(questao.id, questao.alternativa_correta_id)}
+                                                disabled={isQuestionAnswered(questao.id) || selectedAnswers[questao.id] == null}
+                                                className=" cursor-pointer mt-8 ml-4 px-8 py-3 bg-[#0E00D0] text-white rounded-lg hover:bg-blue-600 transition duration-200 text-2xl font-bold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                                Responder
+                                            </button>
+
                                         </section>
 
                                         {/* Rodapé e Ações */}
@@ -366,7 +364,7 @@ export const QuestionsPanel: React.FC<QuestionsPanelProps> = ({
                                                 {/* Botão Gabarito Comentado */}
                                                 <button
                                                     onClick={() => toggleTab(questao.id, 'gabarito')}
-                                                     disabled={!isQuestionAnswered(questao.id)}
+                                                    disabled={!isQuestionAnswered(questao.id)}
                                                     className={`font-bold flex flex-row items-center justify-center cursor-pointer p-2 transition duration-200 ease-in-out w-full sm:w-1/3 text-center space-x-2 ${activeTabs[questao.id] === 'gabarito'
                                                         ? 'text-white bg-blue-900'
                                                         : 'text-gray-300 hover:text-white'
@@ -380,7 +378,7 @@ export const QuestionsPanel: React.FC<QuestionsPanelProps> = ({
                                                 {/* Botão Estatísticas */}
                                                 <button
                                                     onClick={() => toggleTab(questao.id, 'estatisticas')}
-                                                     disabled={!isQuestionAnswered(questao.id)}
+                                                    disabled={!isQuestionAnswered(questao.id)}
                                                     className={`font-bold flex flex-row items-center justify-center cursor-pointer p-2 transition duration-200 ease-in-out w-full sm:w-1/3 text-center border-t sm:border-t-0 sm:border-l border-gray-700 space-x-2 ${activeTabs[questao.id] === 'estatisticas'
                                                         ? 'text-white bg-blue-900'
                                                         : 'text-gray-300 hover:text-white'
@@ -395,7 +393,7 @@ export const QuestionsPanel: React.FC<QuestionsPanelProps> = ({
                                                 {/* Botão Dúvida */}
                                                 <button
                                                     onClick={() => toggleTab(questao.id, 'duvida')}
-                                                     disabled={!isQuestionAnswered(questao.id)}
+                                                    disabled={!isQuestionAnswered(questao.id)}
                                                     className={`font-bold flex flex-row items-center justify-center cursor-pointer p-2 transition duration-200 ease-in-out w-full sm:w-1/3 text-center border-t sm:border-t-0 sm:border-l border-gray-700 space-x-2 ${activeTabs[questao.id] === 'duvida'
                                                         ? 'text-white bg-blue-900'
                                                         : 'text-gray-300 hover:text-white'
@@ -424,13 +422,13 @@ export const QuestionsPanel: React.FC<QuestionsPanelProps> = ({
                                                 )}
 
                                             </AnimatePresence>
-                                                  {openReportModalId && (
-                                                    <ReportarModal
-                                                      questaoId={openReportModalId}
-                                                      onClose={closeReportModal}
-                                                      token={userToken}
-                                                    />
-                                                  )}
+                                            {openReportModalId && (
+                                                <ReportarModal
+                                                    questaoId={openReportModalId}
+                                                    onClose={closeReportModal}
+                                                    token={userToken}
+                                                />
+                                            )}
                                         </div>
                                     </div>
                                 )}

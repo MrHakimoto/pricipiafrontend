@@ -1,11 +1,11 @@
-// components/questions/QuestionWrapper.tsx
 'use client';
 
 import { useQuestionObserver } from '@/hooks/useQuestionObserver';
+import React, { useRef, useEffect } from 'react';
 
 interface QuestionWrapperProps {
   questionId: number;
-  children: (questionRef: React.RefObject<HTMLDivElement>) => React.ReactNode;
+  children: React.ReactNode;
 }
 
 export const QuestionWrapper: React.FC<QuestionWrapperProps> = ({ 
@@ -15,8 +15,8 @@ export const QuestionWrapper: React.FC<QuestionWrapperProps> = ({
   const questionRef = useQuestionObserver(questionId);
 
   return (
-    <div id={`question-${questionId}`} className="question-section">
-      {children(questionRef)}
+    <div id={`question-${questionId}`} ref={questionRef} className="question-section">
+      {children}
     </div>
   );
 };

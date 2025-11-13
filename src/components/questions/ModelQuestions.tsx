@@ -216,7 +216,7 @@ export const ModelQuestions: React.FC<ModelQuestionsProps> = ({
                 <div className="flex-grow rounded-l-md relative bg-white text-xl text-gray-800 px-6 py-3 flex items-center justify-between">
 
                   <div className="text-lg font-medium ">
-                    <button onClick={toggleTopics} className="cursor-pointer text-blue-800 hover:text-blue-600 flex items-center gap-2">
+                    <button onClick={() => toggleTopics(questao.id)} className="cursor-pointer text-blue-800 hover:text-blue-600 flex items-center gap-2">
                       {topicsVisible ? <>Ocultar tópicos <ChevronUp className="w-4 h-4" /></> : <>Ver tópicos <ChevronDown className="w-4 h-4" /></>}
                     </button>
 

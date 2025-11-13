@@ -1,5 +1,6 @@
 //lib/dailyCheck/daily.ts
 import { api } from "../axios"; // Sua instância configurada do Axios
+import type { AxiosError } from "axios";
 
 /**
  * Busca o estado atual do streak e o status do check-in do utilizador logado.
@@ -64,22 +65,21 @@ export const checkinDaily = async (token: string) => {
   if (!token) throw new Error("Token não fornecido.");
 
   try {
-    // [CORRIGIDO] Ação de check-in usa 'api.post'.
-    // O 2º argumento é o corpo (body), o 3º é a configuração (headers).
     const response = await api.post("/checkin", {}, {
       headers: { Authorization: `Bearer ${token}` },
     });
 
     return response.data;
+
   } catch (error) {
-    // Se o erro for 409 (Conflict), significa que já fez check-in.
-    // Isso não é um "erro" real, então podemos retornar os dados.
-    if (error.response && error.response.status === 409) {
+    const err = error as AxiosError;
+
+    if (err.response && err.response.status === 409) {
       console.warn("Check-in diário: Já realizado hoje.");
-      return error.response.data; // Retorna a resposta (ex: { message: "..." })
+      return err.response.data; // ✅ agora o TS entende
     }
 
-    console.error("Erro ao realizar o check-in:", error);
+    console.error("Erro ao realizar o check-in:", err);
     throw new Error("Falha ao realizar o check-in.");
   }
 };

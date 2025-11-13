@@ -33,7 +33,19 @@ const canvasToFile = (
     }, mimeType, quality);
   });
 
-export default function ImageEditorModal({ image, open, onOpenChange, onConfirm }) {
+interface ImageEditorModalProps {
+  image: File | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onConfirm?: (file: File) => void;
+}
+
+export default function ImageEditorModal({
+  image,
+  open,
+  onOpenChange,
+  onConfirm,
+}: ImageEditorModalProps) {
   const cropperRef = useRef(null);
 
   const [zoom, setZoom] = useState(1);

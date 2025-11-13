@@ -40,6 +40,7 @@ export type Questao = {
   };
   alternativas: Alternativa[];
   prova: Prova; // Agora pode ser null
+  topicos?: string[];
 };
 
 // Tipo para a lista completa

@@ -26,4 +26,6 @@ export interface Questao {
   alternativas: Alternativa[];
   topicos?: Topico[];
   prova?: Prova;
+   gabarito_video?: string | null; // ✅ precisa ter este campo
+  gabarito_comentado_texto?: string | null; // ✅ este também
 }

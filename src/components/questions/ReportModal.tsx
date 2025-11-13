@@ -75,9 +75,17 @@ export default function ReportarModal({ questaoId, onClose, token }: ReportarMod
                 onClose();
             }, 2000);
 
-        } catch (err) {
+        } catch (err: unknown) {
             console.error("ERRO AO ENVIAR REPORTE:", err);
-            setError(err.message || "Erro ao enviar reporte. Tente novamente.");
+
+            if (err instanceof Error) {
+                setError(err.message);
+            } else if (typeof err === "string") {
+                setError(err);
+            } else {
+                setError("Erro ao enviar reporte. Tente novamente.");
+            }
+
             setIsSubmitting(false);
         }
     };
@@ -153,8 +161,8 @@ export default function ReportarModal({ questaoId, onClose, token }: ReportarMod
                                         <label
                                             key={m}
                                             className={`flex items-center p-4 rounded-xl border-2 cursor-pointer transition-all duration-200 ${motivo === m
-                                                    ? 'border-[#C6005C] bg-[#C6005C]/10'
-                                                    : 'border-gray-600 bg-gray-800/50 hover:border-gray-500'
+                                                ? 'border-[#C6005C] bg-[#C6005C]/10'
+                                                : 'border-gray-600 bg-gray-800/50 hover:border-gray-500'
                                                 }`}
                                         >
                                             <input
@@ -166,8 +174,8 @@ export default function ReportarModal({ questaoId, onClose, token }: ReportarMod
                                                 className="sr-only"
                                             />
                                             <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center mr-4 transition-colors ${motivo === m
-                                                    ? 'border-[#C6005C] bg-[#C6005C]'
-                                                    : 'border-gray-500'
+                                                ? 'border-[#C6005C] bg-[#C6005C]'
+                                                : 'border-gray-500'
                                                 }`}>
                                                 {motivo === m && (
                                                     <div className="w-2 h-2 rounded-full bg-white" />
@@ -216,8 +224,8 @@ export default function ReportarModal({ questaoId, onClose, token }: ReportarMod
                                 whileHover={{ scale: !motivo || !descricao || isSubmitting ? 1 : 1.02 }}
                                 whileTap={{ scale: !motivo || !descricao || isSubmitting ? 1 : 0.98 }}
                                 className={`w-full py-4 rounded-xl font-bold text-xl transition-all duration-200 ${!motivo || !descricao || isSubmitting
-                                        ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
-                                        : 'bg-[#C6005C] hover:bg-[#D10063] text-white shadow-lg shadow-[#C6005C]/25'
+                                    ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
+                                    : 'bg-[#C6005C] hover:bg-[#D10063] text-white shadow-lg shadow-[#C6005C]/25'
                                     }`}
                             >
                                 {isSubmitting ? (

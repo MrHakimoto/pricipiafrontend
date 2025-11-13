@@ -141,7 +141,7 @@ export default function ListaCursePage({ idList }: ListaCursePageProps) {
         letra: alt.letra,
         texto: alt.texto
       })) || [],
-      topicos: questao.topicos || [], // Usar tópicos da API se disponíveis
+      topicos: Array.isArray(questao.topicos) ? questao.topicos : [], // Usar tópicos da API se disponíveis
       prova: provaInfo,
       gabarito_video: questao.gabarito_video,
       gabarito_comentado_texto: questao.gabarito_comentado_texto
