@@ -2,7 +2,7 @@
 'use client';
 
 import { useState } from "react";
-import type { Questao, Alternativa } from '@/types/api';
+import type { Questao, Alternativa, Topico } from '@/types/list';
 import { Newspaper, ChartColumn, MessageCircle, ChevronDown, ChevronUp, HelpCircle } from 'lucide-react';
 import { AnswerFeedbackOverlay } from '@/components/questions/AnswerFeedbackOverlay';
 import { useNavigation } from '@/contexts/NavigationContext';
@@ -14,10 +14,20 @@ import { motion, AnimatePresence } from "framer-motion";
 import ReportarModal from "@/components/questions/ReportModal";
 import OpcoesQuestao from "@/components/questions/OpcoesQuestao";
 import { useSession } from "next-auth/react";
+import type { NavigationQuestion } from '@/components/questions/CurseList';
+import type { QuestaoBase } from '@/types/questions';
 
 // Componente de Alternativa (permanece igual)
+
+type SimpleAlternativa = {
+  id: number;
+  letra: string;
+  texto: string;
+};
+
+
 type QuizOptionProps = {
-    alternativa: Alternativa;
+    alternativa: SimpleAlternativa;
     questaoId: number;
     alternativaCorretaId: number;
     selecaoAtual: number | null;
@@ -75,7 +85,7 @@ type QuestaoTab = 'gabarito' | 'duvida' | 'estatisticas' | null;
 
 // Props do QuestionsPanel
 interface QuestionsPanelProps {
-    questions: Questao[];
+    questions: QuestaoBase[];
     className?: string;
 }
 
@@ -190,8 +200,8 @@ export const QuestionsPanel: React.FC<QuestionsPanelProps> = ({
         }
     };
 
-    const renderActiveTabContent = (questao: Questao) => {
-        const { data: session, status } = useSession();
+    const renderActiveTabContent = (questao: QuestaoBase) => {
+
 
         const activeTab = activeTabs[questao.id];
 
@@ -199,9 +209,11 @@ export const QuestionsPanel: React.FC<QuestionsPanelProps> = ({
 
         const content = {
             gabarito: (
-                <GabaritoQuestao questaoId={questao.id} 
-                gabaritoVideo={questao.gabarito_video} 
-                gabaritoComentado={questao.gabarito_comentado_texto} />
+                <GabaritoQuestao
+                    questaoId={questao.id}
+                    gabaritoVideo={questao.gabarito_video || undefined}
+                    gabaritoComentado={questao.gabarito_comentado_texto}
+                />
             ),
             duvida: (
                 <DuvidaQuestao
@@ -228,210 +240,212 @@ export const QuestionsPanel: React.FC<QuestionsPanelProps> = ({
                     <main>
 
                         {questions.map((questao, index) => (
-                            <QuestionWrapper key={questao.id} questionId={questao.id}>
-                                {(questionRef) => (
-                                    <div
-                                        ref={questionRef}
-                                        className="bg-[#00091A] rounded-lg shadow-xl mb-8 border border-[#616161]"
-                                    >
-                                        {/* Cabeçalho da Questão - MODIFICADO */}
-                                        <div className="w-full bg-blue-950 border-b border-gray-700">
-                                            <div className="flex items-center bg-gray-800 overflow-hidden w-full">
-                                                <div className="bg-gradient-to-br from-[#1F293C] to-[#2D3748] text-white px-6 py-4 flex items-center gap-4 flex-shrink-0">
-                                                    <div className="flex flex-col items-center">
-                                                        <span className="text-xs text-gray-400 font-medium">QUESTÃO</span>
-                                                        <span className="text-2xl font-bold text-white">{index + 1}</span>
-                                                    </div>
-                                                    <div className="h-8 w-px bg-gray-600"></div>
-                                                    <div className="flex flex-col items-center">
-                                                        <span className="text-xs text-gray-400 font-medium">ID</span>
-                                                        <span className="text-lg font-semibold text-blue-300">#{questao.id}</span>
-                                                    </div>
+                            <QuestionWrapper key={questao.id}
+                                questionId={questao.id}>
+
+                                <div
+
+                                    className="bg-[#00091A] rounded-lg shadow-xl mb-8 border border-[#616161]"
+                                >
+                                    {/* Cabeçalho da Questão - MODIFICADO */}
+                                    <div className="w-full bg-blue-950 border-b border-gray-700">
+                                        <div className="flex items-center bg-gray-800 overflow-hidden w-full">
+                                            <div className="bg-gradient-to-br from-[#1F293C] to-[#2D3748] text-white px-6 py-4 flex items-center gap-4 flex-shrink-0">
+                                                <div className="flex flex-col items-center">
+                                                    <span className="text-xs text-gray-400 font-medium">QUESTÃO</span>
+                                                    <span className="text-2xl font-bold text-white">{index + 1}</span>
                                                 </div>
+                                                <div className="h-8 w-px bg-gray-600"></div>
+                                                <div className="flex flex-col items-center">
+                                                    <span className="text-xs text-gray-400 font-medium">ID</span>
+                                                    <span className="text-lg font-semibold text-blue-300">#{questao.id}</span>
+                                                </div>
+                                            </div>
 
-                                                <div className="flex-grow rounded-l-md relative bg-white text-xl text-gray-800 px-6 py-3 flex items-center justify-between">
+                                            <div className="flex-grow rounded-l-md relative bg-white text-xl text-gray-800 px-6 py-3 flex items-center justify-between">
 
-                                                    <div className="text-lg font-medium ">
-                                                        <button onClick={toggleTopics} className="cursor-pointer text-blue-800 hover:text-blue-600 flex items-center gap-2">
-                                                            {topicsVisible ? <>Ocultar tópicos <ChevronUp className="w-4 h-4" /></> : <>Ver tópicos <ChevronDown className="w-4 h-4" /></>}
-                                                        </button>
+                                                <div className="text-lg font-medium ">
+                                                    <button onClick={() => toggleTopics(questao.id)} className="cursor-pointer text-blue-800 hover:text-blue-600 flex items-center gap-2">
+                                                        {topicsVisible ? <>Ocultar tópicos <ChevronUp className="w-4 h-4" /></> : <>Ver tópicos <ChevronDown className="w-4 h-4" /></>}
+                                                    </button>
 
-                                                        <AnimatePresence>
-                                                            {topicsVisible && questao.topicos && (
-                                                                <motion.div
-                                                                    initial={{ x: 100, opacity: 0 }}
-                                                                    animate={{ x: 0, opacity: 1 }}
-                                                                    exit={{ x: 100, opacity: 0 }}
-                                                                    transition={{ duration: 0.3 }}
-                                                                    className="absolute top-0 right-0 h-full bg-blue-900 text-white text-sm px-4 py-3 flex items-center gap-2 rounded-l-xl shadow-lg"
-                                                                >
-                                                                    <div className="flex flex-wrap items-center gap-2">
+                                                    <AnimatePresence>
+                                                        {topicsVisible && questao.topicos && (
+                                                            <motion.div
+                                                                initial={{ x: 100, opacity: 0 }}
+                                                                animate={{ x: 0, opacity: 1 }}
+                                                                exit={{ x: 100, opacity: 0 }}
+                                                                transition={{ duration: 0.3 }}
+                                                                className="absolute top-0 right-0 h-full bg-blue-900 text-white text-sm px-4 py-3 flex items-center gap-2 rounded-l-xl shadow-lg"
+                                                            >
+                                                                <div className="flex flex-wrap items-center gap-2">
 
 
-                                                                        {questao.topicos.map(t => (
-                                                                            <span
-                                                                                key={t.id}
-                                                                                className="bg-blue-700 text-white text-xs font-semibold px-2 py-1 rounded-full whitespace-nowrap shadow-md"
-                                                                            >
-                                                                                {t.nome}
-                                                                            </span>
-                                                                        ))}
+                                                                    {questao.topicos.map(t => (
+                                                                        <span
+                                                                            key={t.id}
+                                                                            className="bg-blue-700 text-white text-xs font-semibold px-2 py-1 rounded-full whitespace-nowrap shadow-md"
+                                                                        >
+                                                                            {t.nome}
+                                                                        </span>
+                                                                    ))}
 
-                                                                        <div className="ml-3">
-                                                                            {getDifficultyBadge(questao.dificuldade)}
-                                                                        </div>
+                                                                    <div className="ml-3">
+                                                                        {getDifficultyBadge(questao.dificuldade)}
                                                                     </div>
-                                                                </motion.div>
-                                                            )}
-                                                        </AnimatePresence>
-                                                    </div>
+                                                                </div>
+                                                            </motion.div>
+                                                        )}
+                                                    </AnimatePresence>
                                                 </div>
                                             </div>
                                         </div>
+                                    </div>
 
-                                        {/* Metadados */}
-                                        <div className="flex flex-wrap items-center justify-between gap-3 text-sm font-medium my-4 px-6 border-b border-white pb-4">
+                                    {/* Metadados */}
+                                    <div className="flex flex-wrap items-center justify-between gap-3 text-sm font-medium my-4 px-6 border-b border-white pb-4">
 
-                                            {/* Badges da Prova */}
-                                            <div className="flex flex-wrap gap-3">
-                                                {questao.prova?.banca?.nome && (
-                                                    <span className="px-3 py-1 bg-gray-700 rounded-full text-gray-300">
-                                                        {questao.prova.banca.nome}
-                                                    </span>
-                                                )}
-                                                {questao.prova?.ano && (
-                                                    <span className="px-3 py-1 bg-gray-700 rounded-full text-gray-300">
-                                                        {questao.prova.ano}
-                                                    </span>
-                                                )}
-                                            </div>
-
-
-                                            <OpcoesQuestao
-                                                questao={questao}
-                                                onReport={() => openReportModal(questao.id)}
-                                            />
+                                        {/* Badges da Prova */}
+                                        <div className="flex flex-wrap gap-3">
+                                            {questao.prova?.banca?.nome && (
+                                                <span className="px-3 py-1 bg-gray-700 rounded-full text-gray-300">
+                                                    {questao.prova.banca.nome}
+                                                </span>
+                                            )}
+                                            {questao.prova?.ano && (
+                                                <span className="px-3 py-1 bg-gray-700 rounded-full text-gray-300">
+                                                    {questao.prova.ano}
+                                                </span>
+                                            )}
                                         </div>
 
-                                        {/* Corpo da Questão */}
-                                        <section className="p-6 relative">
-                                            <div
-                                                className="text-gray-200 mb-6 leading-relaxed text-lg"
-                                                dangerouslySetInnerHTML={{ __html: questao.enunciado }}
-                                            />
 
-                                            {/* Alternativas */}
-                                            <div className="relative">
-                                                {questao.alternativas.map((alt) => (
-                                                    <QuizOption
-                                                        key={alt.id}
-                                                        alternativa={alt}
-                                                        questaoId={questao.id}
-                                                        alternativaCorretaId={questao.alternativa_correta_id}
-                                                        selecaoAtual={selectedAnswers[questao.id] || null}
-                                                        statusResposta={isQuestionAnswered(questao.id) ?
-                                                            (selectedAnswers[questao.id] === questao.alternativa_correta_id ? 'correct' : 'incorrect')
-                                                            : 'unanswered'
-                                                        }
-                                                        onSelect={(alternativaId) => handleSelectAnswer(questao.id, alternativaId)}
-                                                    />
-                                                ))}
+                                        <OpcoesQuestao
+                                            questao={questao}
+                                            onReport={() => openReportModal(questao.id)}
+                                        />
+                                    </div>
 
-                                                {/* Overlay de feedback */}
-                                                {showFeedback[questao.id] && (
-                                                    <AnswerFeedbackOverlay
-                                                        status={selectedAnswers[questao.id] === questao.alternativa_correta_id ? 'correct' : 'incorrect'}
-                                                    />
-                                                )}
-                                            </div>
+                                    {/* Corpo da Questão */}
+                                    <section className="p-6 relative">
+                                        <div
+                                            className="text-gray-200 mb-6 leading-relaxed text-lg"
+                                            dangerouslySetInnerHTML={{ __html: questao.enunciado }}
+                                        />
 
-                                            {/* Botão Responder */}
+                                        {/* Alternativas */}
+                                        <div className="relative">
+                                            {questao.alternativas.map((alt) => (
+                                                <QuizOption
+                                                    key={alt.id}
+                                                    alternativa={alt}
+                                                    questaoId={questao.id}
+                                                    alternativaCorretaId={questao.alternativa_correta_id}
+                                                    selecaoAtual={selectedAnswers[questao.id] || null}
+                                                    statusResposta={isQuestionAnswered(questao.id) ?
+                                                        (selectedAnswers[questao.id] === questao.alternativa_correta_id ? 'correct' : 'incorrect')
+                                                        : 'unanswered'
+                                                    }
+                                                    onSelect={(alternativaId) => handleSelectAnswer(questao.id, alternativaId)}
+                                                />
+                                            ))}
 
-
-                                            <button
-                                                onClick={() => handleConfirmAnswer(questao.id, questao.alternativa_correta_id)}
-                                                disabled={isQuestionAnswered(questao.id) || selectedAnswers[questao.id] == null}
-                                                className=" cursor-pointer mt-8 ml-4 px-8 py-3 bg-[#0E00D0] text-white rounded-lg hover:bg-blue-600 transition duration-200 text-2xl font-bold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                                            >
-                                                Responder
-                                            </button>
-
-                                        </section>
-
-                                        {/* Rodapé e Ações */}
-                                        <div className="w-full bg-gray-800 rounded-b-lg">
-                                            <div className="w-full rounded-lg overflow-hidden flex flex-col sm:flex-row justify-around items-center py-4">
-                                                {/* Botão Gabarito Comentado */}
-                                                <button
-                                                    onClick={() => toggleTab(questao.id, 'gabarito')}
-                                                    disabled={!isQuestionAnswered(questao.id)}
-                                                    className={`font-bold flex flex-row items-center justify-center cursor-pointer p-2 transition duration-200 ease-in-out w-full sm:w-1/3 text-center space-x-2 ${activeTabs[questao.id] === 'gabarito'
-                                                        ? 'text-white bg-blue-900'
-                                                        : 'text-gray-300 hover:text-white'
-                                                        }`}
-                                                >
-                                                    <MessageCircle className="w-6 h-6" />
-                                                    <span className="text-lg">Gabarito comentado</span>
-                                                    {getTabIcon(questao.id, 'gabarito')}
-                                                </button>
-
-                                                {/* Botão Estatísticas */}
-                                                <button
-                                                    onClick={() => toggleTab(questao.id, 'estatisticas')}
-                                                    disabled={!isQuestionAnswered(questao.id)}
-                                                    className={`font-bold flex flex-row items-center justify-center cursor-pointer p-2 transition duration-200 ease-in-out w-full sm:w-1/3 text-center border-t sm:border-t-0 sm:border-l border-gray-700 space-x-2 ${activeTabs[questao.id] === 'estatisticas'
-                                                        ? 'text-white bg-blue-900'
-                                                        : 'text-gray-300 hover:text-white'
-                                                        }`}
-
-                                                >
-                                                    <ChartColumn className="w-6 h-6" />
-                                                    <span className="text-lg">Estatísticas</span>
-                                                    {getTabIcon(questao.id, 'estatisticas')}
-                                                </button>
-
-                                                {/* Botão Dúvida */}
-                                                <button
-                                                    onClick={() => toggleTab(questao.id, 'duvida')}
-                                                    disabled={!isQuestionAnswered(questao.id)}
-                                                    className={`font-bold flex flex-row items-center justify-center cursor-pointer p-2 transition duration-200 ease-in-out w-full sm:w-1/3 text-center border-t sm:border-t-0 sm:border-l border-gray-700 space-x-2 ${activeTabs[questao.id] === 'duvida'
-                                                        ? 'text-white bg-blue-900'
-                                                        : 'text-gray-300 hover:text-white'
-                                                        }`}
-                                                >
-                                                    <HelpCircle className="w-6 h-6" />
-                                                    <span className="text-lg">Dúvida</span>
-                                                    {getTabIcon(questao.id, 'duvida')}
-                                                </button>
-                                            </div>
-
-                                            {/* Conteúdo das Abas com Animação */}
-                                            <AnimatePresence>
-                                                {activeTabs[questao.id] && (
-                                                    <motion.div
-                                                        initial={{ opacity: 0, height: 0 }}
-                                                        animate={{ opacity: 1, height: "auto" }}
-                                                        exit={{ opacity: 0, height: 0 }}
-                                                        transition={{ duration: 0.3, ease: "easeInOut" }}
-                                                        className="overflow-hidden"
-                                                    >
-                                                        <div className="px-6 pb-6">
-                                                            {renderActiveTabContent(questao)}
-                                                        </div>
-                                                    </motion.div>
-                                                )}
-
-                                            </AnimatePresence>
-                                            {openReportModalId && (
-                                                <ReportarModal
-                                                    questaoId={openReportModalId}
-                                                    onClose={closeReportModal}
-                                                    token={userToken}
+                                            {/* Overlay de feedback */}
+                                            {showFeedback[questao.id] && (
+                                                <AnswerFeedbackOverlay
+                                                    status={selectedAnswers[questao.id] === questao.alternativa_correta_id ? 'correct' : 'incorrect'}
+                                                    onAnimationEnd={() => { }}
                                                 />
                                             )}
                                         </div>
+
+                                        {/* Botão Responder */}
+
+
+                                        <button
+                                            onClick={() => handleConfirmAnswer(questao.id, questao.alternativa_correta_id)}
+                                            disabled={isQuestionAnswered(questao.id) || selectedAnswers[questao.id] == null}
+                                            className=" cursor-pointer mt-8 ml-4 px-8 py-3 bg-[#0E00D0] text-white rounded-lg hover:bg-blue-600 transition duration-200 text-2xl font-bold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            Responder
+                                        </button>
+
+                                    </section>
+
+                                    {/* Rodapé e Ações */}
+                                    <div className="w-full bg-gray-800 rounded-b-lg">
+                                        <div className="w-full rounded-lg overflow-hidden flex flex-col sm:flex-row justify-around items-center py-4">
+                                            {/* Botão Gabarito Comentado */}
+                                            <button
+                                                onClick={() => toggleTab(questao.id, 'gabarito')}
+                                                disabled={!isQuestionAnswered(questao.id)}
+                                                className={`font-bold flex flex-row items-center justify-center cursor-pointer p-2 transition duration-200 ease-in-out w-full sm:w-1/3 text-center space-x-2 ${activeTabs[questao.id] === 'gabarito'
+                                                    ? 'text-white bg-blue-900'
+                                                    : 'text-gray-300 hover:text-white'
+                                                    }`}
+                                            >
+                                                <MessageCircle className="w-6 h-6" />
+                                                <span className="text-lg">Gabarito comentado</span>
+                                                {getTabIcon(questao.id, 'gabarito')}
+                                            </button>
+
+                                            {/* Botão Estatísticas */}
+                                            <button
+                                                onClick={() => toggleTab(questao.id, 'estatisticas')}
+                                                disabled={!isQuestionAnswered(questao.id)}
+                                                className={`font-bold flex flex-row items-center justify-center cursor-pointer p-2 transition duration-200 ease-in-out w-full sm:w-1/3 text-center border-t sm:border-t-0 sm:border-l border-gray-700 space-x-2 ${activeTabs[questao.id] === 'estatisticas'
+                                                    ? 'text-white bg-blue-900'
+                                                    : 'text-gray-300 hover:text-white'
+                                                    }`}
+
+                                            >
+                                                <ChartColumn className="w-6 h-6" />
+                                                <span className="text-lg">Estatísticas</span>
+                                                {getTabIcon(questao.id, 'estatisticas')}
+                                            </button>
+
+                                            {/* Botão Dúvida */}
+                                            <button
+                                                onClick={() => toggleTab(questao.id, 'duvida')}
+                                                disabled={!isQuestionAnswered(questao.id)}
+                                                className={`font-bold flex flex-row items-center justify-center cursor-pointer p-2 transition duration-200 ease-in-out w-full sm:w-1/3 text-center border-t sm:border-t-0 sm:border-l border-gray-700 space-x-2 ${activeTabs[questao.id] === 'duvida'
+                                                    ? 'text-white bg-blue-900'
+                                                    : 'text-gray-300 hover:text-white'
+                                                    }`}
+                                            >
+                                                <HelpCircle className="w-6 h-6" />
+                                                <span className="text-lg">Dúvida</span>
+                                                {getTabIcon(questao.id, 'duvida')}
+                                            </button>
+                                        </div>
+
+                                        {/* Conteúdo das Abas com Animação */}
+                                        <AnimatePresence>
+                                            {activeTabs[questao.id] && (
+                                                <motion.div
+                                                    initial={{ opacity: 0, height: 0 }}
+                                                    animate={{ opacity: 1, height: "auto" }}
+                                                    exit={{ opacity: 0, height: 0 }}
+                                                    transition={{ duration: 0.3, ease: "easeInOut" }}
+                                                    className="overflow-hidden"
+                                                >
+                                                    <div className="px-6 pb-6">
+                                                        {renderActiveTabContent(questao)}
+                                                    </div>
+                                                </motion.div>
+                                            )}
+
+                                        </AnimatePresence>
+                                        {openReportModalId && (
+                                            <ReportarModal
+                                                questaoId={openReportModalId}
+                                                onClose={closeReportModal}
+                                                token={userToken || ""}
+                                            />
+                                        )}
                                     </div>
-                                )}
+                                </div>
+
                             </QuestionWrapper>
                         ))}
                     </main>

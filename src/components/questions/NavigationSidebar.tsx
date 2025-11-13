@@ -1,4 +1,4 @@
-// components/questions/NavigationSidebar.tsx (corrigido)
+// components/questions/NavigationSidebar.tsx
 'use client';
 
 import { useNavigation } from '@/contexts/NavigationContext';

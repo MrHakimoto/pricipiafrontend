@@ -4,18 +4,25 @@
 import { useState, useRef, useEffect } from 'react';
 import { MoreVertical, Copy, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import type { Questao } from '@/types/api';
+import type { Questao } from '@/types/list'; // CORREÇÃO: Importar de '@/types/list'
 import { useSession } from 'next-auth/react';
 
 interface OpcoesQuestaoProps {
-  questao: Questao;
+  questao: {
+    id: number;
+    enunciado: string;
+    // apenas as propriedades que você realmente usa
+  };
   onReport: () => void;
 }
+
+
+
 
 export default function OpcoesQuestao({ questao, onReport }: OpcoesQuestaoProps) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
-   const { data: session, status } = useSession();
+  const { data: session, status } = useSession();
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -28,15 +35,15 @@ export default function OpcoesQuestao({ questao, onReport }: OpcoesQuestaoProps)
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-//   const handleCopyText = async () => {
-//     try {
-//       await navigator.clipboard.writeText(questao.enunciado);
-//       setIsOpen(false);
-//       console.log('Texto copiado!');
-//     } catch (err) {
-//       console.error('Falha ao copiar texto:', err);
-//     }
-//   };
+  //   const handleCopyText = async () => {
+  //     try {
+  //       await navigator.clipboard.writeText(questao.enunciado);
+  //       setIsOpen(false);
+  //       console.log('Texto copiado!');
+  //     } catch (err) {
+  //       console.error('Falha ao copiar texto:', err);
+  //     }
+  //   };
 
   const handleReport = () => {
     setIsOpen(false);

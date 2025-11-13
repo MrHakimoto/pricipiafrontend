@@ -1,4 +1,5 @@
 import { api } from "../axios"; // Sua instância configurada do Axios
+import type { AxiosError } from 'axios';
 
 /**
  * Define a estrutura de dados que o backend espera para um novo reporte.
@@ -28,15 +29,13 @@ export const inviteReport = async (data: ReportPayload, token: string): Promise<
   if (!data || !data.message) throw new Error("A mensagem é obrigatória para o reporte.");
 
   try {
-    // [CORRIGIDO] A assinatura do Axios é: post(url, dados, config)
-    // Os 'headers' vão dentro do objeto de configuração (o terceiro argumento).
     const response = await api.post("/support-requests", data, {
       headers: { Authorization: `Bearer ${token}` },
     });
     return response.data;
-  } catch (error) {
-    console.error("Erro ao enviar reporte:", error.response?.data || error.message);
-    // [CORRIGIDO] Lança o erro em vez de retornar um array vazio
+  } catch (error: unknown) {
+    const axiosError = error as AxiosError;
+    console.error("Erro ao enviar reporte:", axiosError.response?.data || axiosError.message);
     throw new Error("Falha ao enviar o reporte.");
   }
 };
@@ -66,9 +65,9 @@ export const getListaById = async (id: number, token: string): Promise<any> => {
       headers: { Authorization: `Bearer ${token}` },
     });
     return response.data;
-  } catch (error) {
-    console.error(`Erro ao buscar questões da lista #${id}:`, error.response?.data || error.message);
-    // [CORRIGIDO] Lança o erro em vez de retornar um array vazio
+  } catch (error: unknown) {
+    const axiosError = error as AxiosError;
+    console.error(`Erro ao buscar questões da lista #${id}:`, axiosError.response?.data || axiosError.message);
     throw new Error("Falha ao buscar as questões da lista.");
   }
 };

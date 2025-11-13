@@ -1,8 +1,11 @@
-// contexts/NavigationContext.tsx (corrigido)
+// contexts/NavigationContext.tsx
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import type { Questao } from '@/types/api';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import type { QuestaoBase } from '@/types/questions';
+
+// Tipo que o NavigationProvider vai receber (mesmo do questionsFormatted)
+export type NavigationQuestion = QuestaoBase;
 
 export type QuestionStatus = 'unanswered' | 'correct' | 'incorrect' | 'viewing';
 
@@ -27,15 +30,13 @@ const NavigationContext = createContext<NavigationContextType | undefined>(undef
 
 export const useNavigation = () => {
   const context = useContext(NavigationContext);
-  if (context === undefined) {
-    throw new Error('useNavigation must be used within a NavigationProvider');
-  }
+  if (!context) throw new Error('useNavigation must be used within a NavigationProvider');
   return context;
 };
 
 interface NavigationProviderProps {
   children: React.ReactNode;
-  questions: Questao[];
+  questions: NavigationQuestion[];
 }
 
 export const NavigationProvider: React.FC<NavigationProviderProps> = ({ 
@@ -45,67 +46,88 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({
   const [questionsNavigation, setQuestionsNavigation] = useState<QuestaoNavigation[]>([]);
   const [currentQuestionId, setCurrentQuestionId] = useState<number | null>(null);
 
+  // Inicializar questões de navegação
   useEffect(() => {
+    console.log('Inicializando NavigationProvider com questões:', initialQuestions.length);
+    
     const initialNavigation: QuestaoNavigation[] = initialQuestions.map((questao, index) => ({
       id: questao.id,
       status: 'unanswered',
       numero: index + 1,
       isHovered: false,
-      isViewing: index === 0 // Primeira questão como viewing por padrão
+      isViewing: index === 0 // Primeira questão como viewing inicial
     }));
-    setQuestionsNavigation(initialNavigation);
     
+    setQuestionsNavigation(initialNavigation);
+
     if (initialQuestions.length > 0) {
-      setCurrentQuestionId(initialQuestions[0].id);
+      const firstQuestionId = initialQuestions[0].id;
+      setCurrentQuestionId(firstQuestionId);
+      console.log('Questão inicial definida:', firstQuestionId);
     }
   }, [initialQuestions]);
 
-  const updateQuestionStatus = (questionId: number, status: 'correct' | 'incorrect') => {
+  const updateQuestionStatus = useCallback((questionId: number, status: 'correct' | 'incorrect') => {
+    console.log(`Atualizando status da questão ${questionId} para:`, status);
     setQuestionsNavigation(prev => 
       prev.map(q => 
         q.id === questionId ? { ...q, status } : q
       )
     );
-  };
+  }, []);
 
-  const setCurrentQuestion = (questionId: number) => {
-    const previousQuestionId = currentQuestionId;
+  const setCurrentQuestion = useCallback((questionId: number) => {
+    console.log('Definindo questão atual:', questionId);
     setCurrentQuestionId(questionId);
-
-    // Atualiza o estado de visualização sem afetar o status de correção
     setQuestionsNavigation(prev =>
-      prev.map(q => ({
-        ...q,
-        isViewing: q.id === questionId, // Apenas a questão atual fica como viewing
-        status: q.status // Mantém o status original (correct/incorrect/unanswered)
+      prev.map(q => ({ 
+        ...q, 
+        isViewing: q.id === questionId 
       }))
     );
-  };
+  }, []);
 
-  const setQuestionHover = (questionId: number, isHovered: boolean) => {
+  const setQuestionHover = useCallback((questionId: number, isHovered: boolean) => {
     setQuestionsNavigation(prev =>
-      prev.map(q =>
+      prev.map(q => 
         q.id === questionId ? { ...q, isHovered } : q
       )
     );
-  };
+  }, []);
 
-  const scrollToQuestion = (questionId: number) => {
-    console.log('Scroll to question:', questionId);
+  const scrollToQuestion = useCallback((questionId: number) => {
+    console.log('Scroll para questão:', questionId);
     
-    const element = document.getElementById(`question-${questionId}`);
-    if (element) {
-      // Scroll mais preciso para o centro da tela
-       element.scrollIntoView({ 
-        behavior: 'smooth', 
-        block: 'center',
-        inline: 'nearest'
-      });
-
-    } else {
-      console.error('Element not found:', `question-${questionId}`);
-    }
-  };
+    // Pequeno delay para garantir que o DOM esteja atualizado
+    setTimeout(() => {
+      const element = document.getElementById(`question-${questionId}`);
+      if (element) {
+        console.log('Elemento encontrado, fazendo scroll...');
+        element.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'center', 
+          inline: 'nearest' 
+        });
+        
+        // Atualizar a questão atual após o scroll
+        setCurrentQuestion(questionId);
+      } else {
+        console.warn(`Elemento question-${questionId} não encontrado para scroll`);
+        
+        // Tentar encontrar qualquer elemento com data-question-id como fallback
+        const fallbackElement = document.querySelector(`[data-question-id="${questionId}"]`);
+        if (fallbackElement) {
+          console.log('Elemento fallback encontrado, fazendo scroll...');
+          fallbackElement.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'center', 
+            inline: 'nearest' 
+          });
+          setCurrentQuestion(questionId);
+        }
+      }
+    }, 100);
+  }, [setCurrentQuestion]);
 
   const value: NavigationContextType = {
     questions: questionsNavigation,
@@ -115,6 +137,17 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({
     setQuestionHover,
     scrollToQuestion
   };
+
+  // Log para debug
+  useEffect(() => {
+    console.log('Estado atual do NavigationContext:', {
+      currentQuestionId,
+      questionsCount: questionsNavigation.length,
+      viewingQuestions: questionsNavigation.filter(q => q.isViewing).length,
+      correctCount: questionsNavigation.filter(q => q.status === 'correct').length,
+      incorrectCount: questionsNavigation.filter(q => q.status === 'incorrect').length
+    });
+  }, [currentQuestionId, questionsNavigation]);
 
   return (
     <NavigationContext.Provider value={value}>

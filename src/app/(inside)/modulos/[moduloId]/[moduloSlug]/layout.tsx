@@ -51,7 +51,7 @@ export default function ModuloLayout({
           setInitialLoading(true);
 
           try {
-            const contentsData = await getModuloContents(moduloId, session.laravelToken);
+            const contentsData = await getModuloContents(moduloId, session!.laravelToken!);
             console.log("✅ Dados recebidos:", contentsData);
 
             setContents(contentsData);

@@ -5,7 +5,7 @@ import { NavigationProvider } from '@/contexts/NavigationContext';
 import { QuestionNavigationSidebar } from '@/components/questions/QuestionNavigationSidebar';
 import { QuestionProgress } from '@/components/questions/QuestionProgress';
 import { ModelQuestions } from '@/components/questions/ModelQuestions';
-import type { Questao } from '@/types/api';
+import type { Questao } from '@/types/list';
 
 interface ModelQuestionsWithNavigationProps {
   questions: Questao[];
@@ -18,8 +18,17 @@ export const ModelQuestionsWithNavigation: React.FC<ModelQuestionsWithNavigation
   showSidebar = true,
   showProgress = true
 }) => {
+  // Converter Questao para QuestaoBase
+  const convertedQuestions = questions.map(questao => ({
+    ...questao,
+    prova: questao.prova ? {
+      banca: { nome: questao.prova.banca?.nome || '' },
+      ano: questao.prova.ano
+    } : { banca: { nome: '' }, ano: 0 }
+  }));
+
   return (
-    <NavigationProvider questions={questions}>
+    <NavigationProvider questions={convertedQuestions}>
       <div className="flex h-screen bg-gray-900">
         {/* Conteúdo principal */}
         <div className="flex-1 overflow-y-auto">

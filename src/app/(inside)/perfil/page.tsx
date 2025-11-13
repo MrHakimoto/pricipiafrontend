@@ -249,17 +249,17 @@ export default function Profile() {
     // Preparar dados para envio (remover máscaras e ajustar formatos)
     const dadosParaEnvio = {
       id: form.id,
-      name: form.name.trim(),
-      cpf: form.cpf.replace(/\D/g, ""),
+      name: (form.name ?? "").trim(),
+      cpf: (form.cpf ?? "").replace(/\D/g, ""),
       phone: form.celular.replace(/\D/g, ""),
-      gender: form.gender ? form.gender[0].toUpperCase() : null, // 'masculino' -> 'M'
+      gender: form.gender ? form.gender[0].toUpperCase() : undefined,
       birth_date: converterDataParaISO(form.birth_date),
     };
 
     console.log("Dados para envio ao backend:", dadosParaEnvio);
 
     try {
-      await saveMyProfile(dadosParaEnvio, sessionAny?.laravelToken);
+      await saveMyProfile(dadosParaEnvio, sessionAny?.laravelToken!);
 
       // Atualiza sessão (pode ser necessário adaptar dependendo do tipo real do update)
       if (typeof update === "function") {
