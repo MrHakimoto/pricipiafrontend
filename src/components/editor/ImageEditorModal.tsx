@@ -1,19 +1,9 @@
 "use client";
 import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
-import { Cropper } from "react-advanced-cropper";
+import { Cropper, CropperRef } from "react-advanced-cropper";
 import "react-advanced-cropper/dist/style.css";
 import * as Dialog from "@radix-ui/react-dialog";
 import { RotateCcw, RotateCw, FlipHorizontal, FlipVertical, X } from "lucide-react";
-
-/**
- * ImageEditorModal.jsx
- *
- * Props:
- *  - image: File (blob) da imagem
- *  - open: boolean
- *  - onOpenChange: (boolean) => void
- *  - onConfirm: (file) => void    // recebe o File final quando clicar em Salvar
- */
 
 const canvasToFile = (
   canvas: HTMLCanvasElement,
@@ -40,25 +30,41 @@ interface ImageEditorModalProps {
   onConfirm?: (file: File) => void;
 }
 
+interface OriginalSize {
+  width: number;
+  height: number;
+}
+
+interface FlipState {
+  h: boolean;
+  v: boolean;
+}
+
+interface CurrentSelection {
+  selW: number;
+  selH: number;
+  percentOfOriginal: number;
+}
+
 export default function ImageEditorModal({
   image,
   open,
   onOpenChange,
   onConfirm,
 }: ImageEditorModalProps) {
-  const cropperRef = useRef(null);
+  const cropperRef = useRef<CropperRef>(null);
 
-  const [zoom, setZoom] = useState(1);
-  const [resizePercent, setResizePercent] = useState(100);
-  const [outputMime, setOutputMime] = useState("image/png"); // "image/png" or "image/jpeg"
-  const [aspectRatio, setAspectRatio] = useState(null);
-  const [rotationAccum, setRotationAccum] = useState(0);
-  const [flipState, setFlipState] = useState({ h: false, v: false });
+  const [zoom, setZoom] = useState<number>(1);
+  const [resizePercent, setResizePercent] = useState<number>(100);
+  const [outputMime, setOutputMime] = useState<string>("image/png");
+  const [aspectRatio, setAspectRatio] = useState<number | null>(null);
+  const [rotationAccum, setRotationAccum] = useState<number>(0);
+  const [flipState, setFlipState] = useState<FlipState>({ h: false, v: false });
 
-  const [imageUrl, setImageUrl] = useState(null);
-  const [originalSize, setOriginalSize] = useState({ width: 0, height: 0 });
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [originalSize, setOriginalSize] = useState<OriginalSize>({ width: 0, height: 0 });
 
-  const [currentSelection, setCurrentSelection] = useState(null);
+  const [currentSelection, setCurrentSelection] = useState<CurrentSelection | null>(null);
 
   useEffect(() => {
     if (!image) {
@@ -79,27 +85,34 @@ export default function ImageEditorModal({
   }, [image]);
 
   const updateSelection = useCallback(() => {
-    if (!cropperRef.current) return;
-    const coords = cropperRef.current.getCoordinates();
-    if (!coords) return;
-    const selW = Math.round(coords.width * (resizePercent / 100));
-    const selH = Math.round(coords.height * (resizePercent / 100));
+    const cropper = cropperRef.current;
+    if (!cropper) return;
+    
+    const coordinates = cropper.getCoordinates();
+    if (!coordinates) return;
+    
+    const selW = Math.round(coordinates.width * (resizePercent / 100));
+    const selH = Math.round(coordinates.height * (resizePercent / 100));
     const percentOfOriginal = originalSize.width
       ? Math.round((selW / originalSize.width) * 100)
       : 0;
     setCurrentSelection({ selW, selH, percentOfOriginal });
   }, [resizePercent, originalSize]);
 
-  const rotate = (angle) => {
-    if (!cropperRef.current) return;
-    cropperRef.current.rotateImage(angle);
+  const rotate = (angle: number) => {
+    const cropper = cropperRef.current;
+    if (!cropper) return;
+    
+    cropper.rotateImage(angle);
     setRotationAccum((r) => (r + angle) % 360);
     updateSelection();
   };
 
-  const flip = (horizontal, vertical) => {
-    if (!cropperRef.current) return;
-    cropperRef.current.flipImage(horizontal, vertical);
+  const flip = (horizontal: boolean, vertical: boolean) => {
+    const cropper = cropperRef.current;
+    if (!cropper) return;
+    
+    cropper.flipImage(horizontal, vertical);
     setFlipState((f) => ({
       h: horizontal ? !f.h : f.h,
       v: vertical ? !f.v : f.v,
@@ -107,21 +120,25 @@ export default function ImageEditorModal({
     updateSelection();
   };
 
-  const zoomTo = (value) => {
-    if (!cropperRef.current) return;
-    cropperRef.current.zoomImage(value);
+  const zoomTo = (value: number) => {
+    const cropper = cropperRef.current;
+    if (!cropper) return;
+    
+    cropper.zoomImage(value);
     setZoom(value);
     updateSelection();
   };
 
   const handleConfirm = async () => {
-    if (!cropperRef.current || !imageUrl) return;
-    const coords = cropperRef.current.getCoordinates();
-    if (!coords) return;
+    const cropper = cropperRef.current;
+    if (!cropper || !imageUrl || !image) return; // ✅ Adicionei verificação para image
+    
+    const coordinates = cropper.getCoordinates();
+    if (!coordinates) return;
 
     const scale = resizePercent / 100;
-    const rawW = Math.round(coords.width * scale);
-    const rawH = Math.round(coords.height * scale);
+    const rawW = Math.round(coordinates.width * scale);
+    const rawH = Math.round(coordinates.height * scale);
 
     const rotNorm = ((rotationAccum % 360) + 360) % 360;
     const swapDims = rotNorm === 90 || rotNorm === 270;
@@ -134,10 +151,14 @@ export default function ImageEditorModal({
     finalCanvas.height = outH || 1;
     const ctx = finalCanvas.getContext("2d");
 
+    if (!ctx) return;
+
     const img = new Image();
     img.crossOrigin = "anonymous";
     img.src = imageUrl;
-    await new Promise((res) => (img.onload = res));
+    await new Promise((resolve) => {
+      img.onload = resolve;
+    });
 
     ctx.save();
     ctx.translate(finalCanvas.width / 2, finalCanvas.height / 2);
@@ -151,10 +172,10 @@ export default function ImageEditorModal({
 
     ctx.drawImage(
       img,
-      coords.left,
-      coords.top,
-      coords.width,
-      coords.height,
+      coordinates.left,
+      coordinates.top,
+      coordinates.width,
+      coordinates.height,
       -finalCanvas.width / 2,
       -finalCanvas.height / 2,
       finalCanvas.width,
@@ -163,8 +184,8 @@ export default function ImageEditorModal({
 
     ctx.restore();
 
-    const file = await canvasToFile(finalCanvas, image.name, outputMime);
-    onConfirm && onConfirm(file);
+    const file = await canvasToFile(finalCanvas, image.name, outputMime); // ✅ Agora image não é mais null aqui
+    onConfirm?.(file);
 
     onOpenChange(false);
   };
@@ -211,16 +232,32 @@ export default function ImageEditorModal({
 
           <div className="py-3 px-4 flex flex-col lg:flex-row gap-4 lg:items-center bg-gray-900/60 border-t border-gray-800">
             <div className="flex gap-2">
-              <button onClick={() => rotate(-90)} className="p-2 bg-gray-700 rounded hover:bg-gray-600" title="Girar -90">
+              <button 
+                onClick={() => rotate(-90)} 
+                className="p-2 bg-gray-700 rounded hover:bg-gray-600" 
+                title="Girar -90°"
+              >
                 <RotateCcw size={16} />
               </button>
-              <button onClick={() => rotate(90)} className="p-2 bg-gray-700 rounded hover:bg-gray-600" title="Girar +90">
+              <button 
+                onClick={() => rotate(90)} 
+                className="p-2 bg-gray-700 rounded hover:bg-gray-600" 
+                title="Girar +90°"
+              >
                 <RotateCw size={16} />
               </button>
-              <button onClick={() => flip(true, false)} className="p-2 bg-gray-700 rounded hover:bg-gray-600" title="Flip Horizontal">
+              <button 
+                onClick={() => flip(true, false)} 
+                className="p-2 bg-gray-700 rounded hover:bg-gray-600" 
+                title="Flip Horizontal"
+              >
                 <FlipHorizontal size={16} />
               </button>
-              <button onClick={() => flip(false, true)} className="p-2 bg-gray-700 rounded hover:bg-gray-600" title="Flip Vertical">
+              <button 
+                onClick={() => flip(false, true)} 
+                className="p-2 bg-gray-700 rounded hover:bg-gray-600" 
+                title="Flip Vertical"
+              >
                 <FlipVertical size={16} />
               </button>
             </div>
@@ -243,7 +280,7 @@ export default function ImageEditorModal({
               <div className="flex gap-2 items-center">
                 <select
                   value={resizePercent}
-                  onChange={(e) => setResizePercent(parseInt(e.target.value))}
+                  onChange={(e) => setResizePercent(Number(e.target.value))}
                   className="bg-gray-700 px-2 py-1 rounded text-sm"
                 >
                   <option value={25}>25%</option>
@@ -274,7 +311,7 @@ export default function ImageEditorModal({
             <div className="flex flex-col text-sm">
               <label className="text-xs text-gray-300">Proporção</label>
               <select
-                value={aspectRatio || "free"}
+                value={aspectRatio ?? "free"}
                 onChange={(e) =>
                   setAspectRatio(e.target.value === "free" ? null : Number(e.target.value))
                 }
@@ -308,6 +345,7 @@ export default function ImageEditorModal({
               <button
                 onClick={handleConfirm}
                 className="px-4 py-2 bg-blue-600 rounded hover:bg-blue-700 font-semibold"
+                disabled={!image} // ✅ Opcional: desabilitar botão se não há imagem
               >
                 Salvar
               </button>
