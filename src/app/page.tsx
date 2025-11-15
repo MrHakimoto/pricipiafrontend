@@ -3,16 +3,10 @@
 import Image from "next/image";
 import styles from "./page.module.css";
 import Head from "next/head";
-import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { redirect } from "next/navigation";
 
 export default function Home() {
-  const router = useRouter();
-
-  useEffect(() => {
-    // Redireciona para a página de login
-    router.push("/login");
-  }, [router]);
+   redirect("/login");
   return (
 
     <div className={styles.page}>

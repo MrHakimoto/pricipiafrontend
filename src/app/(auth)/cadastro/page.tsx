@@ -6,17 +6,11 @@ import Link from 'next/link';
 import { signIn } from 'next-auth/react';
 import { useForm } from "react-hook-form";
 import { TtBar } from '@/components/Motions/ttBar';
-import { useRouter } from 'next/router';
+import { redirect } from "next/navigation";
 
 
 export default function RegisterPage() {
-    const router = useRouter();
-    
-      useEffect(() => {
-        // Redireciona para a página de login
-        router.push("/login");
-      }, [router]);
-    
+ redirect("/login");
     
     const [form, setForm] = useState({ name: '', email: '', password: '', password_confirmation: '' });
     const [error, setErrorr] = useState('');
