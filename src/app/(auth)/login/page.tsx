@@ -135,7 +135,7 @@ const Page = () => {
                             </span> Link por e-mail
                         </button>
                     </div>
-                    <div className="relative my-4 flex items-center">
+                    {/* <div className="relative my-4 flex items-center">
                         <div className="flex-grow h-px bg-gray-700" />
                         <span className="px-3 text-gray-400 text-sm">Ainda não tem conta?</span>
                         <div className="flex-grow h-px bg-gray-700" />
@@ -143,7 +143,7 @@ const Page = () => {
                     <div className="text-center text-gray-500 text-sm">
 
                         <Link href="/cadastro"> <button className="w-full bg-[#1B1F27] text-xl text-white text-bold rounded-lg px-8 py-4  items-center justify-center text-sm hover:bg-gray-700 cursor-pointer">Faça seu cadastro</button></Link>
-                    </div>
+                    </div> */}
                 </div>
             </div>
         </>

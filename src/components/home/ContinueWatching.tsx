@@ -1,56 +1,63 @@
-'use client'
+// src/components/home/ContinueWatching.ts
+'use client';
 
-import Link from 'next/link'
-import { motion } from 'framer-motion'
+import { useState, useEffect } from 'react';
 
-interface Item {
-  id: string | number
-  name: string
-  content_avatar: string
+export interface ContinueWatchingData {
+  aula: {
+    id: number;
+    title: string;
+    duration: number;
+    module: {
+      id: number;
+      name: string;
+    };
+  };
+  progress_percentage: number;
+  last_watched_timestamp: number;
 }
 
-interface ContinueWatchingProps {
-  items: Item[]
-}
+// Hook para buscar dados de "Continuar Assistindo"
+export function useContinueWatching() {
+  const [data, setData] = useState<ContinueWatchingData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-export default function ContinueWatching({ items }: ContinueWatchingProps) {
-  return (
-    <section className="mt-10">
-      <h2 className="text-xl font-semibold mb-4 text-white">Continuar assistindo</h2>
+  useEffect(() => {
+    const fetchContinueWatching = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        // Simulação de chamada API - substitua pela sua implementação real
+        const mockData: ContinueWatchingData = {
+          aula: {
+            id: 1,
+            title: 'Introdução aos Números Complexos',
+            duration: 1800, // 30 minutos em segundos
+            module: {
+              id: 1,
+              name: 'Álgebra Avançada'
+            }
+          },
+          progress_percentage: 65,
+          last_watched_timestamp: 720 // 12 minutos em segundos
+        };
 
-      <motion.div
-        initial={{ opacity: 0, y: 40 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true }}
-        transition={{ duration: 0.6 }}
-        className="flex gap-6 overflow-x-auto pb-2 scrollbar-hide"
-      >
-        {items.map((item: any) => (
-          <Link key={item.id} href={`/conteudo/tv/${item.id}`}>
-            <motion.div
-              whileHover={{ scale: 1.02 }}
-              className="
-                min-w-[260px]
-                bg-[#111827] rounded-xl overflow-hidden shadow-lg 
-                hover:shadow-xl transition-all duration-300
-                cursor-pointer
-              "
-            >
-              <div className="overflow-hidden">
-                <img
-                  src={item.content_avatar}
-                  alt={item.name}
-                  className="w-full h-40 object-cover hover:scale-110 transition-all duration-500"
-                />
-              </div>
+        // Simula delay de rede
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        setData(mockData);
+      } catch (err) {
+        setError('Erro ao carregar dados de continuar assistindo');
+        console.error('Error fetching continue watching:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-              <div className="p-4 text-white text-sm">
-                <p className="font-medium truncate">{item.name}</p>
-              </div>
-            </motion.div>
-          </Link>
-        ))}
-      </motion.div>
-    </section>
-  )
+    fetchContinueWatching();
+  }, []);
+
+  return { data, loading, error };
 }

@@ -1,7 +1,7 @@
 // componentes/questions/CurseList.tsx
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 
@@ -9,6 +9,7 @@ import { NavigationProvider } from '@/contexts/NavigationContext';
 import { QuestionsPanel } from '@/components/questions/QuestionsPanel';
 import { NavigationSidebar } from '@/components/questions/NavigationSidebar';
 import { getListaById } from '@/lib/questions/list';
+import { iniciarTentativa, finalizarTentativa, getTentativaAtiva } from '@/lib/questions/tentativa'; // ✅ Adicione estas importações
 import { Loader2 } from 'lucide-react';
 import { Alternativa, Prova, Questao, ListaCompleta, Topico } from '@/types/list';
 import type { QuestaoBase } from '@/types/questions';
@@ -17,7 +18,6 @@ interface ListaCursePageProps {
   idList: number;
 }
 
-// Tipo para as questões formatadas para o NavigationProvider
 export type NavigationQuestion = QuestaoBase;
 
 export default function ListaCursePage({ idList }: ListaCursePageProps) {
@@ -28,38 +28,49 @@ export default function ListaCursePage({ idList }: ListaCursePageProps) {
   const [listaInfo, setListaInfo] = useState<ListaCompleta | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // ✅ ADICIONE ESTES ESTADOS para o sistema de tentativas
+  const [resolucaoId, setResolucaoId] = useState<number | null>(null);
+  const [respostasSalvas, setRespostasSalvas] = useState<Record<number, number>>({});
+  const [tentativaAtiva, setTentativaAtiva] = useState<any>(null);
   
   const listaId = idList;
+  const fetchDataRef = useRef(false); // ✅ Para evitar loops
 
   useEffect(() => {
+    if (fetchDataRef.current) {
+      console.log('🛑 fetchListaData já foi executado, ignorando...');
+      return;
+    }
+
     const fetchListaData = async () => {
       if (status === 'authenticated' && session?.laravelToken && listaId) {
         try {
+          fetchDataRef.current = true;
           setIsLoading(true);
           setError(null);
           const token = session.laravelToken;
 
           console.log('Buscando lista com ID:', listaId);
-          const response = await getListaById(listaId, token);
-          console.log('Resposta completa da API:', response);
           
-          // CORREÇÃO: Acessar a estrutura correta da resposta
+          // ✅ BUSCAR EM PARALELO: lista + tentativa ativa
+          const [response, tentativaExistente] = await Promise.all([
+            getListaById(listaId, token),
+            getTentativaAtiva(listaId, token) // ✅ Busca tentativa ativa
+          ]);
+          
+          console.log('Resposta completa da API:', response);
+          console.log('Tentativa existente:', tentativaExistente);
+          
           let questoesData: Questao[] = [];
           let listaInfoData: ListaCompleta | null = null;
 
-          // Verificar diferentes estruturas possíveis da resposta
+          // Processar questões (seu código existente)
           if (response && response.questoes && Array.isArray(response.questoes)) {
-            // Estrutura 1: questões no nível raiz
             questoesData = response.questoes;
-            console.log('Questões carregadas do nível raiz:', questoesData.length);
           } else if (response && response.lista_info && Array.isArray(response.lista_info.questoes)) {
-            // Estrutura 2: questões dentro de lista_info
             questoesData = response.lista_info.questoes;
-            console.log('Questões carregadas de lista_info:', questoesData.length);
           } else if (response && Array.isArray(response)) {
-            // Estrutura 3: resposta é diretamente um array de questões
             questoesData = response;
-            console.log('Questões carregadas como array direto:', questoesData.length);
           } else {
             console.warn('Estrutura de resposta inesperada:', response);
             setQuestoes([]);
@@ -67,7 +78,7 @@ export default function ListaCursePage({ idList }: ListaCursePageProps) {
             return;
           }
 
-          // Buscar informações da lista
+          // Processar info da lista (seu código existente)
           if (response.lista_info) {
             listaInfoData = {
               id: response.lista_info.id || listaId,
@@ -84,7 +95,6 @@ export default function ListaCursePage({ idList }: ListaCursePageProps) {
               most_frequent_assunto: response.lista_info.most_frequent_assunto
             };
           } else if (response.name) {
-            // Fallback: se não houver lista_info, mas houver name no nível raiz
             listaInfoData = {
               id: listaId,
               nome: response.name || `Lista ${listaId}`,
@@ -98,10 +108,34 @@ export default function ListaCursePage({ idList }: ListaCursePageProps) {
 
           setQuestoes(questoesData);
           setListaInfo(listaInfoData);
+
+          // ✅ PROCESSAR TENTATIVA ATIVA (igual ao ListaQuestionsPage)
+          if (tentativaExistente) {
+            console.log('✅ Tentativa ativa encontrada:', tentativaExistente);
+            setResolucaoId(tentativaExistente.id);
+            setTentativaAtiva(tentativaExistente);
+
+            // Extrair respostas já salvas
+            const respostas: Record<number, number> = {};
+            if (tentativaExistente.respostas && Array.isArray(tentativaExistente.respostas)) {
+              tentativaExistente.respostas.forEach((resposta: any) => {
+                respostas[resposta.questao_id] = resposta.alternativa_id;
+              });
+            }
+            setRespostasSalvas(respostas);
+            console.log('📝 Respostas carregadas:', respostas);
+
+          } else {
+            console.log('🆕 Nenhuma tentativa ativa - será criada na primeira resposta');
+            setResolucaoId(null);
+            setTentativaAtiva(null);
+            setRespostasSalvas({});
+          }
           
         } catch (err) {
           console.error('Erro detalhado ao carregar lista:', err);
           setError("Falha ao carregar a lista de exercícios. Tente novamente.");
+          fetchDataRef.current = false; // Permite nova tentativa
         } finally {
           setIsLoading(false);
         }
@@ -117,7 +151,49 @@ export default function ListaCursePage({ idList }: ListaCursePageProps) {
     };
 
     fetchListaData();
-  }, [listaId, session, status]);
+
+    return () => {
+      fetchDataRef.current = false;
+    };
+  }, [listaId]);
+
+  // ✅ ADICIONE AS FUNÇÕES DE TENTATIVA (igual ao ListaQuestionsPage)
+  const handleIniciarTentativa = async (): Promise<number> => {
+    if (!listaId) throw new Error("ID da lista não disponível");
+    const token = session?.laravelToken!;
+    try {
+      console.log('🎯 Iniciando nova tentativa...');
+      const novaTentativa = await iniciarTentativa(listaId, token);
+      console.log('✅ Nova tentativa criada:', novaTentativa);
+
+      setResolucaoId(novaTentativa.id);
+      return novaTentativa.id;
+    } catch (error) {
+      console.error('❌ Erro ao iniciar tentativa:', error);
+      throw error;
+    }
+  };
+
+  const handleFinalizarTentativa = async () => {
+    const token = session?.laravelToken!;
+
+    if (!resolucaoId) {
+      console.warn('Nenhuma tentativa ativa para finalizar');
+      return;
+    }
+
+    try {
+      console.log('Finalizando tentativa:', resolucaoId);
+      const resultado = await finalizarTentativa(resolucaoId, token);
+      console.log('Tentativa finalizada com sucesso:', resultado);
+
+      alert('Tentativa finalizada com sucesso! Pontuação: ' + resultado.resolucao.score_final);
+
+    } catch (err) {
+      console.error('Erro ao finalizar tentativa:', err);
+      alert('Erro ao finalizar tentativa. Tente novamente.');
+    }
+  };
 
   // Loading state
   if (isLoading || status === 'loading') {
@@ -168,7 +244,6 @@ export default function ListaCursePage({ idList }: ListaCursePageProps) {
 
   // Prepara as questões para o formato esperado pelo NavigationProvider
   const questionsFormatted: QuestaoBase[] = questoes.map(questao => {
-    // Formatar informações da prova
     const provaInfo = questao.prova ? {
       banca: { 
         nome: questao.prova.sigla || questao.prova.nome || 'Banca não informada' 
@@ -179,7 +254,6 @@ export default function ListaCursePage({ idList }: ListaCursePageProps) {
       ano: 0 
     };
 
-    // Formatar tópicos - garantir que seja um array de objetos com id e nome
     const topicosFormatados = Array.isArray(questao.topicos) 
       ? questao.topicos.map((topico: Topico) => ({
           id: topico.id,
@@ -187,7 +261,6 @@ export default function ListaCursePage({ idList }: ListaCursePageProps) {
         }))
       : [];
 
-    // Formatar alternativas
     const alternativasFormatadas = Array.isArray(questao.alternativas)
       ? questao.alternativas.map((alt: Alternativa) => ({
           id: alt.id,
@@ -199,7 +272,7 @@ export default function ListaCursePage({ idList }: ListaCursePageProps) {
     return {
       id: questao.id,
       enunciado: questao.enunciado || 'Enunciado não disponível',
-      dificuldade: questao.dificuldade || 3, // Default para dificuldade média
+      dificuldade: questao.dificuldade || 3,
       alternativa_correta_id: questao.alternativa_correta_id,
       alternativas: alternativasFormatadas,
       topicos: topicosFormatados,
@@ -209,40 +282,54 @@ export default function ListaCursePage({ idList }: ListaCursePageProps) {
     };
   });
 
-  console.log('Questões formatadas:', questionsFormatted.length);
-  console.log('Informações da lista:', listaInfo);
+  console.log('📊 CurseList Estado final:', {
+    questoesFormatadas: questionsFormatted.length,
+    resolucaoId,
+    respostasSalvas: Object.keys(respostasSalvas).length,
+    listaInfo: listaInfo?.nome,
+    tipo: listaInfo?.tipo
+  });
 
-  // Verificar se todas as questões têm a propriedade 'dificuldade'
-  const questoesComDificuldade = questionsFormatted.filter(q => q.dificuldade !== undefined);
-  console.log('Questões com dificuldade definida:', questoesComDificuldade.length);
+  // ✅ VERIFICA SE É SIMULADO/PROVA (igual ao ListaQuestionsPage)
+  const isSimuladoOuProva = Boolean(
+  listaInfo?.tipo && ['simulado', 'prova'].includes(listaInfo.tipo)
+);
 
   return (
-    <NavigationProvider questions={questionsFormatted}>
-    <div className="flex h-[calc(100vh-245px)] bg-[#00091A] overflow-hidden">
-      {/* Sidebar */}
-      <NavigationSidebar listaInfo={listaInfo ?? undefined} />
-      
-      {/* Painel de Questões */}
-      <QuestionsPanel className="flex-1 overflow-y-auto" questions={questionsFormatted} />
-    </div>
+    // ✅ ATUALIZE O NavigationProvider com todas as props necessárias
+    <NavigationProvider 
+      questions={questionsFormatted}
+      respostasSalvas={respostasSalvas}
+      isSimuladoOuProva={isSimuladoOuProva}
+    >
+      <div className="flex h-[calc(100vh-245px)] bg-[#00091A] overflow-hidden">
+        {/* ✅ ATUALIZE O NavigationSidebar com todas as props */}
+        <NavigationSidebar 
+          listaInfo={listaInfo ?? undefined}
+          resolucaoId={resolucaoId}
+          onFinalizarTentativa={handleFinalizarTentativa}
+        />
+        
+        {/* ✅ ATUALIZE O QuestionsPanel com todas as props */}
+        <QuestionsPanel 
+          className="flex-1 overflow-y-auto" 
+          questions={questionsFormatted}
+          resolucaoId={resolucaoId}
+          respostasSalvas={respostasSalvas}
+          onIniciarTentativa={handleIniciarTentativa}
+          listaId={listaInfo?.id}
+          listaTipo={listaInfo?.tipo}
+        />
+      </div>
 
-      {/* DEBUG - Remova em produção */}
+      {/* DEBUG - Apenas em desenvolvimento */}
       {process.env.NODE_ENV === 'development' && (
-        <div style={{ 
-          position: 'fixed', 
-          bottom: 10, 
-          right: 10, 
-          background: 'rgba(0,0,0,0.8)', 
-          color: 'white', 
-          padding: '10px', 
-          zIndex: 1000,
-          fontSize: '12px',
-          borderRadius: '5px',
-          border: '1px solid #333'
-        }}>
-          <div><strong>DEBUG:</strong></div>
+        <div className="fixed bottom-3 right-3 bg-black/80 text-white p-3 rounded-md border border-gray-700 text-xs z-[1000] font-mono">
+          <div className="font-bold mb-1">DEBUG CurseList:</div>
           <div>Questões: {questoes.length}</div>
-          <div>Lista Info: {listaInfo ? 'Sim' : 'Não'}</div>
+          <div>Tentativa ID: {resolucaoId || 'Não iniciada'}</div>
+          <div>Tipo: {listaInfo?.tipo || 'normal'}</div>
+          <div>É simulado/prova: {isSimuladoOuProva ? 'Sim' : 'Não'}</div>
           <div>Status: {status}</div>
         </div>
       )}

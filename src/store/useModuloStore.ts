@@ -11,14 +11,32 @@ interface CurrentLink {
   module_name: string;
 }
 
+interface UserProgress {
+  last_watched_timestamp: number;
+  is_completed: boolean;
+}
+
+interface Content {
+  id: number;
+  title: string;
+  content_type: 'aula' | 'lista';
+  content_url?: string;
+  duration_in_seconds?: number;
+  list_id?: number;
+  description?: string;
+  attachments?: any[];
+  user_progress?: UserProgress | null;
+}
+
 interface ModuloStore {
   // 🔥 NOVOS ESTADOS PARA CARREGAMENTO INTELIGENTE
   isFirstLoad: boolean;
   currentContentType: "aula" | "lista" | null;
   
   // ESTADOS EXISTENTES
-  contents: any[];
+  contents: Content[];
   currentContentId: number | null;
+  
   initialLoading: boolean;
   showAside: boolean;
   currentLink: CurrentLink | null;
@@ -30,7 +48,7 @@ interface ModuloStore {
   completeFirstLoad: () => void;
   
   // AÇÕES EXISTENTES
-  setContents: (data: any[]) => void;
+  setContents: (contents: Content[]) => void;
   setCurrentContentId: (id: number | null) => void;
   goToLesson: (lesson: any) => void;
   setInitialLoading: (val: boolean) => void;
@@ -38,6 +56,13 @@ interface ModuloStore {
   setCurrentLink: (data: CurrentLink | null) => void;
   setLoadedModuloId: (id: string | null) => void;
   resetModulo: () => void;
+  
+  // 🔥 NOVAS AÇÕES PARA PROGRESSO DE AULA
+  updateLessonProgress: (contentId: number, timestamp: number) => void;
+  markLessonAsCompleted: (contentId: number) => void;
+  markLessonAsUncompleted: (contentId: number) => void;
+  getCurrentLesson: () => Content | undefined;
+  getLessonProgress: (contentId: number) => UserProgress | null;
 }
 
 // Função auxiliar para criar slugs
@@ -148,6 +173,76 @@ export const useModuloStore = create<ModuloStore>()(
           showAside: true,
         });
       },
+
+      // 🔥 NOVAS AÇÕES PARA PROGRESSO DE AULA
+      updateLessonProgress: (contentId: number, timestamp: number) => {
+        const state = get();
+        console.log("Store: updateLessonProgress", contentId, timestamp, "segundos");
+        
+        const updatedContents = state.contents.map(content => 
+          content.id === contentId 
+            ? {
+                ...content,
+                user_progress: {
+                  ...content.user_progress,
+                  last_watched_timestamp: Math.floor(timestamp),
+                  is_completed: content.user_progress?.is_completed || false
+                }
+              }
+            : content
+        );
+
+        set({ contents: updatedContents });
+      },
+
+      markLessonAsCompleted: (contentId: number) => {
+        const state = get();
+        console.log("Store: markLessonAsCompleted", contentId);
+        
+        const updatedContents = state.contents.map(content => 
+          content.id === contentId 
+            ? {
+                ...content,
+                user_progress: {
+                  last_watched_timestamp: content.user_progress?.last_watched_timestamp || 0,
+                  is_completed: true
+                }
+              }
+            : content
+        );
+
+        set({ contents: updatedContents });
+      },
+
+      markLessonAsUncompleted: (contentId: number) => {
+        const state = get();
+        console.log("Store: markLessonAsUncompleted", contentId);
+        
+        const updatedContents = state.contents.map(content => 
+          content.id === contentId 
+            ? {
+                ...content,
+                user_progress: {
+                  last_watched_timestamp: content.user_progress?.last_watched_timestamp || 0,
+                  is_completed: false
+                }
+              }
+            : content
+        );
+
+        set({ contents: updatedContents });
+      },
+
+      getCurrentLesson: () => {
+        const state = get();
+        return state.contents.find(content => content.id === state.currentContentId);
+      },
+
+      getLessonProgress: (contentId: number) => {
+        const state = get();
+        const content = state.contents.find(c => c.id === contentId);
+        return content?.user_progress || null;
+      }
     }),
     {
       name: "modulo-store",
@@ -155,6 +250,7 @@ export const useModuloStore = create<ModuloStore>()(
         // 🔥 PERSISTE OS NOVOS ESTADOS TAMBÉM
         isFirstLoad: state.isFirstLoad,
         currentContentType: state.currentContentType,
+        // Não persiste contents para evitar dados desatualizados
         // contents: state.contents,
         loadedModuloId: state.loadedModuloId,
         currentContentId: state.currentContentId,

@@ -17,6 +17,8 @@ import {
   Plus,
   BookOpen,
   FileText,
+  CheckCircle2,
+  Circle
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
@@ -35,6 +37,7 @@ export default function ConteudoPage({ params }: PageProps) {
   const [tvTipo, setTvTipo] = useState<string>("curso");
   const [loading, setLoading] = useState(true);
   const [openFrente, setOpenFrente] = useState<number | null>(null);
+  const [hoveredModule, setHoveredModule] = useState<number | null>(null);
 
   const containerRefs = useRef<{ [key: number]: HTMLDivElement | null }>({});
   const contentRefs = useRef<{ [key: number]: HTMLDivElement | null }>({});
@@ -62,6 +65,27 @@ export default function ConteudoPage({ params }: PageProps) {
       .replace(/[^a-z0-9\s-]/g, "")
       .trim()
       .replace(/\s+/g, "-");
+
+  // Função para calcular progresso do módulo
+  const calcularProgressoModulo = (modulo: any) => {
+    if (!modulo.contents || modulo.contents.length === 0) return 0;
+    
+    const aulasCompletas = modulo.contents.filter((content: any) => 
+      content.user_progress?.is_completed === 1
+    ).length;
+    
+    const progresso = (aulasCompletas / modulo.contents.length) * 100;
+    return Math.round(progresso);
+  };
+
+  // Função para verificar se módulo está totalmente completo
+  const isModuloCompleto = (modulo: any) => {
+    if (!modulo.contents || modulo.contents.length === 0) return false;
+    
+    return modulo.contents.every((content: any) => 
+      content.user_progress?.is_completed === 1
+    );
+  };
 
   // Função para calcular totais da frente
   const calcularTotaisFrente = (frente: any) => {
@@ -276,18 +300,36 @@ export default function ConteudoPage({ params }: PageProps) {
                               ) / 60
                             );
 
+                            const progresso = calcularProgressoModulo(mod);
+                            const moduloCompleto = isModuloCompleto(mod);
+
                             return (
                               <Link
                                 key={mod.id}
                                 href={`/modulos/${mod.id}/${toSlug(mod.name)}`}
                               >
-                                <div className="flex-shrink-0 w-80 flex bg-[#0c0f1a] rounded-xl shadow-md hover:shadow-lg transition-all duration-200 overflow-hidden border border-blue-800/30">
-                                  <div className="flex-shrink-0">
+                                <div 
+                                  className={`flex-shrink-0 w-80 flex bg-[#0c0f1a] rounded-xl shadow-md hover:shadow-lg transition-all duration-300 overflow-hidden border-2 ${
+                                    moduloCompleto 
+                                      ? "border-green-500 border-2" 
+                                      : hoveredModule === mod.id 
+                                        ? "border-blue-400 border-2" 
+                                        : "border-blue-800/30"
+                                  }`}
+                                  onMouseEnter={() => setHoveredModule(mod.id)}
+                                  onMouseLeave={() => setHoveredModule(null)}
+                                >
+                                  <div className="flex-shrink-0 relative">
                                     <img
                                       src={mod.module_avatar || "/default-module.jpg"}
                                       alt={mod.name}
                                       className="w-28 h-28 object-cover"
                                     />
+                                    {moduloCompleto && (
+                                      <div className="absolute top-2 left-2 bg-green-500 rounded-full p-1">
+                                        <CheckCircle2 className="w-4 h-4 text-white" />
+                                      </div>
+                                    )}
                                   </div>
                                   <div className="flex flex-col justify-between p-3 flex-1 text-white">
                                     <div>
@@ -311,15 +353,25 @@ export default function ConteudoPage({ params }: PageProps) {
                                       </div>
                                     </div>
                                     <div className="flex gap-1 mt-2">
-                                      {[1, 2, 3, 4, 5].map((i) => (
+                                      {mod.contents?.map((content: any, index: number) => (
                                         <div
-                                          key={i}
-                                          className={`h-2 w-3 rounded-sm ${i <= (mod.progresso || 0)
-                                            ? "bg-green-500"
-                                            : "bg-gray-600"
-                                            }`}
+                                          key={content.id}
+                                          className={`h-2 w-3 rounded-sm ${
+                                            content.user_progress?.is_completed === 1
+                                              ? "bg-green-500"
+                                              : "bg-gray-600"
+                                          }`}
+                                          title={content.title}
                                         />
                                       ))}
+                                    </div>
+                                    <div className="flex items-center justify-between mt-2">
+                                      <span className="text-xs text-gray-400">
+                                        {progresso}% completo
+                                      </span>
+                                      {moduloCompleto && (
+                                        <CheckCircle2 className="w-4 h-4 text-green-500" />
+                                      )}
                                     </div>
                                   </div>
                                 </div>

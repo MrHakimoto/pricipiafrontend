@@ -1,14 +1,23 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { registerUser } from './actions';
 import Link from 'next/link';
 import { signIn } from 'next-auth/react';
 import { useForm } from "react-hook-form";
 import { TtBar } from '@/components/Motions/ttBar';
+import { useRouter } from 'next/router';
 
 
 export default function RegisterPage() {
+    const router = useRouter();
+    
+      useEffect(() => {
+        // Redireciona para a página de login
+        router.push("/login");
+      }, [router]);
+    
+    
     const [form, setForm] = useState({ name: '', email: '', password: '', password_confirmation: '' });
     const [error, setErrorr] = useState('');
     const [success, setSuccess] = useState('');

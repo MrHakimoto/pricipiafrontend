@@ -18,6 +18,13 @@ export function ModuloAside({ currentData, moduloId, moduloSlug, onLessonClick }
 
   if (!showAside) return null;
 
+  // Função para formatar o tempo
+  const formatTime = (totalSeconds: number) => {
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, x: 20, width: 0 }}
@@ -43,7 +50,7 @@ export function ModuloAside({ currentData, moduloId, moduloSlug, onLessonClick }
       <div className="bg-gray-800 rounded-xl overflow-hidden">
         <div className="flex justify-between items-center px-6 py-6 relative">
           <button 
-            className="py-2 pl-1 cursor-pointer absolute bg-[#303745] top-0 left-0"
+            className="py-2 pl-1 cursor-pointer absolute bg-[#303745] top-0 left-0 hover:bg-[#404855] transition-all duration-300 hover:scale-105"
             onClick={() => setShowAside(false)}
           >
             <ChevronRight size={45} />
@@ -63,12 +70,9 @@ export function ModuloAside({ currentData, moduloId, moduloSlug, onLessonClick }
         </div>
         <div className="overflow-auto max-h-[415px]">
           {contents.map((lesson, index) => {
-            const totalSeconds = lesson.estimated_time_minutes || 0;
-            const minutes = Math.floor(totalSeconds / 60);
-            const seconds = totalSeconds % 60;
-            const formattedTime = `${minutes.toString().padStart(2, "0")}:${seconds
-              .toString()
-              .padStart(2, "0")}`;
+            // ✅ CORREÇÃO: Use duration_in_seconds em vez de estimated_time_minutes
+            const totalSeconds = lesson.duration_in_seconds || 0;
+            const formattedTime = formatTime(totalSeconds);
 
             return (
               <motion.div

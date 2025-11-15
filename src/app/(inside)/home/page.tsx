@@ -8,17 +8,35 @@ import HomeSkeleton from "@/components/Skeletons/HomeSkeleton";
 import { motion } from 'framer-motion'
 import BannerCarousel from '@/components/home/BannerCarousel'
 import UserCard from '@/components/home/UserCard'
-import ContinueWatching from '@/components/home/ContinueWatching'
 import CoursesSection from '@/components/home/CoursesSection'
 import GoalsSection from '@/components/home/metricas/GoalsSection'
 import WeekProgress from '@/components/home/metricas/WeekProgress'
 import MyLists from '@/components/home/metricas/MyLists'
 import MetricsSection from '@/components/home/metricas/MetricsSection'
+import { FooterHome } from '@/components/home/FooterHome'
+import ContinueWatchingCard  from '@/components/home/ContinueWatchingCard';
 
 
 export default function HomePage() {
   const { done } = useProgressBar();
   const { data: session, status } = useSession();
+  const [continueWatching, setContinueWatching] = useState(null);
+
+  useEffect(() => {
+    const fetchContinueWatching = async () => {
+      try {
+        const response = await fetch('/api/dashboard/continuar-assistindo');
+        if (response.ok) {
+          const data = await response.json();
+          setContinueWatching(data);
+        }
+      } catch (error) {
+        console.error('Erro ao buscar continuar assistindo:', error);
+      }
+    };
+
+    fetchContinueWatching();
+  }, []);
 
   // const [dashboardData, setDashboardData] = useState(null);
 
@@ -61,52 +79,55 @@ export default function HomePage() {
     },
   ]
   return (
-    <main className="min-h-screen bg-gray-100 text-gray-900 dark:bg-[#00091A] dark:text-white px-6 pb-20">
-      <div className="max-w-7xl mx-auto">
-        <BannerCarousel />
+    <>
+      <main className="min-h-screen bg-gray-100 text-gray-900 dark:bg-[#00091A] dark:text-white px-6 pb-20">
+        <div className="max-w-7xl mx-auto">
+          <BannerCarousel />
 
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2, duration: 0.6 }}
-          className="mt-6"
-        >
-          <UserCard nome={session?.user?.name ?? null} />
-        </motion.div>
-
-        <section className="mt-12 space-y-12">
-          <ContinueWatching items={items} />
-            <CoursesSection />
-        </section>
-      </div>
-
-      <section>
-        <div className="max-w-7xl mx-auto space-y-12">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-            className="grid grid-cols-1 md:grid-cols-2 gap-6"
+            transition={{ delay: 0.2, duration: 0.6 }}
+            className="mt-6"
           >
-            <GoalsSection />
-            <WeekProgress />
+            <UserCard nome={session?.user?.name ?? null} />
           </motion.div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 40 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7 }}
-            className="grid grid-cols-1 md:grid-cols-2 gap-6"
-          >
-            <MyLists />
-            <MetricsSection />
-          </motion.div>
+          <section className="mt-12 space-y-12">
+            <div>
+              <ContinueWatchingCard />
+            </div>
+            <CoursesSection />
+          </section>
         </div>
-      </section>
 
-    </main>
+        <section>
+          <div className="max-w-7xl mx-auto space-y-12">
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6 }}
+              className="grid grid-cols-1 md:grid-cols-2 gap-6"
+            >
+              <GoalsSection />
+              <WeekProgress />
+            </motion.div>
 
+            <motion.div
+              initial={{ opacity: 0, y: 40 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.7 }}
+              className="grid grid-cols-1 md:grid-cols-2 gap-6"
+            >
+              <MyLists />
+              <MetricsSection />
+            </motion.div>
+          </div>
+        </section>
 
+      </main>
+      <FooterHome />
+    </>
   )
 
 

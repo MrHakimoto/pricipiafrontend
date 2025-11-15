@@ -1,10 +1,11 @@
 // components/questions/QuestionsPanel.tsx
 'use client';
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Questao, Alternativa, Topico } from '@/types/list';
-import { Newspaper, ChartColumn, MessageCircle, ChevronDown, ChevronUp, HelpCircle } from 'lucide-react';
+import { Newspaper, ChartColumn, MessageCircle, ChevronDown, ChevronUp, HelpCircle, Loader2 } from 'lucide-react'; // Adicionei Loader2
 import { AnswerFeedbackOverlay } from '@/components/questions/AnswerFeedbackOverlay';
+import { salvarResposta } from '@/lib/questions/tentativa';
 import { useNavigation } from '@/contexts/NavigationContext';
 import { QuestionWrapper } from './QuestionWrapper';
 import { GabaritoQuestao } from "./feedback/gabarito";
@@ -17,14 +18,12 @@ import { useSession } from "next-auth/react";
 import type { NavigationQuestion } from '@/components/questions/CurseList';
 import type { QuestaoBase } from '@/types/questions';
 
-// Componente de Alternativa (permanece igual)
-
+// Componente de Alternativa
 type SimpleAlternativa = {
-  id: number;
-  letra: string;
-  texto: string;
+    id: number;
+    letra: string;
+    texto: string;
 };
-
 
 type QuizOptionProps = {
     alternativa: SimpleAlternativa;
@@ -87,24 +86,63 @@ type QuestaoTab = 'gabarito' | 'duvida' | 'estatisticas' | null;
 interface QuestionsPanelProps {
     questions: QuestaoBase[];
     className?: string;
+    resolucaoId: number | null;
+    respostasSalvas: Record<number, number>;
+    onIniciarTentativa: () => Promise<number>;
+    listaId?: number;
+    listaTipo?: string;
 }
 
 // Componente Principal
 export const QuestionsPanel: React.FC<QuestionsPanelProps> = ({
     questions,
-    className = ""
+    className = "",
+    resolucaoId: propResolucaoId,
+    respostasSalvas,
+    onIniciarTentativa,
+    listaId,
+    listaTipo
 }) => {
     const [selectedAnswers, setSelectedAnswers] = useState<Record<number, number | null>>({});
     const [answeredQuestions, setAnsweredQuestions] = useState<Record<number, boolean>>({});
     const [showFeedback, setShowFeedback] = useState<Record<number, boolean>>({});
     const [activeTabs, setActiveTabs] = useState<Record<number, QuestaoTab>>({});
     const [openReportModalId, setOpenReportModalId] = useState<number | null>(null);
-
+    const [isSaving, setIsSaving] = useState<Record<number, boolean>>({});
+    const [currentResolucaoId, setCurrentResolucaoId] = useState<number | null>(propResolucaoId);
     const [topicsVisible, setTopicsVisible] = useState(false);
 
     const { data: session, status } = useSession();
-    const userToken = session?.laravelToken
+    const userToken = session?.laravelToken!
     const { updateQuestionStatus } = useNavigation();
+
+    const isSimuladoOuProva = listaTipo && ['simulado', 'prova'].includes(listaTipo);
+
+    useEffect(() => {
+        if (respostasSalvas && Object.keys(respostasSalvas).length > 0) {
+            console.log('🔄 Carregando respostas salvas:', respostasSalvas);
+
+            const newAnsweredQuestions: Record<number, boolean> = {};
+            Object.keys(respostasSalvas).forEach(questaoId => {
+                const id = parseInt(questaoId);
+                newAnsweredQuestions[id] = true;
+
+                // Atualizar contexto de navegação
+                const questao = questions.find(q => q.id === id);
+                if (questao) {
+                    const isCorrect = respostasSalvas[id] === questao.alternativa_correta_id;
+                    updateQuestionStatus(id, isCorrect ? 'correct' : 'incorrect');
+                }
+            });
+
+            setSelectedAnswers(respostasSalvas);
+            setAnsweredQuestions(newAnsweredQuestions);
+        }
+    }, [respostasSalvas, questions, updateQuestionStatus]);
+
+    useEffect(() => {
+        setCurrentResolucaoId(propResolucaoId);
+    }, [propResolucaoId]);
 
     const handleSelectAnswer = (questionId: number, alternativaId: number) => {
         if (answeredQuestions[questionId]) return;
@@ -115,34 +153,67 @@ export const QuestionsPanel: React.FC<QuestionsPanelProps> = ({
         }));
     };
 
-    const handleConfirmAnswer = (questionId: number, alternativaCorretaId: number) => {
+    const handleConfirmAnswer = async (questionId: number, alternativaCorretaId: number) => {
         const selectedId = selectedAnswers[questionId];
         if (selectedId === undefined || selectedId === null) return;
 
-        const isCorrect = selectedId === alternativaCorretaId;
+        let resolucaoId = currentResolucaoId;
 
-        // Marca como respondida e mostra feedback
-        setAnsweredQuestions(prev => ({
-            ...prev,
-            [questionId]: true
-        }));
+        setIsSaving(prev => ({ ...prev, [questionId]: true }));
 
-        setShowFeedback(prev => ({
-            ...prev,
-            [questionId]: true
-        }));
+        try {
+            // 🔑 LÓGICA CHAVE: Se não há tentativa, criar uma
+            if (!resolucaoId) {
+                console.log('🆕 Primeira resposta - criando tentativa...');
+                resolucaoId = await onIniciarTentativa();
+                setCurrentResolucaoId(resolucaoId);
+            }
 
-        // Atualiza contexto de navegação
-        updateQuestionStatus(questionId, isCorrect ? 'correct' : 'incorrect');
+            // Salvar resposta no backend
+            console.log('💾 Salvando resposta:', { resolucaoId, questionId, selectedId });
+            const resultado = await salvarResposta(resolucaoId!, questionId, selectedId, userToken);
+            console.log('✅ Resposta salva com sucesso:', resultado);
 
-        // Remove o feedback após 2 segundos
-        setTimeout(() => {
-            setShowFeedback(prev => ({
+            const isCorrect = selectedId === alternativaCorretaId;
+
+            // Atualizar estado local
+            setAnsweredQuestions(prev => ({
                 ...prev,
-                [questionId]: false
+                [questionId]: true
             }));
-        }, 2000);
-    };
+
+            if (!isSimuladoOuProva) {
+
+                setShowFeedback(prev => ({
+                    ...prev,
+                    [questionId]: true
+                }));
+
+                // Atualizar contexto de navegação
+                updateQuestionStatus(questionId, isCorrect ? 'correct' : 'incorrect');
+
+                // Remover feedback após 2 segundos
+                setTimeout(() => {
+                    setShowFeedback(prev => ({
+                        ...prev,
+                        [questionId]: false
+                    }));
+                }, 2000);
+
+            } else {
+
+                updateQuestionStatus(questionId, 'answered');
+
+                console.log('🎯 Simulado/Prova: Feedback não mostrado ao usuário');
+            }
+
+        } catch (error) {
+            console.error('❌ Erro ao salvar resposta:', error);
+            alert('Erro ao salvar resposta. Tente novamente.');
+        } finally {
+            setIsSaving(prev => ({ ...prev, [questionId]: false }));
+        }
+    }; // ✅ REMOVI o ponto e vírgula problemático aqui
 
     const openReportModal = (questaoId: number) => {
         setOpenReportModalId(questaoId);
@@ -154,7 +225,6 @@ export const QuestionsPanel: React.FC<QuestionsPanelProps> = ({
 
     const toggleTab = (questionId: number, tab: QuestaoTab) => {
         setActiveTabs(prev => {
-            // Se clicar na mesma aba, fecha. Se clicar em outra, abre a nova e fecha outras
             const currentTab = prev[questionId];
             if (currentTab === tab) {
                 const newState = { ...prev };
@@ -182,7 +252,7 @@ export const QuestionsPanel: React.FC<QuestionsPanelProps> = ({
         return isActive ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />;
     };
 
-    // FUNÇÃO ADICIONADA: Badge de dificuldade (do ModelQuestions)
+    // FUNÇÃO ADICIONADA: Badge de dificuldade
     const getDifficultyBadge = (dificuldade?: number) => {
         switch (dificuldade) {
             case 1:
@@ -201,8 +271,6 @@ export const QuestionsPanel: React.FC<QuestionsPanelProps> = ({
     };
 
     const renderActiveTabContent = (questao: QuestaoBase) => {
-
-
         const activeTab = activeTabs[questao.id];
 
         if (!activeTab) return null;
@@ -231,7 +299,14 @@ export const QuestionsPanel: React.FC<QuestionsPanelProps> = ({
 
         return content[activeTab];
     };
-    console.log(questions)
+
+    console.log('QuestionsPanel estado:', {
+        questionsCount: questions.length,
+        currentResolucaoId,
+        respostasSalvasCount: Object.keys(respostasSalvas).length,
+        selectedAnswersCount: Object.keys(selectedAnswers).length,
+        answeredQuestionsCount: Object.keys(answeredQuestions).length
+    });
     return (
         <div className={`flex-1 flex flex-col min-h-0 ${className} scrollbar-hide`}>
             {/* Container das questões com scroll próprio */}
@@ -343,7 +418,8 @@ export const QuestionsPanel: React.FC<QuestionsPanelProps> = ({
                                                     alternativaCorretaId={questao.alternativa_correta_id}
                                                     selecaoAtual={selectedAnswers[questao.id] || null}
                                                     statusResposta={isQuestionAnswered(questao.id) ?
-                                                        (selectedAnswers[questao.id] === questao.alternativa_correta_id ? 'correct' : 'incorrect')
+                                                        (isSimuladoOuProva ? 'unanswered' : // Não revela se é correto/incorreto
+                                                            (selectedAnswers[questao.id] === questao.alternativa_correta_id ? 'correct' : 'incorrect'))
                                                         : 'unanswered'
                                                     }
                                                     onSelect={(alternativaId) => handleSelectAnswer(questao.id, alternativaId)}
@@ -351,7 +427,7 @@ export const QuestionsPanel: React.FC<QuestionsPanelProps> = ({
                                             ))}
 
                                             {/* Overlay de feedback */}
-                                            {showFeedback[questao.id] && (
+                                            {!isSimuladoOuProva && showFeedback[questao.id] && (
                                                 <AnswerFeedbackOverlay
                                                     status={selectedAnswers[questao.id] === questao.alternativa_correta_id ? 'correct' : 'incorrect'}
                                                     onAnimationEnd={() => { }}
@@ -367,7 +443,14 @@ export const QuestionsPanel: React.FC<QuestionsPanelProps> = ({
                                             disabled={isQuestionAnswered(questao.id) || selectedAnswers[questao.id] == null}
                                             className=" cursor-pointer mt-8 ml-4 px-8 py-3 bg-[#0E00D0] text-white rounded-lg hover:bg-blue-600 transition duration-200 text-2xl font-bold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
-                                            Responder
+                                            {isSaving[questao.id] ? (
+                                                <>
+                                                    <Loader2 className="animate-spin w-5 h-5" />
+                                                    Salvando...
+                                                </>
+                                            ) : (
+                                                'Responder'
+                                            )}
                                         </button>
 
                                     </section>

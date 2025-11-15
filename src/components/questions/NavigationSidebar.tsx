@@ -3,7 +3,7 @@
 
 import { useNavigation } from '@/contexts/NavigationContext';
 import { motion } from "framer-motion";
-import { ArrowLeft, FileText, Clock, Mail, XCircle, Square } from "lucide-react";
+import { ArrowLeft, FileText, Clock, Mail, XCircle, Square, Flag, Circle } from "lucide-react"; // ✅ Adicionei Circle
 import Link from "next/link";
 
 interface NavigationSidebarProps {
@@ -13,63 +13,93 @@ interface NavigationSidebarProps {
     nome: string;
     descricao?: string;
     total_time_in_seconds?: number;
+    tipo?: string;
   };
+  onFinalizarTentativa?: () => void;
+  resolucaoId?: number | null;
 }
 
-export const NavigationSidebar: React.FC<NavigationSidebarProps> = ({ 
+export const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
   className = "",
-  listaInfo
+  listaInfo,
+  onFinalizarTentativa,
+  resolucaoId
 }) => {
   const { questions, scrollToQuestion, setQuestionHover } = useNavigation();
 
-  // Estatísticas
+  // ✅ Verificar se é simulado ou prova
+  const isSimuladoOuProva = listaInfo?.tipo && ['simulado', 'prova'].includes(listaInfo.tipo);
+
+  // Estatísticas - ✅ Atualizadas para considerar o status 'answered'
   const correctCount = questions.filter(q => q.status === 'correct').length;
   const incorrectCount = questions.filter(q => q.status === 'incorrect').length;
+  const answeredCount = questions.filter(q => q.status === 'answered').length; // ✅ Novo
   const viewingCount = questions.filter(q => q.isViewing).length;
   const unansweredCount = questions.filter(q => q.status === 'unanswered').length;
-  
-  const totalTime = listaInfo?.total_time_in_seconds || questions.length * 3;
-  const difficulty = "Médio";
 
+  // ✅ Para simulados/provas, contar "answered" como respondidas
+  const totalRespondidas = isSimuladoOuProva
+    ? answeredCount
+    : correctCount + incorrectCount;
+
+  const totalTime = listaInfo?.total_time_in_seconds || questions.length * 3;
+
+  const getDifficultyText = () => {
+    if (listaInfo?.tipo === 'simulado') return 'Simulado';
+    if (listaInfo?.tipo === 'prova') return 'Prova';
+    return "Médio";
+  };
+
+  // ✅ FUNÇÃO COMPLETAMENTE ATUALIZADA para cores
   const getStatusClasses = (question: any) => {
     const baseClasses = "px-3 py-2 rounded-md text-sm font-semibold transition-all duration-300 border-2 ";
-    
-    // PRIORIDADE: viewing > correct/incorrect > hover > unanswered
-    
+
+    // PRIORIDADE: viewing > answered/correct/incorrect > hover > unanswered
+
     // Primeiro verifica se está sendo visualizada (MAIOR PRIORIDADE)
     if (question.isViewing) {
       if (question.status === 'correct') {
-        return baseClasses + (question.isHovered 
-          ? 'bg-green-800 text-green-300 border-white shadow-lg scale-110' 
+        return baseClasses + (question.isHovered
+          ? 'bg-green-800 text-green-300 border-white shadow-lg scale-110'
           : 'bg-green-900 text-green-400 border-blue-500 shadow-lg shadow-blue-500/50');
       }
       if (question.status === 'incorrect') {
-        return baseClasses + (question.isHovered 
-          ? 'bg-red-800 text-red-300 border-white shadow-lg scale-110' 
+        return baseClasses + (question.isHovered
+          ? 'bg-red-800 text-red-300 border-white shadow-lg scale-110'
           : 'bg-red-900 text-red-400 border-blue-500 shadow-lg shadow-blue-500/50');
       }
-      return baseClasses + (question.isHovered 
-        ? 'bg-blue-800 text-blue-300 border-white shadow-lg scale-110' 
+      if (question.status === 'answered') {
+        return baseClasses + (question.isHovered
+          ? 'bg-blue-800 text-blue-300 border-white shadow-lg scale-110'
+          : 'bg-blue-900 text-blue-400 border-blue-500 shadow-lg shadow-blue-500/50');
+      }
+      return baseClasses + (question.isHovered
+        ? 'bg-blue-800 text-blue-300 border-white shadow-lg scale-110'
         : 'bg-blue-900 text-blue-400 border-blue-500 shadow-lg shadow-blue-500/50');
     }
-    
-    // Depois verifica o status de correção
+
+    // Depois verifica o status de correção/resposta
     if (question.status === 'correct') {
-      return baseClasses + (question.isHovered 
-        ? 'bg-green-800 text-green-300 border-white shadow-lg scale-110' 
+      return baseClasses + (question.isHovered
+        ? 'bg-green-800 text-green-300 border-white shadow-lg scale-110'
         : 'bg-green-900 text-green-400 border-green-600 shadow-lg shadow-green-500/25');
     }
     if (question.status === 'incorrect') {
-      return baseClasses + (question.isHovered 
-        ? 'bg-red-800 text-red-300 border-white shadow-lg scale-110' 
+      return baseClasses + (question.isHovered
+        ? 'bg-red-800 text-red-300 border-white shadow-lg scale-110'
         : 'bg-red-900 text-red-400 border-red-600 shadow-lg shadow-red-500/25');
     }
-    
+    if (question.status === 'answered') {
+      return baseClasses + (question.isHovered
+        ? 'bg-blue-800 text-blue-300 border-white shadow-lg scale-110'
+        : 'bg-blue-900 text-blue-400 border-blue-600 shadow-lg shadow-blue-500/25');
+    }
+
     // Por último verifica hover e estado normal
     if (question.isHovered) {
       return baseClasses + 'bg-gray-700 text-white border-white shadow-lg scale-110';
     }
-    
+
     return baseClasses + 'bg-gray-800 text-gray-400 border-gray-600 hover:bg-gray-700';
   };
 
@@ -95,8 +125,8 @@ export const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
         className="flex-1 p-5 overflow-y-auto"
       >
         {/* Voltar */}
-        <Link 
-          href="/listas-oficiais" 
+        <Link
+          href="/listas-oficiais"
           className="text-gray-400 text-sm hover:text-white flex items-center gap-1 mb-6 transition-colors duration-200"
         >
           <ArrowLeft size={16} /> Voltar
@@ -110,15 +140,42 @@ export const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
           </div>
 
           <h2 className="text-lg font-semibold text-white">
-            {listaInfo?.nome || "Minha lista fofinha :)"}dsf
-            
+            {listaInfo?.nome || "Minha lista fofinha :)"}
           </h2>
+          {isSimuladoOuProva && (
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={onFinalizarTentativa}
+              disabled={!resolucaoId}
+              className={`w-full py-3 rounded-xl font-medium flex items-center justify-center gap-2 text-sm transition-all duration-300 ${resolucaoId
+                  ? 'bg-red-600 hover:bg-red-700 text-white cursor-pointer'
+                  : 'bg-gray-600 cursor-not-allowed text-gray-400'
+                }`}
+            >
+              <Flag size={16} />
+              Finalizar {listaInfo?.tipo === 'simulado' ? 'Simulado' : 'Prova'}
+              {!resolucaoId && (
+                <span className="text-xs ml-1">(Não iniciada)</span>
+              )}
+            </motion.button>
+          )}
 
           <div className="flex items-center gap-2 text-xs text-gray-400 mt-1">
             <div className="flex items-center gap-1">
               <Clock size={14} /> <span>≈ {totalTime} min</span>
             </div>
-            <span className="bg-gray-700 px-2 py-0.5 rounded-full text-gray-300">{difficulty}</span>
+            <span className="bg-gray-700 px-2 py-0.5 rounded-full text-gray-300">
+              {getDifficultyText()}
+            </span>
+            {listaInfo?.tipo && (
+              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${listaInfo.tipo === 'simulado' ? 'bg-orange-600 text-orange-100' :
+                  listaInfo.tipo === 'prova' ? 'bg-red-600 text-red-100' :
+                    'bg-blue-600 text-blue-100'
+                }`}>
+                {listaInfo.tipo.toUpperCase()}
+              </span>
+            )}
           </div>
         </div>
 
@@ -129,33 +186,65 @@ export const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
           </span>
         </div>
 
-        {/* Estatísticas */}
+        {/* ✅ Estatísticas ATUALIZADAS */}
         <div className="flex items-center gap-2 mb-3 text-sm">
-          <div className="flex items-center gap-1 text-green-400">
-            <Mail size={14} /> {correctCount}
-          </div>
-          <div className="flex items-center gap-1 text-red-400">
-            <XCircle size={14} /> {incorrectCount}
-          </div>
-          <div className="flex items-center gap-1 text-gray-400">
-            <Square size={14} /> {unansweredCount}
-          </div>
+          {isSimuladoOuProva ? (
+            // ✅ Para simulados/provas: mostramos apenas "respondidas" e "não respondidas"
+            <>
+              <div className="flex items-center gap-1 text-blue-400">
+                <Circle size={14} /> {answeredCount}
+              </div>
+              <div className="flex items-center gap-1 text-gray-400">
+                <Square size={14} /> {unansweredCount}
+              </div>
+            </>
+          ) : (
+            // ✅ Para listas normais: mostramos correto/incorreto/não respondido
+            <>
+              <div className="flex items-center gap-1 text-green-400">
+                <Mail size={14} /> {correctCount}
+              </div>
+              <div className="flex items-center gap-1 text-red-400">
+                <XCircle size={14} /> {incorrectCount}
+              </div>
+              <div className="flex items-center gap-1 text-gray-400">
+                <Square size={14} /> {unansweredCount}
+              </div>
+            </>
+          )}
         </div>
 
-        {/* Barras de progresso */}
+        {/* ✅ Barras de progresso ATUALIZADAS */}
         <div className="flex gap-1 mb-4">
-          <div 
-            className="h-2 rounded-full bg-green-500 transition-all duration-500 ease-out"
-            style={{ width: `${(correctCount / questions.length) * 100}%` }}
-          ></div>
-          <div 
-            className="h-2 rounded-full bg-red-500 transition-all duration-500 ease-out"
-            style={{ width: `${(incorrectCount / questions.length) * 100}%` }}
-          ></div>
-          <div 
-            className="h-2 rounded-full bg-gray-600 transition-all duration-500 ease-out"
-            style={{ width: `${(unansweredCount / questions.length) * 100}%` }}
-          ></div>
+          {isSimuladoOuProva ? (
+            // ✅ Para simulados/provas: apenas azul (respondidas) e cinza (não respondidas)
+            <>
+              <div
+                className="h-2 rounded-full bg-blue-500 transition-all duration-500 ease-out"
+                style={{ width: `${(answeredCount / questions.length) * 100}%` }}
+              ></div>
+              <div
+                className="h-2 rounded-full bg-gray-600 transition-all duration-500 ease-out"
+                style={{ width: `${(unansweredCount / questions.length) * 100}%` }}
+              ></div>
+            </>
+          ) : (
+            // ✅ Para listas normais: verde/vermelho/cinza
+            <>
+              <div
+                className="h-2 rounded-full bg-green-500 transition-all duration-500 ease-out"
+                style={{ width: `${(correctCount / questions.length) * 100}%` }}
+              ></div>
+              <div
+                className="h-2 rounded-full bg-red-500 transition-all duration-500 ease-out"
+                style={{ width: `${(incorrectCount / questions.length) * 100}%` }}
+              ></div>
+              <div
+                className="h-2 rounded-full bg-gray-600 transition-all duration-500 ease-out"
+                style={{ width: `${(unansweredCount / questions.length) * 100}%` }}
+              ></div>
+            </>
+          )}
         </div>
 
         {/* Números das Questões */}
@@ -184,10 +273,39 @@ export const NavigationSidebar: React.FC<NavigationSidebarProps> = ({
         <motion.button
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
-          className="w-full bg-pink-600 hover:bg-pink-700 py-3 rounded-xl font-medium flex items-center justify-center gap-2 text-sm transition-all duration-300"
+          className="w-full bg-pink-600 hover:bg-pink-700 py-3 rounded-xl font-medium flex items-center justify-center gap-2 text-sm transition-all duration-300 mb-4"
         >
           Gerar PDF da lista <span className="bg-white text-pink-600 px-2 py-1 rounded-md text-xs font-bold">PDF</span>
         </motion.button>
+
+        {/* ✅ Botão Finalizar Tentativa - SOMENTE para simulado/prova */}
+
+        {/* Status da Tentativa */}
+        <div className="mt-3 text-center">
+          <span className={`text-xs font-medium ${resolucaoId ? 'text-green-400' : 'text-yellow-400'
+            }`}>
+            {resolucaoId
+              ? `✓ Tentativa #${resolucaoId} ativa`
+              : '⚠ Aguardando início da tentativa'
+            }
+            {isSimuladoOuProva && ` (${listaInfo?.tipo})`}
+          </span>
+        </div>
+
+        {/* DEBUG - Apenas em desenvolvimento */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="mt-4 p-2 bg-black/50 rounded text-xs text-gray-400">
+            <div>DEBUG:</div>
+            <div>Resolução ID: {resolucaoId || 'null'}</div>
+            <div>Questões: {questions.length}</div>
+            <div>Respondidas: {totalRespondidas}</div>
+            <div>Tipo: {listaInfo?.tipo || 'normal'}</div>
+            <div>É simulado/prova: {isSimuladoOuProva ? 'Sim' : 'Não'}</div>
+            <div>Corretas: {correctCount}</div>
+            <div>Incorretas: {incorrectCount}</div>
+            <div>Respondidas (neutro): {answeredCount}</div>
+          </div>
+        )}
       </motion.div>
     </div>
   );

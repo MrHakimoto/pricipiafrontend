@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/ThemeProvider"
 import "./globals.css";
 import { SessionProvider } from "next-auth/react"
+import PandaVideoScript from "@/components/PandaVideoScript";
 
 import 'nprogress/nprogress.css';
 import '../styles/nprogress-custom.css';
@@ -39,6 +40,13 @@ export default function RootLayout({
     <SessionWrapper>
 
       <html lang="pt-br">
+        <head>
+          <script 
+            src="https://cdn.pandavideo.com.br/player/v1.0.0/panda-player.min.js" 
+            async
+          />
+          <PandaVideoScript contentUrl="" />
+        </head>
         <body className={` ${geistSans.variable} ${geistMono.variable} overflow-x-hidden`}>
           <ThemeProvider
             attribute="class"
