@@ -147,7 +147,7 @@ const Forum = () => {
   return (
   <div className="min-h-screen font-sans relative text-black bg-[#F6F6F6] dark:text-white dark:bg-[#00091A]">
     {/* Header */}
-    <div className="px-8 py-6 border-gray-300 bg-white dark:bg-[#1B1F27] dark:border-gray-700">
+    <div className="px-8 py-6 border-gray-300 bg-[#D7D7D7] dark:bg-[#1B1F27] dark:border-gray-700">
       <h1 className="text-lg font-bold">
         Fórum{" "}
         <span className="font-normal text-gray-600 dark:text-gray-300">
