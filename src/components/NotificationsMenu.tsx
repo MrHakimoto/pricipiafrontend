@@ -145,13 +145,14 @@ export function NotificationsMenu({ hoverColor = "#0E00D0" }: { hoverColor?: str
       <button
         onClick={() => setIsOpen(!isOpen)}
         className={`cursor-pointer w-12 h-12 lg:w-14 lg:h-14 rounded-full flex items-center justify-center transition-all duration-300 group relative
+          dark:bg-[#1F293C] hover:bg-gray-200 dark:hover:bg-[#2A374B] focus:outline-none border border-gray-300 dark:border-[#555555]
           ${isOpen ? `border border-[${hoverColor}] shadow-lg shadow-blue-500/20` : ''}
-          bg-[#1F293C] text-[#DBD9D9] hover:bg-[#2A374B] hover:border hover:border-[${hoverColor}] hover:shadow-lg hover:shadow-blue-500/20
+          dark:bg-[#1F293C] text-gray-700 dark:text-[#DBD9D9] hover:bg-[#2A374B] hover:border hover:border-[${hoverColor}] hover:shadow-lg hover:shadow-blue-500/20
         `}
       >
         <BellDot
           className={`w-6 h-6 lg:w-7 lg:h-7 transition-colors duration-300
-    ${isOpen ? 'text-blue-600 dark:text-[#0E00D0]' : 'text-gray-300 dark:text-white group-hover:text-blue-600 dark:group-hover:text-[#0E00D0]'}`}
+    ${isOpen ? 'text-blue-600 dark:text-[#0E00D0]' : 'text-gray-700 dark:text-white group-hover:text-blue-600 dark:group-hover:text-[#0E00D0]'}`}
         />
         {unreadCount > 0 && ( // Conectado à API
           <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold">

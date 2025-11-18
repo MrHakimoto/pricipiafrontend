@@ -47,7 +47,7 @@ export default function RootLayout({
           />
           <PandaVideoScript contentUrl="" />
         </head>
-        <body className={` ${geistSans.variable} ${geistMono.variable} overflow-x-hidden`}>
+        <body className={` ${geistSans.variable} ${geistMono.variable} overflow-x-hidden bg-[#F6F6F6]`}>
           <ThemeProvider
             attribute="class"
             defaultTheme="dark" // Você pode começar com o dark

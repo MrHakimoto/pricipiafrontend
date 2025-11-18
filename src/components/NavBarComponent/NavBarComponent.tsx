@@ -50,11 +50,11 @@ export const NavBarComponent = () => {
     return (
         <>
             {/* Navbar Principal */}
-            <nav className="flex items-center justify-between bg-white dark:bg-[#00091A] px-4 lg:px-6 py-3 shadow-md border-b border-[#555555]">
-                
+            <nav className="flex items-center justify-between bg-[#F8F8F8] dark:bg-[#00091A] px-4 lg:px-6 py-3 shadow-md border-b border-[#555555]">
+
                 {/* Logo e Botão Mobile */}
                 <div className="flex items-center space-x-4">
-                    <button 
+                    <button
                         onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
                         className="lg:hidden cursor-pointer w-12 h-12 rounded-full bg-[#1F293C] flex items-center justify-center text-[#DBD9D9] hover:bg-[#2A374B] hover:border hover:border-[#0E00D0] hover:shadow-lg hover:shadow-blue-500/20 transition-all duration-300"
                     >
@@ -62,10 +62,18 @@ export const NavBarComponent = () => {
                     </button>
 
                     <Link href={'/home'} className="flex-shrink-0">
-                        <img 
-                            src="https://cdn.principiamatematica.com/81c128fd-1223-4f20-af12-c242987d6f46.png" 
-                            alt="Princípia Matemática" 
-                            className="w-32 lg:w-[225px] h-16 lg:h-[110px] object-contain" 
+                        {/* Logo Light */}
+                        <img
+                            src="/logo-principia-black.png"
+                            alt="Princípia Matemática"
+                            className="w-32 lg:w-[225px] h-16 lg:h-[110px] object-contain block dark:hidden"
+                        />
+
+                        {/* Logo Dark */}
+                        <img
+                            src="/logo-principia-white.png"
+                            alt="Princípia Matemática"
+                            className="w-32 lg:w-[225px] h-16 lg:h-[110px] object-contain hidden dark:block"
                         />
                     </Link>
                 </div>
@@ -78,15 +86,13 @@ export const NavBarComponent = () => {
                             <button
                                 key={href}
                                 onClick={() => handleNavigate(href)}
-                                className={`flex items-center cursor-pointer space-x-2 text-2xl group relative transition-all duration-300 ${
-                                    active ? 'font-bold text-black dark:text-white' : 'text-[#4A5260] hover:text-black dark:hover:text-white'
-                                }`}
-                            >
-                                
-                                <Icon
-                                    className={`w-8 h-8 transition-colors duration-300 ${
-                                        active ? 'text-[#0E00D0]' : 'text-[#4A5260] group-hover:text-[#0E00D0]'
+                                className={`flex items-center cursor-pointer space-x-2 text-2xl group relative transition-all duration-300 ${active ? 'font-bold text-black dark:text-white' : 'text-[#4A5260] hover:text-black dark:hover:text-white'
                                     }`}
+                            >
+
+                                <Icon
+                                    className={`w-8 h-8 transition-colors duration-300 ${active ? 'text-[#0E00D0]' : 'text-[#4A5260] group-hover:text-[#0E00D0]'
+                                        }`}
                                 />
                                 <span className="relative">
                                     {label}
@@ -113,11 +119,11 @@ export const NavBarComponent = () => {
             {/* Menu Mobile */}
             <div className={`lg:hidden fixed inset-0 z-50 transition-all duration-300 ease-in-out ${isMobileMenuOpen ? 'opacity-100 visible' : 'opacity-0 invisible pointer-events-none'}`}>
                 <div className="absolute inset-0 bg-black bg-opacity-50" onClick={() => setIsMobileMenuOpen(false)} />
-                
+
                 <div className={`absolute right-0 top-0 h-full w-80 bg-[#00091A] border-l border-[#555555] shadow-2xl transform transition-transform duration-300 ${isMobileMenuOpen ? 'translate-x-0' : 'translate-x-full'}`}>
                     <div className="flex items-center justify-between p-4 border-b border-[#555555]">
                         <h2 className="text-xl font-bold text-white">Menu</h2>
-                        <button 
+                        <button
                             onClick={() => setIsMobileMenuOpen(false)}
                             className="w-10 h-10 rounded-full bg-[#1F293C] flex items-center justify-center text-[#DBD9D9] hover:bg-[#2A374B] hover:text-white transition-all duration-200"
                         >
@@ -133,14 +139,12 @@ export const NavBarComponent = () => {
                                     <button
                                         key={href}
                                         onClick={() => handleNavigate(href)}
-                                        className={`flex items-center w-full cursor-pointer space-x-4 text-xl p-4 rounded-xl transition-all duration-300 group ${
-                                            active ? 'bg-[#1F293C] border border-[#0E00D0] text-white font-bold' : 'text-[#4A5260] hover:text-[#0E00D0] hover:bg-[#1A2332]'
-                                        }`}
+                                        className={`flex items-center w-full cursor-pointer space-x-4 text-xl p-4 rounded-xl transition-all duration-300 group ${active ? 'bg-[#1F293C] border border-[#0E00D0] text-white font-bold' : 'text-[#4A5260] hover:text-[#0E00D0] hover:bg-[#1A2332]'
+                                            }`}
                                     >
                                         <Icon
-                                            className={`w-7 h-7 transition-colors duration-300 ${
-                                                active ? 'text-[#0E00D0]' : 'text-[#4A5260] group-hover:text-[#0E00D0]'
-                                            }`}
+                                            className={`w-7 h-7 transition-colors duration-300 ${active ? 'text-[#0E00D0]' : 'text-[#4A5260] group-hover:text-[#0E00D0]'
+                                                }`}
                                         />
                                         <span>{label}</span>
                                     </button>

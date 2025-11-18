@@ -80,7 +80,7 @@ export default function HomePage() {
   ]
   return (
     <>
-      <main className="min-h-screen bg-gray-100 text-gray-900 dark:bg-[#00091A] dark:text-white px-6 pb-20">
+      <main className="min-h-screen bg-[#F6F6F6] text-gray-900 dark:bg-[#00091A] dark:text-white px-6 pb-20">
         <div className="max-w-7xl mx-auto">
           <BannerCarousel />
 

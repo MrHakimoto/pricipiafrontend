@@ -30,7 +30,7 @@ export default function InsideLayout({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen bg-white dark:bg-[#00091A] dark:text-white flex flex-col w-full overflow-hidden">
+    <div className="min-h-screen bg-[#F6F6F6] dark:bg-[#00091A] dark:text-white flex flex-col w-full overflow-hidden">
       <NavBarComponent />
       <main className="flex-1 w-full overflow-hidden">
         {children}
