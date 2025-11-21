@@ -2,13 +2,13 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import GoogleProvider from "next-auth/providers/google";
 import { api } from "@/lib/axios";
 import type { NextAuthOptions } from "next-auth";
-import { cookies } from "next/headers"; // 1. Importe cookies
-import { decode } from "next-auth/jwt"; // 2. Importe decode
+import { cookies } from "next/headers"; 
+import { decode } from "next-auth/jwt"; 
 
 export const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
-        // ... (seu código do CredentialsProvider continua igual) ...
+        // ... (Seu CredentialsProvider continua idêntico) ...
         id: "credentials",
         name: "Credentials",
         credentials: {
@@ -17,15 +17,12 @@ export const authOptions: NextAuthOptions = {
             laravelToken: { label: "Token", type: "text" }, 
         },
         async authorize(credentials) {
-            // ... (seu código do authorize continua igual) ...
-            // COPIE O CÓDIGO ANTERIOR AQUI
              if (credentials?.laravelToken) {
-                // ... lógica do magic link ...
                  try {
                     const { data: user } = await api.get("/user", {
-                    headers: {
-                        Authorization: `Bearer ${credentials.laravelToken}`,
-                    },
+                        headers: {
+                            Authorization: `Bearer ${credentials.laravelToken}`,
+                        },
                     });
                     if (!user) return null;
                     return {
@@ -61,13 +58,18 @@ export const authOptions: NextAuthOptions = {
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
       async profile(profile) {
         
-        // --- INÍCIO DA CORREÇÃO ---
-        // Tenta recuperar o token da sessão atual para provar ao Laravel que estamos logados
         let tokenAtual = null;
         
         try {
-            const cookieStore = cookies();
-            // O nome do cookie muda se for produção (__Secure-) ou localhost
+            // 🔥 CORREÇÃO: cookies() pode ser síncrono ou assíncrono dependendo da versão.
+            // Para garantir compatibilidade, tratamos o resultado.
+            const cookieStoreResult = cookies();
+            
+            // Se for uma Promise (Next.js 15+ ou canary), aguardamos. Se não, usamos direto.
+            const cookieStore = (cookieStoreResult instanceof Promise) 
+                                ? await cookieStoreResult 
+                                : cookieStoreResult;
+            
             const tokenCookie = cookieStore.get("next-auth.session-token")?.value || 
                                 cookieStore.get("__Secure-next-auth.session-token")?.value;
 
@@ -76,16 +78,13 @@ export const authOptions: NextAuthOptions = {
                     token: tokenCookie,
                     secret: process.env.NEXTAUTH_SECRET!,
                 });
-                // Pega o 'laravelToken' que salvamos na sessão
                 tokenAtual = decoded?.laravelToken; 
             }
         } catch (e) {
             console.log("Não foi possível recuperar a sessão atual (usuário deslogado?)");
         }
-        // --- FIM DA CORREÇÃO ---
 
         try {
-          // Agora enviamos o token no Header!
           const { data } = await api.post("/auth/google", {
             email: profile.email,
             name: profile.name,
@@ -93,14 +92,15 @@ export const authOptions: NextAuthOptions = {
             provider: "google",
             provider_id: profile.sub,
           }, {
-            // 🚨 AQUI ESTÁ O SEGREDO: Se tiver token, envia. Se não, vai vazio.
             headers: tokenAtual ? { 
                 'Authorization': `Bearer ${tokenAtual}` 
             } : {}
           });
 
-          // Se o Laravel retornou erro (ex: 409 Conflict), vai cair no catch abaixo.
-          // Se chegou aqui, é sucesso.
+          // Tratamento robusto para a resposta
+          if (!data.user || !data.token) {
+             throw new Error("Dados incompletos do backend.");
+          }
 
           return {
             id: data.user.id.toString(),
@@ -111,10 +111,9 @@ export const authOptions: NextAuthOptions = {
           };
 
         } catch (error: any) {
-          console.error("Erro no login Google:", error.response?.data?.message);
-          
-          // Se o backend recusou (ex: emails diferentes), lançamos erro para o NextAuth abortar
-          throw new Error(error.response?.data?.message || "Falha na autenticação.");
+          const errorMessage = error.response?.data?.message || error.message || "Erro desconhecido no login Google.";
+          console.error("Erro no login Google (Backend):", errorMessage);
+          throw new Error(errorMessage);
         }
       },
     }),
@@ -137,7 +136,7 @@ export const authOptions: NextAuthOptions = {
   },
   pages: {
     signIn: "/login",
-    error: "/perfil", // Opcional: Redireciona para perfil em caso de erro (vinculo falhou)
+    error: "/perfil", 
   },
   secret: process.env.NEXTAUTH_SECRET!,
 };
