@@ -17,7 +17,7 @@ export default function Page() {
     event.preventDefault();
 
     if (!emailField) {
-      setError("Preencha o email!");
+      setError("Preencha o email, é necessário!");
       return;
     }
 

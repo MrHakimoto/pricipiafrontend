@@ -35,7 +35,7 @@ export const FooterHome = () => {
               Aqui você irá aprender matemática de verdade, sem decorar fórmulas.
             </p>
             <p className="text-xs text-white max-w-xs">
-              Forjado sob o esplendor solar das terras norte-mineiras.
+              Forjado sob o esplendor solar das terras norte-mineiras. E depois de muita luta!
             </p>
           </div>
 
