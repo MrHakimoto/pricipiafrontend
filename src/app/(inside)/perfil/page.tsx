@@ -2,8 +2,8 @@
 
 import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { fetchMyProfile, saveMyProfile } from "@/lib/perfil/userData";
-import { useSession } from "next-auth/react";
+import { fetchMyProfile, saveMyProfile, setPassword, unlinkGoogleAccount, checkGoogleStatus } from "@/lib/perfil/userData";
+import { useSession, signIn } from "next-auth/react"; // <--- Importei signIn
 
 import type { UserProfile } from "@/lib/perfil/userData";
 import ProfileSkeleton from "@/components/Skeletons/ProfileCardSkeleton";
@@ -11,15 +11,6 @@ import ProfileSkeleton from "@/components/Skeletons/ProfileCardSkeleton";
 type ProfileForm = UserProfile & {
   celular: string;
 };
-
-// type ProfileForm = {
-//   id: string;
-//   name: string;
-//   cpf: string;
-//   birth_date: string;
-//   gender: string;
-//   celular: string;
-// };
 
 type ErrorMap = Record<string, string>;
 
@@ -41,20 +32,29 @@ export default function Profile() {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [existProfile, setExistProfile] = useState<boolean>(false);
-
+  const [newPassword, SetNewPassword] = useState<string>("");
+  const [confirmPassword, SetConfirmPassword] = useState<string>("");
+  const [isChangingPassword, setIsChangingPassword] = useState<boolean>(false);
   const { data: session, status, update } = useSession();
-  // session do NextAuth normalmente tem tipos, mas para acessar laravelToken sem erro:
+  const [isGoogle, setIsGoogle] = useState<boolean | undefined>();
+  const [popup, setPopup] = useState({
+    open: false,
+    title: "",
+    message: ""
+  });
+
   const sessionAny = session as any;
 
   useEffect(() => {
     const loadData = async (): Promise<void> => {
       try {
         setIsLoading(true);
+        const responseGoogle = await checkGoogleStatus(sessionAny?.laravelToken);
         const data: any = await fetchMyProfile(sessionAny?.laravelToken);
         console.log("fetchMyProfile ->", data);
 
         if (data) {
-          // Formata a data (AAAA-MM-DD -> DD/MM/AAAA)
+          setIsGoogle(responseGoogle)
           const formatarData = (dataISO?: string | null): string => {
             if (!dataISO) return "";
 
@@ -65,7 +65,6 @@ export default function Profile() {
             return `${dia}/${mes}/${ano}`;
           };
 
-          // Mapeia o gênero retornado
           const mapearGender = (gender?: string | null): string => {
             switch (gender?.toUpperCase()) {
               case "M":
@@ -77,7 +76,6 @@ export default function Profile() {
             }
           };
 
-          // Aplica as máscaras usando as funções já definidas
           setForm({
             id: String(data.user_id ?? ""),
             name: sessionAny?.user?.name ?? "",
@@ -116,7 +114,50 @@ export default function Profile() {
     )}`;
   };
 
-  // Validar CPF
+  const validatePassword = (password: string): string | null => {
+    if (!password || password.trim().length < 6) {
+      return "A senha deve ter pelo menos 6 caracteres";
+    }
+    return null;
+  };
+
+  const handleSetPassword = async () => {
+    const newPassError = validatePassword(newPassword);
+    if (newPassError) {
+      setErrors((prev) => ({ ...prev, newPassword: newPassError }));
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setErrors((prev) => ({ ...prev, confirmPassword: "As senhas não conferem" }));
+      return;
+    }
+
+    setErrors((prev) => ({ ...prev, newPassword: "", confirmPassword: "" }));
+    setIsChangingPassword(true);
+
+    try {
+      await setPassword(sessionAny?.laravelToken, newPassword);
+      setPopup({
+        open: true,
+        title: "Senha atualizada!",
+        message: "Sua senha foi alterada com sucesso."
+      });
+
+      SetNewPassword("");
+      SetConfirmPassword("");
+      setMostrarAlterarSenha(false);
+    } catch (error) {
+      console.log("Deu erro", error);
+      setPopup({
+        open: true,
+        title: "Erro",
+        message: "Não foi possível alterar sua senha. Tente novamente."
+      });
+    } finally {
+      setIsChangingPassword(false);
+    }
+  }
+
   const validarCPF = (cpfRaw: string): boolean => {
     const cpf = cpfRaw.replace(/\D/g, "");
 
@@ -146,7 +187,6 @@ export default function Profile() {
     return true;
   };
 
-  // Máscara para telefone
   const aplicarMascaraTelefone = (value: string): string => {
     const numbers = value.replace(/\D/g, "");
 
@@ -157,7 +197,6 @@ export default function Profile() {
     return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7, 11)}`;
   };
 
-  // Máscara para data
   const aplicarMascaraData = (value: string): string => {
     const numbers = value.replace(/\D/g, "");
 
@@ -171,7 +210,6 @@ export default function Profile() {
     const { name, value } = e.target as HTMLInputElement;
     let valorFormatado = value;
 
-    // Aplicar máscaras conforme o campo
     switch (name) {
       case "cpf":
         valorFormatado = aplicarMascaraCPF(value);
@@ -188,7 +226,6 @@ export default function Profile() {
 
     setForm((prev) => ({ ...prev, [name]: valorFormatado }));
 
-    // Limpar erro do campo quando usuário começar a digitar
     if (errors[name]) {
       setErrors((prev) => ({ ...prev, [name]: "" }));
     }
@@ -197,12 +234,10 @@ export default function Profile() {
   const validarFormulario = (): boolean => {
     const novosErros: ErrorMap = {};
 
-    // Validar nome
     if (!form.name || form.name.trim().length <= 3) {
       novosErros.name = "Nome deve ter mais de 3 caracteres";
     }
 
-    // Validar CPF
     if (form.cpf) {
       const cpfNumeros = form.cpf.replace(/\D/g, "");
       if (cpfNumeros.length !== 11 || !validarCPF(cpfNumeros)) {
@@ -210,7 +245,6 @@ export default function Profile() {
       }
     }
 
-    // Validar telefone
     if (form.celular) {
       const telefoneNumeros = form.celular.replace(/\D/g, "");
       if (telefoneNumeros.length !== 11) {
@@ -218,7 +252,6 @@ export default function Profile() {
       }
     }
 
-    // Validar data
     if (form.birth_date) {
       const dataNumeros = form.birth_date.replace(/\D/g, "");
       if (dataNumeros.length !== 8) {
@@ -235,7 +268,7 @@ export default function Profile() {
     const partes = data.split("/");
     if (partes.length !== 3) return "";
     const [dia, mes, ano] = partes;
-    return `${ano}-${mes}-${dia}`; // formato ISO
+    return `${ano}-${mes}-${dia}`;
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>): Promise<void> => {
@@ -247,7 +280,6 @@ export default function Profile() {
       return;
     }
 
-    // Preparar dados para envio (remover máscaras e ajustar formatos)
     const dadosParaEnvio = {
       id: form.id,
       name: (form.name ?? "").trim(),
@@ -262,7 +294,6 @@ export default function Profile() {
     try {
       await saveMyProfile(dadosParaEnvio, sessionAny?.laravelToken!);
 
-      // Atualiza sessão (pode ser necessário adaptar dependendo do tipo real do update)
       if (typeof update === "function") {
         await update({
           ...(session as any),
@@ -273,14 +304,38 @@ export default function Profile() {
         });
       }
 
-      alert("Dados salvos");
+      setPopup({
+        open: true,
+        title: "Perfil atualizado",
+        message: "Seus dados foram salvos com sucesso."
+      });
     } catch (error) {
       console.error("Erro ao salvar perfil:", error);
-      alert("Erro ao salvar os dados. Tente novamente.");
+      setPopup({
+        open: true,
+        title: "Erro",
+        message: "Erro ao salvar os dados. Tente novamente."
+      });
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  // Função para iniciar o vinculo com o Google
+  const handleGoogleLink = () => {
+    // O 'callbackUrl' garante que o usuário volte para o perfil após vincular
+    signIn("google", { callbackUrl: "/perfil" });
+  };
+
+  const handleUnlinkGoogle = async () => {
+    const response = await unlinkGoogleAccount(sessionAny?.laravelToken!);
+    if (response) {
+      setIsGoogle(false);
+    }
+  }
+
+
+
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -313,7 +368,6 @@ export default function Profile() {
     },
   };
 
-  console.log(sessionAny?.user?.name);
   if (isLoading) {
     return <ProfileSkeleton />;
   }
@@ -363,7 +417,6 @@ export default function Profile() {
 
         {/* Conteúdo Principal */}
         <section className="flex-1 w-full">
-
           {/* Tabs */}
           <motion.div
             className="flex gap-6 border-b border-gray-700 text-sm ml-1 md:ml-2"
@@ -376,8 +429,8 @@ export default function Profile() {
                 key={tab}
                 variants={tabVariants}
                 className={`cursor-pointer pb-2 ${abaAtiva === tab
-                    ? "border-b-2 border-black text-black dark:border-white dark:text-white font-medium"
-                    : "text-gray-800 hover:text-gray-950 dark:text-gray-400 dark:hover:text-white"
+                  ? "border-b-2 border-black text-black dark:border-white dark:text-white font-medium"
+                  : "text-gray-800 hover:text-gray-950 dark:text-gray-400 dark:hover:text-white"
                   }`}
                 onClick={() => setAbaAtiva(tab as "dadosPessoais" | "dadosAcesso" | "assinaturas")}
               >
@@ -434,11 +487,11 @@ export default function Profile() {
                       onChange={handleChange}
                       placeholder="000.000.000-00"
                       maxLength={14}
-                       className="    w-full rounded p-2 bg-white text-gray-900
+                      className="    w-full rounded p-2 bg-white text-gray-900
     placeholder-gray-400
     border border-gray-600 focus:outline-none focus:ring-2 focus:ring-[#0e00d0]
     dark:bg-transparent dark:text-white dark:placeholder-gray-500 dark:border-gray-600"
-    />
+                    />
                     {errors.cpf && (
                       <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-red-400 text-xs mt-1">
                         {errors.cpf}
@@ -455,8 +508,7 @@ export default function Profile() {
                       onChange={handleChange}
                       placeholder="DD/MM/AAAA"
                       maxLength={10}
-                      
-                       className="    w-full rounded p-2 bg-white text-gray-900
+                      className="    w-full rounded p-2 bg-white text-gray-900
     placeholder-gray-400
     border border-gray-600 focus:outline-none focus:ring-2 focus:ring-[#0e00d0]
     dark:bg-transparent dark:text-white dark:placeholder-gray-500 dark:border-gray-600"
@@ -475,7 +527,7 @@ export default function Profile() {
                       name="gender"
                       value={form.gender}
                       onChange={handleChange}
-                       className="    w-full rounded p-2 bg-white text-gray-900
+                      className="    w-full rounded p-2 bg-white text-gray-900
     placeholder-gray-400
     border border-gray-600 focus:outline-none focus:ring-2 focus:ring-[#0e00d0]
     dark:bg-transparent dark:text-white dark:placeholder-gray-500 dark:border-gray-600"
@@ -496,11 +548,10 @@ export default function Profile() {
                       onChange={handleChange}
                       placeholder="(00) 00000-0000"
                       maxLength={15}
-                       className="    w-full rounded p-2 bg-white text-gray-900
+                      className="    w-full rounded p-2 bg-white text-gray-900
     placeholder-gray-400
     border border-gray-600 focus:outline-none focus:ring-2 focus:ring-[#0e00d0]
     dark:bg-transparent dark:text-white dark:placeholder-gray-500 dark:border-gray-600"
-
                     />
                     {errors.celular && (
                       <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-red-400 text-xs mt-1">
@@ -540,23 +591,88 @@ export default function Profile() {
 
               {/* Dados de acesso */}
               {abaAtiva === "dadosAcesso" && (
-                <motion.div initial="hidden" animate="visible" variants={containerVariants} className="space-y-4 text-sm">
-                  <motion.div variants={itemVariants}>
-                    <p className="text-black dark:text-gray-300 mb-1">Email:</p>
-                    <p className="text-black dark:text-gray-300">{sessionAny?.user?.email ?? "—"}</p>
+                <motion.div initial="hidden" animate="visible" variants={containerVariants} className="space-y-6 text-sm">
+                  {/* Seção de Email e Senha */}
+                  <div className="space-y-4">
+                    <motion.div variants={itemVariants}>
+                      <p className="text-black dark:text-gray-300 mb-1 font-medium">Email:</p>
+                      <p className="text-black dark:text-gray-300 bg-gray-100 dark:bg-gray-800/50 p-2 rounded border border-gray-300 dark:border-gray-700">
+                        {sessionAny?.user?.email ?? "—"}
+                      </p>
+                    </motion.div>
+
+                    <motion.div variants={itemVariants}>
+                      <p className="text-black dark:text-gray-300 mb-2 font-medium">Senha:</p>
+                      <motion.button
+                        onClick={() => setMostrarAlterarSenha(true)}
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        className="cursor-pointer text-white bg-[#0e00d0] px-4 py-2 rounded text-sm hover:bg-blue-700 flex items-center gap-2"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                          <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                        </svg>
+                        Alterar senha
+                      </motion.button>
+                    </motion.div>
+                  </div>
+
+                  <div className="border-t border-gray-300 dark:border-gray-700 my-4"></div>
+
+                  {/* Seção de Login Social */}
+                  <motion.div variants={itemVariants} className="space-y-3">
+                    <h3 className="text-black dark:text-white font-medium text-base">Login Social</h3>
+
+                    <p className="text-gray-600 dark:text-gray-400 text-xs mb-3">
+                      Habilite o login com o Google se o e-mail da sua conta Google for o mesmo do seu cadastro atual ({sessionAny?.user?.email}).
+                    </p>
+
+                    {/* BOTÃO GOOGLE */}
+                    <motion.button
+                      onClick={!isGoogle ? handleGoogleLink : undefined}
+                      disabled={isGoogle}
+                      whileHover={!isGoogle ? { scale: 1.02 } : {}}
+                      whileTap={!isGoogle ? { scale: 0.98 } : {}}
+                      className={`
+      flex items-center gap-3 px-4 py-2 rounded-lg border shadow-sm transition-all 
+      ${isGoogle
+                          ? "bg-green-500 border-green-600 text-white cursor-not-allowed shadow-md"
+                          : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50 cursor-pointer dark:bg-[#1b1f27] dark:border-gray-600 dark:text-white dark:hover:bg-[#252a35]"
+                        }
+    `}
+                    >
+                      {/* Ícone Google */}
+                      <svg
+                        width="18"
+                        height="18"
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 48 48"
+                        className={`${isGoogle ? "opacity-80" : ""}`}
+                      >
+                        <path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z" />
+                        <path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z" />
+                        <path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z" />
+                        <path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571c0.001-0.001,0.002-0.001,0.003-0.002l6.19,5.238C36.971,39.205,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z" />
+                      </svg>
+
+                      <span className="font-medium">
+                        {isGoogle ? "Conta Google conectada!" : "Conectar conta Google"}
+                      </span>
+                    </motion.button>
+
+                    {/* REMOVER GOOGLE */}
+                    {isGoogle && (
+                      <button
+                        onClick={handleUnlinkGoogle}
+                        className="cursor-pointer text-red-600 dark:text-red-400 text-sm underline hover:text-red-700 transition-all"
+                      >
+                        Remover vinculação com Google
+                      </button>
+                    )}
                   </motion.div>
 
-                  <motion.div variants={itemVariants}>
-                    <p className="text-black dark:text-gray-300 mb-1">Senha:</p>
-                    <motion.button
-                      onClick={() => setMostrarAlterarSenha(true)}
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      className="cursor-pointer text-white bg-[#0e00d0] px-3 py-1 rounded text-sm hover:bg-blue-700"
-                    >
-                      Alterar senha
-                    </motion.button>
-                  </motion.div>
+
                 </motion.div>
               )}
 
@@ -582,7 +698,7 @@ export default function Profile() {
         </section>
       </main>
 
-      {/* Modal Alterar Senha */}
+      {/* Modal Alterar Senha - implementado sem shadcn/ui */}
       <AnimatePresence>
         {mostrarAlterarSenha && (
           <motion.div
@@ -592,19 +708,21 @@ export default function Profile() {
             className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
           >
             <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              transition={{ duration: 0.18 }}
               className="bg-[#00091A] border border-gray-700 rounded-lg p-6 w-full max-w-md relative"
             >
-              <motion.button
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
-                onClick={() => setMostrarAlterarSenha(false)}
+              <button
+                onClick={() => {
+                  setMostrarAlterarSenha(false);
+                  setErrors((prev) => ({ ...prev, newPassword: "", confirmPassword: "" }));
+                }}
                 className="cursor-pointer absolute top-2 right-2 text-white text-xl hover:text-[#D0004C]"
               >
                 &times;
-              </motion.button>
+              </button>
 
               <h2 className="text-white font-semibold text-lg mb-1">Alterar senha</h2>
               <p className="text-gray-400 text-sm mb-4">Digite uma nova senha para alterar a atual.</p>
@@ -613,31 +731,84 @@ export default function Profile() {
                 <label className="block text-sm text-white font-semibold mb-1">Nova senha</label>
                 <input
                   type="password"
+                  name="newPassword"
+                  value={newPassword}
+                  onChange={(e) => {
+                    SetNewPassword(e.target.value);
+                    if (errors.newPassword) setErrors((p) => ({ ...p, newPassword: "" }));
+                  }}
                   className="w-full p-2 bg-transparent border border-gray-600 rounded text-white focus:outline-none focus:ring-2 focus:ring-[#0e00d0]"
                 />
+                {errors.newPassword && (
+                  <p className="text-red-400 text-xs mt-1">{errors.newPassword}</p>
+                )}
               </div>
 
               <div className="mb-6">
                 <label className="block text-sm text-white font-semibold mb-1">Confirmar nova senha</label>
                 <input
                   type="password"
+                  name="confirmPassword"
+                  value={confirmPassword}
+                  onChange={(e) => {
+                    SetConfirmPassword(e.target.value);
+                    if (errors.confirmPassword) setErrors((p) => ({ ...p, confirmPassword: "" }));
+                  }}
                   className="w-full p-2 bg-transparent border border-gray-600 rounded text-white focus:outline-none focus:ring-2 focus:ring-[#0e00d0]"
                 />
+                {errors.confirmPassword && (
+                  <p className="text-red-400 text-xs mt-1">{errors.confirmPassword}</p>
+                )}
               </div>
 
               <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="bg-[#D0004C] cursor-pointer text-white px-4 py-2 rounded hover:bg-[#0e00d0] w-full"
+                whileHover={{ scale: isChangingPassword ? 1 : 1.02 }}
+                whileTap={{ scale: isChangingPassword ? 1 : 0.98 }}
+                onClick={handleSetPassword}
+                disabled={isChangingPassword}
+                className="bg-[#D0004C] cursor-pointer text-white px-4 py-2 rounded hover:bg-[#0e00d0] w-full disabled:opacity-60"
               >
-                Alterar senha
+                {isChangingPassword ? "Alterando..." : "Alterar senha"}
               </motion.button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Popup genérico (sucesso / erro) */}
+      <AnimatePresence>
+        {popup.open && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-60 flex items-end sm:items-center justify-center p-4 pointer-events-none"
+          >
+            <motion.div
+              initial={{ y: 20, opacity: 0, scale: 0.98 }}
+              animate={{ y: 0, opacity: 1, scale: 1 }}
+              exit={{ y: 20, opacity: 0, scale: 0.98 }}
+              transition={{ duration: 0.18 }}
+              className="pointer-events-auto w-full max-w-sm bg-white dark:bg-[#0b1220] border border-gray-700 rounded-2xl shadow-2xl p-4"
+            >
+              <div className="flex flex-col gap-3">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{popup.title}</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-300">{popup.message}</p>
+                </div>
+                <div className="flex justify-end">
+                  <button
+                    onClick={() => setPopup({ ...popup, open: false })}
+                    className="px-3 py-2 bg-[#0e00d0] text-white rounded-md"
+                  >
+                    OK
+                  </button>
+                </div>
+              </div>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
     </div>
   );
-
-
 }

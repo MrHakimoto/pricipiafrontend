@@ -1,189 +1,256 @@
 'use client'
 
-import { Flame, Check, Loader2 } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import useSWR from 'swr'
-import { motion, AnimatePresence } from 'framer-motion'
+import { Check, X, Flame, Calendar } from 'lucide-react'
+import { checkinStatus, checkinDaily } from '@/lib/dailyCheck/daily'
 
-// 1. Importe suas funções da API
-import { checkinStatus, checkinDaily } from '@/lib/dailyCheck/daily' // Ajuste o caminho se necessário
-
-// 2. Defina o tipo de dados que a API retorna
 interface UserStreak {
-  id: number;
-  user_id: number;
-  current_streak: number;
-  longest_streak: number;
-  last_checkin_date: string;
-  has_checked_in_today: boolean;
+  id: number
+  user_id: number
+  current_streak: number
+  longest_streak: number
+  last_checkin_date: string
+  has_checked_in_today: boolean
 }
 
-// 3. Chave de cache para o SWR
+type DayStatus = 'done' | 'current' | 'missed' | 'pending'
+
+interface WeekDay {
+  name: string
+  status: DayStatus
+}
+
 const STREAK_KEY = '/api/checkin-status'
+
+// Funções para gerenciar o cookie de check-in
+const getCheckinCookie = (): string | null => {
+  if (typeof window === 'undefined') return null
+  const cookies = document.cookie.split(';')
+  const checkinCookie = cookies.find(cookie => cookie.trim().startsWith('daily_checkin='))
+  return checkinCookie ? checkinCookie.split('=')[1] : null
+}
+
+const setCheckinCookie = (): void => {
+  if (typeof window === 'undefined') return
+  const today = new Date().toDateString()
+  const expires = new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 horas
+  document.cookie = `daily_checkin=${today}; path=/; expires=${expires.toUTCString()}; SameSite=Lax`
+}
 
 export default function WeekProgress() {
   const { data: session } = useSession()
   const token = session?.laravelToken
+  
+  const [hasAutoCheckedIn, setHasAutoCheckedIn] = useState<boolean>(false)
+  const [animatedStreak, setAnimatedStreak] = useState<number>(0)
+  const [loaded, setLoaded] = useState<boolean>(false)
 
-  const [isSubmitting, setIsSubmitting] = useState(false)
-
-  // 4. Hook de busca de dados (SWR)
-  // Ele busca o status assim que o componente é montado
   const {
     data: streakData,
     error,
     isLoading,
-    mutate, // A 'mutate' é a função mágica para atualizar a UI
+    mutate,
   } = useSWR<UserStreak>(
-    token ? [STREAK_KEY, token] : null, // Só busca se o token existir
-    ([key, token]) => checkinStatus(token as string)
+    token ? [STREAK_KEY, token] : null,
+    ([key, token]: [string, string]) => checkinStatus(token)
   )
 
-  // 5. Função para fazer o Check-in
-  const handleCheckin = async () => {
-    if (!token) return
-    setIsSubmitting(true)
+  // Check-in automático ao carregar a página
+  useEffect(() => {
+    const autoCheckin = async (): Promise<void> => {
+      if (!token || hasAutoCheckedIn || !streakData) return
 
-    try {
-      // Chama a API de check-in
-      const newStreakData = await checkinDaily(token)
-      
-      // 6. ATUALIZAÇÃO MÁGICA (Otimista)
-      // Atualiza a UI instantaneamente com os novos dados,
-      // sem precisar de um novo 'fetch'.
-      mutate(newStreakData.streak, false) // 'false' impede uma re-busca desnecessária
-      
-    } catch (err) {
-      console.error('Falha ao fazer check-in:', err)
-      // Adicionar um toast de erro aqui seria uma boa
-    } finally {
-      setIsSubmitting(false)
+      const today = new Date().toDateString()
+      const lastCheckinCookie = getCheckinCookie()
+
+      // Se já fez check-in hoje no cookie, não faz nada
+      if (lastCheckinCookie === today) {
+        setHasAutoCheckedIn(true)
+        return
+      }
+
+      // Se ainda não fez check-in hoje na API
+      if (!streakData.has_checked_in_today) {
+        try {
+          const newStreakData = await checkinDaily(token)
+          mutate(newStreakData.streak, false)
+          setCheckinCookie()
+          setHasAutoCheckedIn(true)
+        } catch (err) {
+          console.error('Falha no check-in automático:', err)
+        }
+      } else {
+        setCheckinCookie()
+        setHasAutoCheckedIn(true)
+      }
     }
+
+    if (streakData && !isLoading) {
+      autoCheckin()
+    }
+  }, [streakData, isLoading, token, hasAutoCheckedIn, mutate])
+
+  // Animação do número
+  useEffect(() => {
+    if (!streakData || isLoading) return
+
+    setLoaded(true)
+    
+    let start = 0
+    const target = streakData.current_streak
+    const duration = 1000
+    const startTime = performance.now()
+
+    const animateNumber = (timestamp: number): void => {
+      const elapsed = timestamp - startTime
+      const progress = Math.min(1, elapsed / duration)
+      const eased = 1 - Math.pow(1 - progress, 3)
+
+      const current = Math.floor(eased * target)
+      setAnimatedStreak(current)
+
+      if (progress < 1) {
+        requestAnimationFrame(animateNumber)
+      } else {
+        setAnimatedStreak(target)
+      }
+    }
+
+    requestAnimationFrame(animateNumber)
+  }, [streakData, isLoading])
+
+  // Gerar dias da semana baseado no estado atual
+  const getWeekDays = (): WeekDay[] => {
+    const days = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
+    const today = new Date().getDay()
+    
+    return days.map((day, index): WeekDay => {
+      let status: DayStatus = 'pending'
+      
+      if (index === today) {
+        status = streakData?.has_checked_in_today ? 'done' : 'current'
+      } else if (index < today) {
+        status = streakData?.current_streak! > 0 ? 'done' : 'missed'
+      }
+
+      return { name: day, status }
+    })
   }
 
-  // --- Estados de UI ---
+  const DAYS = getWeekDays()
+
+  // Função para formatar o texto do streak
+  const getStreakText = (streak: number): string => {
+    return streak === 1 ? 'dia' : 'dias'
+  }
+
   if (isLoading) {
     return (
-      <div className="bg-white dark:bg-[#111827] border border-gray-200 dark:border-gray-700 rounded-xl p-6 min-h-[220px] flex justify-center items-center">
-        <Loader2 className="animate-spin text-gray-400" size={32} />
+      <div className="flex-1 max-w-sm bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-6 shadow-2xl border border-gray-700/50 animate-pulse">
+        <div className="h-5 bg-gray-700 rounded w-24 mb-6"></div>
+        <div className="h-16 bg-gray-700 rounded w-20 mx-auto mb-3"></div>
+        <div className="h-4 bg-gray-700 rounded w-16 mx-auto mb-6"></div>
+        <div className="flex justify-between mb-6">
+          {Array.from({ length: 7 }).map((_, i) => (
+            <div key={i} className="flex flex-col items-center">
+              <div className="w-6 h-6 bg-gray-700 rounded-full mb-1"></div>
+              <div className="h-2 bg-gray-700 rounded w-3"></div>
+            </div>
+          ))}
+        </div>
+        <div className="h-8 bg-gray-700 rounded-full"></div>
       </div>
     )
   }
 
   if (error || !streakData) {
     return (
-      <div className="bg-white dark:bg-[#111827] border border-gray-200 dark:border-gray-700 rounded-xl p-6 min-h-[220px] text-center">
-        <h2 className="text-lg font-semibold mb-2 text-red-500">Erro</h2>
-        <p className="text-sm text-gray-600 dark:text-gray-400">Não foi possível carregar seu progresso.</p>
+      <div className="flex-1 max-w-sm bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-6 shadow-2xl border border-gray-700/50 text-center">
+        <div className="flex items-center justify-center gap-2 text-gray-400 mb-4">
+          <Calendar size={20} />
+          <span className="text-sm">Ofensiva</span>
+        </div>
+        <p className="text-xs text-gray-500">Não foi possível carregar</p>
       </div>
     )
   }
 
-  // --- Variáveis de estado ---
   const hasCheckedIn = streakData.has_checked_in_today
-  const currentStreak = streakData.current_streak
 
   return (
-    <motion.div
-      layout // Anima a mudança de altura
-      className="bg-white dark:bg-[#111827] border border-gray-200 dark:border-gray-700 rounded-xl p-6"
-    >
-      <h2 className="text-lg font-semibold mb-6 text-gray-900 dark:text-white">
-        Ofensiva de Check-in
-      </h2>
+    <div className={`flex-1 max-w-sm bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-6 shadow-2xl border border-gray-700/50 transition-all duration-700 ${loaded ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
       
-      {/* Visual Central */}
-      <div className="flex flex-col items-center gap-2 mb-6">
-        <motion.div
-          animate={{ scale: [1, 1.2, 1], rotate: [0, -10, 10, 0] }}
-          transition={{ duration: 0.5, ease: 'easeInOut' }}
-        >
-          <Flame
-            className={`w-20 h-20 transition-all duration-300 ${
-              hasCheckedIn
-                ? 'text-orange-500 fill-orange-500 shadow-[0_0_25px_theme(colors.orange.500)]'
-                : 'text-gray-400 dark:text-gray-600'
-            }`}
-          />
-        </motion.div>
-        
-        {/* Animação do número mudando */}
-        <div className="relative h-16 w-16">
-          <AnimatePresence>
-            <motion.span
-              key={currentStreak} // Isso faz a animação rodar toda vez que o número muda
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.3 }}
-              className="absolute inset-0 flex items-center justify-center text-5xl font-bold text-gray-900 dark:text-white"
-            >
-              {currentStreak}
-            </motion.span>
-          </AnimatePresence>
+      {/* Header elegante */}
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-2">
+          <Flame size={20} className="text-orange-400" />
+          <span className="text-sm font-semibold text-white">Ofensiva</span>
         </div>
-        
-        <p className="font-semibold text-gray-700 dark:text-gray-300">
-          dias de ofensiva
-        </p>
+        <div className="text-xs text-gray-400 flex items-center gap-1">
+          <Calendar size={12} />
+          <span>Hoje</span>
+        </div>
       </div>
 
-      {/* Botão de Ação / Mensagem de Concluído */}
-      <div className="h-20">
-        <AnimatePresence mode="wait">
-          {!hasCheckedIn ? (
-            // --- ESTADO 1: Botão de Check-in ---
-            <motion.div
-              key="button"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-            >
-              <button
-                onClick={handleCheckin}
-                disabled={isSubmitting}
-                className="w-full h-12 px-6 font-semibold text-white rounded-lg transition-all duration-300 
-                           bg-blue-600 hover:bg-blue-700 
-                           dark:bg-[#0E00D0] dark:hover:bg-blue-800
-                           focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900
-                           disabled:bg-gray-400 dark:disabled:bg-gray-600"
-              >
-                {isSubmitting ? (
-                  <Loader2 className="animate-spin mx-auto" />
-                ) : (
-                  'Fazer check-in de hoje'
-                )}
-              </button>
-              <p className="text-xs text-center text-gray-500 dark:text-gray-400 mt-2">
-                Sua maior ofensiva foi de {streakData.longest_streak} dias!
-              </p>
-            </motion.div>
-          ) : (
-            // --- ESTADO 2: Check-in Concluído ---
-            <motion.div
-              key="checked"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="text-center"
-            >
-              <div
-                className="w-full h-12 px-6 font-semibold rounded-lg flex items-center justify-center gap-2
-                           bg-green-100 text-green-800
-                           dark:bg-green-500/10 dark:text-green-400
-                           border border-green-300 dark:border-green-500/30"
-              >
-                <Check className="w-5 h-5" />
-                Check-in de hoje concluído!
-              </div>
-              <p className="text-xs text-center text-gray-500 dark:text-gray-400 mt-2">
-                Bom trabalho. Volte amanhã para manter sua ofensiva.
-              </p>
-            </motion.div>
-          )}
-        </AnimatePresence>
+      {/* Streak principal */}
+      <div className="text-center mb-6">
+        <div className="flex items-baseline justify-center gap-2 mb-1">
+          <span className="text-5xl font-bold bg-gradient-to-r from-orange-400 to-orange-500 bg-clip-text text-transparent">
+            {animatedStreak}
+          </span>
+          <span className="text-lg text-gray-400">{getStreakText(animatedStreak)}</span>
+        </div>
+        <p className="text-xs text-gray-500">sequência atual</p>
       </div>
-    </motion.div>
+
+      {/* Semana estilizada */}
+      <div className="flex justify-between mb-6 px-1">
+        {DAYS.map((day, index) => (
+          <div key={index} className="flex flex-col items-center">
+            <div className={`w-7 h-7 flex items-center justify-center rounded-full mb-2 transition-all duration-300 ${
+              day.status === "done"
+                ? "bg-gradient-to-br from-orange-500 to-orange-600 shadow-lg shadow-orange-500/25"
+                : day.status === "current"
+                ? "bg-gradient-to-br from-blue-500 to-blue-600 shadow-lg shadow-blue-500/25 ring-2 ring-blue-400/50"
+                : day.status === "missed"
+                ? "bg-gradient-to-br from-gray-600 to-gray-700"
+                : "bg-gradient-to-br from-gray-700 to-gray-800 border border-gray-600/50"
+            }`}>
+              {day.status === "done" && <Check className="text-white w-3 h-3" />}
+              {day.status === "current" && <Check className="text-white w-3 h-3" />}
+              {day.status === "missed" && <X className="text-white w-3 h-3" />}
+            </div>
+            <span className={`text-xs font-medium transition-colors ${
+              day.status === "pending" ? "text-gray-500" : "text-gray-300"
+            }`}>
+              {day.name}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {/* Status elegante simplificado */}
+      <div className={`p-3 rounded-xl transition-all duration-500 ${
+        hasCheckedIn 
+          ? 'bg-gradient-to-r from-green-500/10 to-green-600/10 border border-green-500/20' 
+          : 'bg-gradient-to-r from-blue-500/10 to-blue-600/10 border border-blue-500/20'
+      }`}>
+        <span className={`text-xs font-semibold block text-center ${
+          hasCheckedIn ? 'text-green-400' : 'text-blue-400'
+        }`}>
+          {hasCheckedIn ? 'Check-in realizado ✓' : 'Estude todos os dias'}
+        </span>
+      </div>
+
+      {/* Recorde */}
+      <div className="flex items-center justify-between mt-4 text-xs">
+        <span className="text-gray-500">Melhor sequência</span>
+        <span className="text-orange-400 font-semibold">
+          {streakData.longest_streak} {getStreakText(streakData.longest_streak)}
+        </span>
+      </div>
+    </div>
   )
 }

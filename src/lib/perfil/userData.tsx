@@ -10,6 +10,43 @@ export interface UserProfile {
   phone?: string;
 }
 
+export const linkGoogleAccount = async (token: string, googleData: { email: string; google_id: string; avatar?: string }) => {
+  try {
+    const response = await api.post("/user/link-google", googleData, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    return response.data;
+  } catch (error: any) {
+    console.error("Erro ao vincular Google:", error.response?.data || error.message);
+    throw error; // Lança o erro para o componente mostrar o Toast
+  }
+};
+
+export const unlinkGoogleAccount = async (token: string) => {
+  try {
+    const response = await api.post("/user/unlink-google", {}, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    return response.data;
+  } catch (error: any) {
+    console.error("Erro ao desvincular Google:", error.response?.data || error.message);
+    // Repassa o erro para o componente mostrar (ex: "Defina uma senha antes")
+    throw error; 
+  }
+};
+
+
+export const checkGoogleStatus = async (token: string): Promise<boolean> => {
+  try {
+    const response = await api.get<{ is_linked: boolean }>("/user/google-status", {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    return response.data.is_linked;
+  } catch (error) {
+    return false;
+  }
+};
+
 /** Busca o perfil do usuário logado */
 export const fetchMyProfile = async (token: string): Promise<UserProfile | null> => {
   try {
@@ -23,6 +60,20 @@ export const fetchMyProfile = async (token: string): Promise<UserProfile | null>
     throw new Error("Falha ao buscar o perfil.");
   }
 };
+
+export const setPassword = async (token: string, data: string) => {
+  try {
+    const response = await api.post("/setPassword", { password: data, password_confirmation: data }, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return response.data;
+  } catch (error: any) {
+    if (error.response?.status === 404) return null;
+    console.error("Erro ao buscar perfil:", error);
+    throw new Error("Falha ao buscar o perfil.");
+  }
+};
+
 
 /** Cria ou atualiza o perfil do usuário logado */
 export const saveMyProfile = async (dados: UserProfile, token: string): Promise<UserProfile> => {

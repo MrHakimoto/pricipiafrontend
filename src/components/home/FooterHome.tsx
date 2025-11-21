@@ -25,7 +25,7 @@ export const FooterHome = () => {
               Substitua este 'div' pelo seu componente de Logo ou tag <img /> 
             */}
             <div className="w-16 h-16 bg-white/10 rounded-lg flex items-center justify-center">
-                <img src={'https://cdn.principiamatematica.com/81c128fd-1223-4f20-af12-c242987d6f46.png'} alt="Logo" className="w-10 h-10" />
+                <img src={'/logo.jpg'} alt="Logo" className="" />
             </div>
             
             <h2 className="text-white font-bold text-xl uppercase">

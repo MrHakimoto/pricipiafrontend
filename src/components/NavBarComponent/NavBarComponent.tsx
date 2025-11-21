@@ -8,13 +8,17 @@ import { useProgressBar } from '../Context/ProgressBarContext';
 import { useRouter } from 'next/navigation';
 import { UserMenu } from '../UserComponente';
 import { NotificationsMenu } from '../NotificationsMenu';
+import { useSession } from "next-auth/react";
+
+
 
 export const NavBarComponent = () => {
     const pathname = usePathname();
     const router = useRouter();
     const { start } = useProgressBar();
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-
+    const { data: session, status, update } = useSession();
+    const sessionAny = session as any;
     useEffect(() => {
         document.body.style.overflow = isMobileMenuOpen ? 'hidden' : '';
         document.body.style.position = isMobileMenuOpen ? 'fixed' : '';
@@ -111,7 +115,7 @@ export const NavBarComponent = () => {
                     {/* Hover azul quando aberto */}
                     <NotificationsMenu hoverColor="#0E00D0" />
                     <div className="cursor-pointer hidden lg:block">
-                        <UserMenu session={sessionData} hoverColor="#0E00D0" />
+                        <UserMenu session={sessionAny} hoverColor="#0E00D0" />
                     </div>
                 </div>
             </nav>
@@ -153,7 +157,7 @@ export const NavBarComponent = () => {
                         </div>
 
                         <div className="pt-4 border-t border-[#555555]">
-                            <UserMenu mobile session={sessionData} hoverColor="#0E00D0" />
+                            <UserMenu mobile session={sessionAny} hoverColor="#0E00D0" />
                         </div>
                     </div>
                 </div>

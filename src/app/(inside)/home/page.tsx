@@ -14,7 +14,7 @@ import WeekProgress from '@/components/home/metricas/WeekProgress'
 import MyLists from '@/components/home/metricas/MyLists'
 import MetricsSection from '@/components/home/metricas/MetricsSection'
 import { FooterHome } from '@/components/home/FooterHome'
-import ContinueWatchingCard  from '@/components/home/ContinueWatchingCard';
+import ContinueWatchingCard from '@/components/home/ContinueWatchingCard';
 
 
 export default function HomePage() {
@@ -83,21 +83,22 @@ export default function HomePage() {
       <main className="min-h-screen bg-[#F6F6F6] text-gray-900 dark:bg-[#00091A] dark:text-white px-6 pb-20">
         <div className="max-w-7xl mx-auto">
           <BannerCarousel />
-
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2, duration: 0.6 }}
             className="mt-6"
           >
+
             <UserCard nome={session?.user?.name ?? null} />
           </motion.div>
 
           <section className="mt-12 space-y-12">
-            <div>
+            <div className="flex gap-6">
+              <WeekProgress />
               <ContinueWatchingCard />
             </div>
-            <CoursesSection />
+            {/* <CoursesSection /> */}
           </section>
         </div>
 
@@ -109,8 +110,8 @@ export default function HomePage() {
               transition={{ duration: 0.6 }}
               className="grid grid-cols-1 md:grid-cols-2 gap-6"
             >
-              <GoalsSection />
-              <WeekProgress />
+              a
+
             </motion.div>
 
             <motion.div

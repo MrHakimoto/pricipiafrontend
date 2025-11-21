@@ -292,8 +292,8 @@ const QuestaoFooter = ({
           onClick={() => onToggleTab('gabarito')}
           disabled={!isAnswered}
           className={`font-bold flex flex-row items-center justify-center cursor-pointer p-2 transition duration-200 ease-in-out w-full sm:w-1/3 text-center space-x-2 ${activeTab === 'gabarito'
-              ? 'text-white bg-blue-900'
-              : 'text-gray-300 hover:text-white'
+            ? 'text-white bg-blue-900'
+            : 'text-gray-300 hover:text-white'
             }`}
         >
           <MessageCircle className="w-6 h-6" />
@@ -306,8 +306,8 @@ const QuestaoFooter = ({
           onClick={() => onToggleTab('estatisticas')}
           disabled={!isAnswered}
           className={`font-bold flex flex-row items-center justify-center cursor-pointer p-2 transition duration-200 ease-in-out w-full sm:w-1/3 text-center border-t sm:border-t-0 sm:border-l border-gray-700 space-x-2 ${activeTab === 'estatisticas'
-              ? 'text-white bg-blue-900'
-              : 'text-gray-300 hover:text-white'
+            ? 'text-white bg-blue-900'
+            : 'text-gray-300 hover:text-white'
             }`}
         >
           <ChartColumn className="w-6 h-6" />
@@ -320,8 +320,8 @@ const QuestaoFooter = ({
           onClick={() => onToggleTab('duvida')}
           disabled={!isAnswered}
           className={`font-bold flex flex-row items-center justify-center cursor-pointer p-2 transition duration-200 ease-in-out w-full sm:w-1/3 text-center border-t sm:border-t-0 sm:border-l border-gray-700 space-x-2 ${activeTab === 'duvida'
-              ? 'text-white bg-blue-900'
-              : 'text-gray-300 hover:text-white'
+            ? 'text-white bg-blue-900'
+            : 'text-gray-300 hover:text-white'
             }`}
         >
           <HelpCircle className="w-6 h-6" />
@@ -384,7 +384,7 @@ const renderActiveTabContent = (questao: Questao, activeTab: QuestaoTab, userTok
       <DuvidaQuestao
         questaoId={questao.id}
         enunciado={questao.enunciado}
-        //token={userToken}
+      //token={userToken}
       />
     ),
     estatisticas: (
@@ -431,7 +431,7 @@ export const ModelQuestions: React.FC<QuestionsPanelProps> = ({
             {questions.map((questao, index) => (
 
               <div
-
+                key={questao.id}
                 className="bg-[#00091A] rounded-lg shadow-xl mb-8 border border-[#616161]"
               >
                 {/* Cabeçalho da Questão */}
@@ -526,12 +526,12 @@ export const ModelQuestions: React.FC<QuestionsPanelProps> = ({
 
       {/* Modal de Reportar */}
       {openReportModalId && (
-    <ReportarModal
-        questaoId={openReportModalId}
-        onClose={closeReportModal}
-        token={userToken || ''}
-    />
-)}
+        <ReportarModal
+          questaoId={openReportModalId}
+          onClose={closeReportModal}
+          token={userToken || ''}
+        />
+      )}
     </div>
   );
 };

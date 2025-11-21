@@ -7,7 +7,7 @@ export async function middleware(request: NextRequest) {
   const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
 
   // 🔓 Rotas públicas (sem login)
-  const publicRoutes = ["/login", "/terms", "/privacy", "/contact"];
+  const publicRoutes = ["/login", "/terms", "/privacy", "/contact", "/definir-senha", "/magic-login"];
 
   const isPublicPage = publicRoutes.some((route) =>
     request.nextUrl.pathname.startsWith(route)

@@ -173,7 +173,7 @@ export function UserMenu({ mobile = false, session, hoverColor = "#0E00D0" }: Us
 
             <button
               onClick={() => signOut()}
-              className="flex items-center justify-between w-full px-3 py-2.5 text-sm rounded-md text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-300 hover:bg-red-100 dark:hover:bg-[#2A1A2A] transition-all duration-200"
+              className="flex items-center cursor-pointer justify-between w-full px-3 py-2.5 text-sm rounded-md text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-300 hover:bg-red-100 dark:hover:bg-[#2A1A2A] transition-all duration-200"
             >
               <div className="flex items-center space-x-3"><LogOut className="w-4 h-4" /><span>Sair da conta</span></div>
               <LogOut className="w-4 h-4" />

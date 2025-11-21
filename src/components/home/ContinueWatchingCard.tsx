@@ -41,7 +41,7 @@ export default function ContinueWatchingCard({ data }: ContinueWatchingCardProps
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-gray-800 rounded-lg p-6 border border-gray-700 hover:border-gray-600 transition-colors cursor-pointer"
+      className="flex-1 bg-gray-800 rounded-lg p-6 border border-gray-700 hover:border-gray-600 transition-colors cursor-pointer"
       onClick={() => {
         // Navegar para a aula ou reproduzir vídeo
         console.log('Continuar aula:', aula.id);
