@@ -40,8 +40,6 @@ export default function ListaQuestionsPage() {
     // ✅ IMPEDIR EXECUÇÕES MÚLTIPLAS
     
 
-
-
   useEffect(() => {
 
     if (fetchDataRef.current) {
@@ -153,7 +151,7 @@ export default function ListaQuestionsPage() {
 
           } else {
             console.log('🆕 Nenhuma tentativa ativa - será criada na primeira resposta');
-            setResolucaoId(null);
+            //setResolucaoId(null);
             setTentativaAtiva(null);
             setRespostasSalvas({});
           }

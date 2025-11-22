@@ -13,6 +13,7 @@ import CommentSection from "@/components/modules/CommentSection";
 
 import { useVideoProgress } from '@/hooks/useVideoProgress';
 import { usePandaPlayer } from '@/hooks/usePandaPlayer';
+import { DuvidaCard } from "@/components/modules/DuvidaCard";
 
 
 
@@ -59,51 +60,51 @@ export default function ConteudoPage() {
   const thisDataD = contents.find((c) => c.id === Number(conteudoId));
   const currentIndex = contents.findIndex((c) => c.id === Number(conteudoId));
 
-const { sendHeartbeat, saveFinalProgress, isSaving } = useVideoProgress(Number(conteudoId));
-const { setupPlayerListeners, currentTimeRef } = usePandaPlayer(
-  Number(conteudoId), 
-  thisDataD?.user_progress?.last_watched_timestamp
-);
+  const { sendHeartbeat, saveFinalProgress, isSaving } = useVideoProgress(Number(conteudoId));
+  const { setupPlayerListeners, currentTimeRef } = usePandaPlayer(
+    Number(conteudoId),
+    thisDataD?.user_progress?.last_watched_timestamp
+  );
 
   useEffect(() => {
     const cleanup = setupPlayerListeners();
 
     // Save final quando o usuário sair da página
-     const handleBeforeUnload = () => {
-    const finalTime = currentTimeRef.current;
-    console.log('🚪 Usuário saindo - salvando tempo:', finalTime);
-    saveFinalProgress(finalTime);
-  };
+    const handleBeforeUnload = () => {
+      const finalTime = currentTimeRef.current;
+      console.log('🚪 Usuário saindo - salvando tempo:', finalTime);
+      saveFinalProgress(finalTime);
+    };
 
 
     window.addEventListener('beforeunload', handleBeforeUnload);
 
-     return () => {
-    cleanup();
-    window.removeEventListener('beforeunload', handleBeforeUnload);
-    
-    // Save final na desmontagem do componente
-    const finalTime = currentTimeRef.current;
-    console.log('🔚 Saindo da aula - salvando tempo final:', finalTime);
-    saveFinalProgress(finalTime);
-  };
-}, [setupPlayerListeners, saveFinalProgress, conteudoId, session, thisDataD]);
+    return () => {
+      cleanup();
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+
+      // Save final na desmontagem do componente
+      const finalTime = currentTimeRef.current;
+      console.log('🔚 Saindo da aula - salvando tempo final:', finalTime);
+      saveFinalProgress(finalTime);
+    };
+  }, [setupPlayerListeners, saveFinalProgress, conteudoId, session, thisDataD]);
 
   // Ref para guardar o último tempo conhecido (fallback)
   const lastKnownTimeRef = useRef<number>(0);
 
   // 🔥 EFFECT PARA ATUALIZAR O LAST KNOWN TIME
   useEffect(() => {
-  const handleMessage = (event: MessageEvent) => {
-    // Listen para mensagens do Panda Video
-    if (event.data && event.data.type === 'panda_timeupdate') {
-      currentTimeRef.current = event.data.currentTime;
-    }
-  };
+    const handleMessage = (event: MessageEvent) => {
+      // Listen para mensagens do Panda Video
+      if (event.data && event.data.type === 'panda_timeupdate') {
+        currentTimeRef.current = event.data.currentTime;
+      }
+    };
 
-     window.addEventListener('message', handleMessage);
-  return () => window.removeEventListener('message', handleMessage);
-}, []);
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
   // 🔥 ATUALIZA O STORE QUANDO O CONTEÚDO MUDA
   useEffect(() => {
     if (thisDataD) {
@@ -203,7 +204,7 @@ const { setupPlayerListeners, currentTimeRef } = usePandaPlayer(
 
   const attachmentsCount: number = thisDataD.attachments?.length || 0;
   const isCompleted = thisDataD.user_progress?.is_completed || false;
-const hasProgress = (thisDataD.user_progress?.last_watched_timestamp || 0) > 0;
+  const hasProgress = (thisDataD.user_progress?.last_watched_timestamp || 0) > 0;
 
   return (
     <div>
@@ -418,7 +419,10 @@ const hasProgress = (thisDataD.user_progress?.last_watched_timestamp || 0) > 0;
                   )}
                 </div>
               ) : (
-                <p className="leading-relaxed">Dúvidas e discussões da aula.</p>
+                <DuvidaCard
+                  courseContentId={Number(conteudoId)}
+                  enunciado={thisDataD.title} // ← ADICIONAR ESTA PROP
+                />
               )}
             </div>
             <section className="mt-8">
@@ -426,8 +430,8 @@ const hasProgress = (thisDataD.user_progress?.last_watched_timestamp || 0) > 0;
                 Digite aqui seu comentário
               </h3>
 
-              <section className="mt-8">
-                <h3 className="text-white font-semibold mb-6 text-2xl">
+              <section className="mt-8 max-w-6xl">
+                <h3 className="text-white font-semibold mb-6 text-2xl max-w-6xl">
                   Comentários e Discussões
                 </h3>
 

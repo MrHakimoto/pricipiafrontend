@@ -9,7 +9,7 @@ export interface ListaResolucao {
   user_id: number;
   lista_id: number;
   status: string;
-  score_final?: number | null;
+  score_final?: number | null | undefined;
   total_questoes?: number | null;
   [key: string]: any;
 }

@@ -1,7 +1,7 @@
-// contexts/NavigationContext.tsx - VERSÃO CORRIGIDA
+// contexts/NavigationContext.tsx - VERSÃO ATUALIZADA
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import type { QuestaoBase } from '@/types/questions';
 
 export type NavigationQuestion = QuestaoBase;
@@ -22,6 +22,14 @@ export interface NavigationContextType {
   setCurrentQuestion: (questionId: number) => void;
   setQuestionHover: (questionId: number, isHovered: boolean) => void;
   scrollToQuestion: (questionId: number) => void;
+  
+  // ✅ NOVOS: Para o botão "refazer lista"
+  todasQuestoesRespondidas: boolean;
+  progresso: {
+    respondidas: number;
+    total: number;
+    percentual: number;
+  };
 }
 
 const NavigationContext = createContext<NavigationContextType | undefined>(undefined);
@@ -50,6 +58,25 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({
   
   const initializedRef = useRef(false);
 
+  // ✅ CALCULAR PROGRESSO (usando useMemo para performance)
+  const progresso = useMemo(() => {
+    const respondidas = questionsNavigation.filter(q => 
+      q.status === 'correct' || q.status === 'incorrect' || q.status === 'answered'
+    ).length;
+    const total = questionsNavigation.length;
+    
+    return {
+      respondidas,
+      total,
+      percentual: total > 0 ? Math.round((respondidas / total) * 100) : 0
+    };
+  }, [questionsNavigation]);
+
+  // ✅ VERIFICAR SE TODAS AS QUESTÕES FORAM RESPONDIDAS
+  const todasQuestoesRespondidas = useMemo(() => {
+    return progresso.respondidas > 0 && progresso.respondidas >= progresso.total;
+  }, [progresso]);
+
   // ✅ FUNÇÃO CORRIGIDA: Agora considera isSimuladoOuProva corretamente
   const getQuestionStatus = useCallback((questaoId: number, questaoData: NavigationQuestion, respostas: Record<number, number>): QuestionStatus => {
     if (respostas[questaoId]) {
@@ -64,7 +91,7 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({
       }
     }
     return 'unanswered';
-  }, [isSimuladoOuProva]); // ✅ ADICIONEI isSimuladoOuProva como dependência
+  }, [isSimuladoOuProva]);
 
   useEffect(() => {
     if (initialQuestions.length === 0) return;
@@ -72,13 +99,13 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({
     console.log('🔄 NavigationProvider: Inicializando', {
       questionsCount: initialQuestions.length,
       respostasCount: respostasSalvas ? Object.keys(respostasSalvas).length : 0,
-      isSimuladoOuProva, // ✅ Isso deve ser true para simulados/provas
+      isSimuladoOuProva,
       primeiraVez: !initializedRef.current
     });
 
     const initialNavigation: QuestaoNavigation[] = initialQuestions.map((questao, index) => {
       const status = respostasSalvas 
-        ? getQuestionStatus(questao.id, questao, respostasSalvas) // ✅ Removeu o parâmetro isSimulado daqui
+        ? getQuestionStatus(questao.id, questao, respostasSalvas)
         : 'unanswered';
 
       console.log(`📝 Questão ${questao.id} - Status: ${status} (isSimuladoOuProva: ${isSimuladoOuProva})`);
@@ -100,7 +127,7 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({
 
     initializedRef.current = true;
 
-  }, [initialQuestions, respostasSalvas, getQuestionStatus]); // ✅ getQuestionStatus já inclui isSimuladoOuProva
+  }, [initialQuestions, respostasSalvas, getQuestionStatus]);
 
   const updateQuestionStatus = useCallback((questionId: number, status: 'correct' | 'incorrect' | 'answered') => {
     console.log(`🔄 Atualizando questão ${questionId} para: ${status} (isSimuladoOuProva: ${isSimuladoOuProva})`);
@@ -117,9 +144,8 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({
         q.id === questionId ? { ...q, status: finalStatus } : q
       )
     );
-  }, [isSimuladoOuProva]); // ✅ ADICIONEI a dependência
+  }, [isSimuladoOuProva]);
 
-  // ... (restante das funções permanecem iguais)
   const setCurrentQuestion = useCallback((questionId: number) => {
     setCurrentQuestionId(questionId);
     setQuestionsNavigation(prev =>
@@ -159,6 +185,9 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({
     setCurrentQuestion,
     setQuestionHover,
     scrollToQuestion,
+    // ✅ NOVOS VALORES
+    todasQuestoesRespondidas,
+    progresso,
   };
 
   // Log para debug
@@ -170,8 +199,10 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({
       incorrectCount: questionsNavigation.filter(q => q.status === 'incorrect').length,
       answeredCount: questionsNavigation.filter(q => q.status === 'answered').length,
       unansweredCount: questionsNavigation.filter(q => q.status === 'unanswered').length,
+      todasQuestoesRespondidas,
+      progresso: `${progresso.respondidas}/${progresso.total} (${progresso.percentual}%)`
     });
-  }, [questionsNavigation, isSimuladoOuProva]);
+  }, [questionsNavigation, isSimuladoOuProva, todasQuestoesRespondidas, progresso]);
 
   return (
     <NavigationContext.Provider value={value}>

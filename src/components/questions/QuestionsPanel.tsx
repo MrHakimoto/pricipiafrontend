@@ -1,7 +1,7 @@
 // components/questions/QuestionsPanel.tsx
 'use client';
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Questao, Alternativa, Topico } from '@/types/list';
 import { Newspaper, ChartColumn, MessageCircle, ChevronDown, ChevronUp, HelpCircle, Loader2 } from 'lucide-react'; // Adicionei Loader2
 import { AnswerFeedbackOverlay } from '@/components/questions/AnswerFeedbackOverlay';
@@ -17,6 +17,7 @@ import OpcoesQuestao from "@/components/questions/OpcoesQuestao";
 import { useSession } from "next-auth/react";
 import type { NavigationQuestion } from '@/components/questions/CurseList';
 import type { QuestaoBase } from '@/types/questions';
+import { RefazerListaButton } from "./RefazerListaButton";
 
 // Componente de Alternativa
 type SimpleAlternativa = {
@@ -112,6 +113,10 @@ export const QuestionsPanel: React.FC<QuestionsPanelProps> = ({
     const [currentResolucaoId, setCurrentResolucaoId] = useState<number | null>(propResolucaoId);
     const [topicsVisible, setTopicsVisible] = useState(false);
 
+    const { todasQuestoesRespondidas, progresso } = useNavigation();
+    const [tentativaFinalizada, setTentativaFinalizada] = useState(false);
+
+    const [isRefazendoLista, setIsRefazendoLista] = useState(false);
     const { data: session, status } = useSession();
     const userToken = session?.laravelToken!
     const { updateQuestionStatus } = useNavigation();
@@ -139,6 +144,62 @@ export const QuestionsPanel: React.FC<QuestionsPanelProps> = ({
             setAnsweredQuestions(newAnsweredQuestions);
         }
     }, [respostasSalvas, questions, updateQuestionStatus]);
+
+    useEffect(() => {
+        if (currentResolucaoId  === null && Object.keys(respostasSalvas).length > 0) {
+            console.log('🎯 Tentativa finalizada detectada - mostrando botão refazer');
+            setTentativaFinalizada(true);
+        } else {
+            setTentativaFinalizada(false);
+        }
+    }, [currentResolucaoId , respostasSalvas]);
+
+    
+
+    const handleRefazerLista = async () => {
+        setIsRefazendoLista(true);
+
+        try {
+            console.log('🔄 Iniciando nova tentativa para refazer lista...');
+
+            // Cria nova tentativa no backend
+            const novaResolucaoId = await onIniciarTentativa();
+
+            // Recarrega a página para buscar os dados frescos
+            window.location.reload();
+
+        } catch (error) {
+            console.error('❌ Erro ao refazer lista:', error);
+            alert('Erro ao reiniciar a lista. Tente novamente.');
+            setIsRefazendoLista(false);
+        }
+    };
+
+    const deveMostrarBotaoRefazer = useMemo(() => {
+        console.log('🔍 Verificando se deve mostrar botão:', {
+            todasQuestoesRespondidas,
+            tentativaFinalizada,
+            currentResolucaoId,
+            respostasSalvasCount: Object.keys(respostasSalvas).length,
+            questionsCount: questions.length
+        });
+
+        // CASO 1: Todas as questões foram respondidas E a tentativa ainda está ativa
+        if (todasQuestoesRespondidas && currentResolucaoId) {
+            console.log('✅ Mostrar botão: Todas questões respondidas + tentativa ativa');
+            return true;
+        }
+
+        // CASO 2: Tentativa foi FINALIZADA no backend (mais comum)
+        if (tentativaFinalizada) {
+            console.log('✅ Mostrar botão: Tentativa finalizada no backend');
+            return true;
+        }
+
+        console.log('❌ Não mostrar botão');
+        return false;
+    }, [todasQuestoesRespondidas, tentativaFinalizada, currentResolucaoId, respostasSalvas, questions.length]);
+
 
     useEffect(() => {
         setCurrentResolucaoId(propResolucaoId);
@@ -313,7 +374,26 @@ export const QuestionsPanel: React.FC<QuestionsPanelProps> = ({
             <div className="flex-1 overflow-y-auto scrollbar-hide">
                 <div className="max-w-7xl mx-auto p-6">
                     <main>
-
+                        {todasQuestoesRespondidas && (
+                            <div className="fixed bottom-6 right-6 z-50">
+                                <motion.button
+                                    initial={{ scale: 0, opacity: 0 }}
+                                    animate={{ scale: 1, opacity: 1 }}
+                                    transition={{
+                                        type: "spring",
+                                        stiffness: 300,
+                                        damping: 20
+                                    }}
+                                    onClick={handleRefazerLista}
+                                    className="px-6 py-3 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg shadow-lg hover:from-green-700 hover:to-green-800 transition-all duration-300 font-bold text-lg flex items-center gap-2 border-2 border-green-500 hover:shadow-xl transform hover:scale-105"
+                                >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                    </svg>
+                                    Refazer Lista
+                                </motion.button>
+                            </div>
+                        )}
                         {questions.map((questao, index) => (
                             <QuestionWrapper key={questao.id}
                                 questionId={questao.id}>
@@ -534,6 +614,15 @@ export const QuestionsPanel: React.FC<QuestionsPanelProps> = ({
                     </main>
                 </div>
             </div>
+            {deveMostrarBotaoRefazer && (
+                <RefazerListaButton 
+                    onRefazerLista={handleRefazerLista}
+                    isLoading={isRefazendoLista}
+                    isTentativaFinalizada={tentativaFinalizada}
+                />
+            )}
+
         </div>
+
     );
 };

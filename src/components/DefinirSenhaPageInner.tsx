@@ -7,6 +7,7 @@ import type { AxiosError } from "axios";
 
 import TopProgressBar from "@/components/Motions/TopProgressBar";
 import ProProgressiveBar from "@/components/Motions/ProProgressiveBar";
+import Link from "next/link";
 
 export default function DefinirSenhaPageInner() {
     const searchParams = useSearchParams();
@@ -72,11 +73,11 @@ export default function DefinirSenhaPageInner() {
             <div className="w-full max-w-md z-10 space-y-6 bg-[#0d1117]/60 backdrop-blur-xl border border-gray-700 p-8 rounded-2xl shadow-xl">
                 {/* LOGO */}
                 <div className="flex justify-center mb-4">
-                    <div className="bg-white rounded-full w-12 h-12 flex items-center justify-center">
+                    <div className="bg-white rounded-full w-24 h-24 flex items-center justify-center overflow-hidden">
                         <img
                             src="https://cdn.principiamatematica.com/119340e2-d838-4b5a-babd-93155672a097.png"
                             alt="Logo"
-                            className="w-[78px] h-[78px]"
+                            className="w-full h-full object-contain"
                         />
                     </div>
                 </div>
@@ -88,11 +89,10 @@ export default function DefinirSenhaPageInner() {
                 {/* MENSAGENS */}
                 {status.message && (
                     <div
-                        className={`p-3 text-center rounded-lg font-medium ${
-                            status.type === "success"
+                        className={`p-3 text-center rounded-lg font-medium ${status.type === "success"
                                 ? "bg-green-900/40 text-green-300 border border-green-700"
                                 : "bg-red-900/40 text-red-300 border border-red-700"
-                        }`}
+                            }`}
                     >
                         {status.message}
                     </div>
@@ -142,6 +142,7 @@ export default function DefinirSenhaPageInner() {
                         {loading ? "Salvando..." : "Definir Senha"}
                     </button>
                 </form>
+                <div className="m-5"><Link href={"/login"}>Voltar para Login</Link></div>
             </div>
         </div>
     );
