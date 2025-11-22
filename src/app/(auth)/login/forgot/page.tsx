@@ -62,9 +62,9 @@ export default function Page() {
         <div className="w-full max-w-md z-10 space-y-6 bg-[#0d1117]/60 backdrop-blur-xl border border-gray-700 p-8 rounded-2xl shadow-xl">
           {/* Logo */}
           <div className="flex justify-center mb-4">
-  <div className="bg-white rounded-full w-12 h-12 flex items-center justify-center overflow-hidden">
+  <div className="rounded-full w-12 h-12 flex items-center justify-center overflow-hidden">
     <img
-      src="https://cdn.principiamatematica.com/119340e2-d838-4b5a-babd-93155672a097.png"
+      src="https://cdn.principiamatematica.com/2c8f7618-207d-42e5-ad1b-05096fc66c94.png"
       alt="Logo"
       className="w-full h-full object-contain"
     />
