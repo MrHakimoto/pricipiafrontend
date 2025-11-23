@@ -54,52 +54,76 @@ export default function ConteudoPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
           {data.map((item: any) => (
             <Link key={item.id} href={`/conteudo/tv/${item.id}`}>
-              <div className="relative group rounded-xl overflow-hidden shadow-lg cursor-pointer transition-transform duration-300 hover:scale-[1.02]">
-                {/* IMAGEM */}
-                <img
-                  src={item.content_avatar || "/placeholder.jpg"}
-                  alt={item.name}
-                  className="w-full h-64 object-cover transition-transform duration-500 group-hover:scale-105"
-                />
+              <div className="relative group rounded-2xl overflow-hidden shadow-2xl cursor-pointer transition-all duration-500 hover:scale-[1.03] hover:shadow-2xl bg-gradient-to-br from-gray-900 to-black">
 
-                {/* OVERLAY */}
-                <div className="absolute inset-0 bg-black bg-opacity-70 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col md:flex-row items-start gap-4 p-6">
-                  {/* BOTÃO PLAY */}
-                  <div className="flex-shrink-0 flex items-center justify-center">
-                    <div className="bg-[#C6005C] p-3 rounded-full shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:scale-110">
-                      <Play className="text-white w-5 h-5 md:w-6 md:h-6" />
+                {/* CONTAINER DA IMAGEM */}
+                <div className="relative h-64 overflow-hidden">
+                  <img
+                    src={item.content_avatar || "/placeholder.jpg"}
+                    alt={item.name}
+                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                  />
+
+                  {/* GRADIENT OVERLAY */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-60 group-hover:opacity-30 transition-opacity duration-300" />
+                </div>
+
+                {/* OVERLAY INTERATIVO */}
+                <div className="absolute inset-0 bg-gradient-to-br from-[#C6005C]/20 to-[#1F2937]/90 opacity-0 group-hover:opacity-100 transition-all duration-500 flex items-center justify-center p-6">
+
+                  {/* CARD DE INFORMAÇÕES */}
+                  <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 w-full max-w-sm border border-white/20 shadow-2xl">
+
+                    {/* BOTÃO PLAY DESTACADO */}
+                    <div className="flex justify-center mb-4">
+                      <div className="bg-gradient-to-r from-[#C6005C] to-[#FF0080] p-4 rounded-full shadow-2xl hover:shadow-3xl transition-all duration-300 transform hover:scale-110 group/btn">
+                        <Play className="text-white w-6 h-6 group-hover/btn:scale-110 transition-transform" fill="white" />
+                      </div>
                     </div>
-                  </div>
 
-                  {/* BLOCO DE INFORMAÇÕES */}
-                  <div className="flex-1 flex flex-col gap-3">
-                    <h2 className="text-white font-semibold text-lg md:text-xl">{item.name}</h2>
-
-                    <div className="grid grid-cols-1 gap-2 md:grid-cols-1">
-                      {/* Duração total */}
-                      <div className="bg-[#1F2937] rounded-md p-3 text-center">
-                        <p className="text-2xl md:text-3xl font-bold">{item.statistics.total_duration_formatted}</p>
-                        <p className="text-sm text-gray-300 mt-1">Duração total</p>
+                    {/* ESTATÍSTICAS DO CURSO */}
+                    <div className="space-y-3">
+                      {/* DURAÇÃO TOTAL */}
+                      <div className="text-center p-3 bg-black/40 rounded-xl border border-white/10">
+                        <p className="text-3xl font-bold text-white mb-1">{item.statistics.total_duration_formatted}</p>
+                        <p className="text-xs text-gray-300 uppercase tracking-wider">Duração Total</p>
                       </div>
 
-                      {/* Aulas */}
-                      <div className="bg-[#1F2937] rounded-md p-3 text-center">
-                        <p className="text-2xl md:text-3xl font-bold">{item.statistics.aulas_count}</p>
-                        <p className="text-sm text-gray-300 mt-1">aulas | {item.statistics.aulas_duration_formatted}</p>
+                      {/* AULAS */}
+                      <div className="flex justify-between items-center p-3 bg-black/30 rounded-xl border border-white/5">
+                        <div className="text-left">
+                          <p className="text-2xl font-bold text-white">{item.statistics.aulas_count}</p>
+                          <p className="text-xs text-gray-400">Aulas</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-semibold text-gray-300">{item.statistics.aulas_duration_formatted}</p>
+                        </div>
                       </div>
 
-                      {/* Listas */}
-                      <div className="bg-[#1F2937] rounded-md p-3 text-center">
-                        <p className="text-2xl md:text-3xl font-bold">{item.statistics.listas_count}</p>
-                        <p className="text-sm text-gray-300 mt-1">listas | {item.statistics.listas_duration_formatted}</p>
+                      {/* LISTAS */}
+                      <div className="flex justify-between items-center p-3 bg-black/30 rounded-xl border border-white/5">
+                        <div className="text-left">
+                          <p className="text-2xl font-bold text-white">{item.statistics.listas_count}</p>
+                          <p className="text-xs text-gray-400">Listas</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-semibold text-gray-300">{item.statistics.listas_duration_formatted}</p>
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {/* NOME DO CURSO ABAIXO */}
-                <div className="p-4 bg-[#111827]">
-                  <h3 className="text-white font-medium text-lg truncate">{item.name}</h3>
+                {/* RODAPÉ DO CARD */}
+                <div className="p-5 bg-gradient-to-r from-[#1F2937] to-[#111827] border-t border-white/10">
+                  <h3 className="text-white font-semibold text-lg truncate text-center group-hover:text-[#FF0080] transition-colors duration-300">
+                    {item.name}
+                  </h3>
+                  <div className="flex justify-center mt-2">
+                    <span className="text-xs text-gray-400 bg-black/30 px-2 py-1 rounded-full">
+                      Clique para explorar
+                    </span>
+                  </div>
                 </div>
               </div>
             </Link>

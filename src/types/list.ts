@@ -65,6 +65,7 @@ export type Questao = {
   minutagem: number | null;
   tempo_resolucao?: number;
   dificuldade: number;
+  adaptado?: boolean;
   created_at: string;
   updated_at: string;
   pivot?: {

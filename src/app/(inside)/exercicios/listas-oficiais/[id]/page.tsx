@@ -1,7 +1,7 @@
 //exercicios/listas-oficiais/[id]/page.tsx
 'use client';
 
-import { useEffect, useState, useRef  } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 
@@ -34,11 +34,11 @@ export default function ListaQuestionsPage() {
   const listaId = params.id;
 
 
-   const fetchDataRef = useRef(false);
+  const fetchDataRef = useRef(false);
 
 
-    // ✅ IMPEDIR EXECUÇÕES MÚLTIPLAS
-    
+  // ✅ IMPEDIR EXECUÇÕES MÚLTIPLAS
+
 
   useEffect(() => {
 
@@ -176,7 +176,7 @@ export default function ListaQuestionsPage() {
 
     fetchListaData();
 
-     return () => {
+    return () => {
       fetchDataRef.current = false;
     };
   }, [listaId]);
@@ -277,12 +277,14 @@ export default function ListaQuestionsPage() {
     // Formatar informações da prova
     const provaInfo = questao.prova ? {
       banca: {
-        nome: questao.prova.sigla || questao.prova.nome || 'Banca não informada'
+        nome: questao.prova.nome || 'Banca não informada' // ⚠️ manter nome real
       },
-      ano: questao.prova.ano || 0
+      ano: questao.prova.ano || 0,
+      sigla: questao.prova.sigla || undefined // ✅ incluir sigla
     } : {
       banca: { nome: 'Banca não informada' },
-      ano: 0
+      ano: 0,
+      sigla: undefined
     };
 
     // Formatar tópicos - garantir que seja um array de objetos com id e nome
@@ -312,7 +314,8 @@ export default function ListaQuestionsPage() {
       topicos: topicosFormatados,
       prova: provaInfo,
       gabarito_video: questao.gabarito_video || null,
-      gabarito_comentado_texto: questao.gabarito_comentado_texto || 'Gabarito comentado não disponível.'
+      gabarito_comentado_texto: questao.gabarito_comentado_texto || 'Gabarito comentado não disponível.',
+      adaptado: !!questao.adaptado
     };
 
     // Verificar se todas as propriedades obrigatórias estão presentes

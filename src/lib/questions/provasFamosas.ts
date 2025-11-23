@@ -6,31 +6,41 @@ import { api } from "../axios";
  * Representa o agrupamento de provas (ex: ENEM, FUVEST)
  */
 export interface ProvaGroup {
-  nome: string;           // Ex: "ENEM"
-  total_edicoes: number;  // Ex: 5
-  id?: string;           // Identificador único do grupo
+  id: number;
+  nome: string;
+  total_edicoes: number;
+
+  // necessário para seu componente
+  edicoes?: ProvaEdition[];
 }
 
 /**
  * Representa uma edição específica de uma prova
  */
 export interface ProvaEdition {
-  id: number;           // ID da prova no banco
-  nome: string;         // Ex: "ENEM"
-  ano: number;          // Ex: 2022
-  descricao?: string;   // Descrição opcional
+  id: number;
+  ano: number;
+  descricao?: string;
+
+  // necessárias para seu componente
+  tempo_total: number;
+  total_questoes: number;
 }
 
 /**
  * Cria uma lista de simulado a partir de uma prova oficial
  */
-export const gerarSimuladoDaProva = async (token: string, provaId: number | string) => {
+export const gerarSimuladoDaProva = async (
+  token: string,
+  editionId: string,
+  selectedTime: string
+) => {
   if (!token) throw new Error("Token obrigatório");
-  
+
   try {
-    const response = await api.post<{ lista_id: number, message: string }>(
-      `/provas/${provaId}/gerar-simulado`, 
-      {}, 
+    const response = await api.post<{ lista_id: number; message: string }>(
+      `/provas/${editionId}/gerar-simulado`,
+      { selectedTime },
       { headers: { Authorization: `Bearer ${token}` } }
     );
     return response.data;
@@ -43,7 +53,9 @@ export const gerarSimuladoDaProva = async (token: string, provaId: number | stri
 /**
  * Buscar todas as provas disponíveis
  */
-export const getAvailableExams = async (token: string): Promise<ProvaGroup[]> => {
+export const getAvailableExams = async (
+  token: string
+): Promise<ProvaGroup[]> => {
   if (!token) throw new Error("Token não fornecido.");
 
   try {
@@ -53,7 +65,10 @@ export const getAvailableExams = async (token: string): Promise<ProvaGroup[]> =>
     return response.data;
   } catch (error) {
     const err = error as AxiosError;
-    console.error("Erro ao buscar provas disponíveis:", err.response?.data || err.message);
+    console.error(
+      "Erro ao buscar provas disponíveis:",
+      err.response?.data || err.message
+    );
     return [];
   }
 };
@@ -62,7 +77,7 @@ export const getAvailableExams = async (token: string): Promise<ProvaGroup[]> =>
  * Buscar edições por nome da prova
  */
 export const getEditionsByExam = async (
-  token: string, 
+  token: string,
   nomeProva: string
 ): Promise<ProvaEdition[]> => {
   if (!token) throw new Error("Token não fornecido.");
@@ -76,7 +91,10 @@ export const getEditionsByExam = async (
     return response.data;
   } catch (error) {
     const err = error as AxiosError;
-    console.error(`Erro ao buscar edições para ${nomeProva}:`, err.response?.data || err.message);
+    console.error(
+      `Erro ao buscar edições para ${nomeProva}:`,
+      err.response?.data || err.message
+    );
     return [];
   }
 };

@@ -19,55 +19,53 @@ export const usePandaPlayer = (courseContentId: number, initialTime?: number) =>
   const currentTimeRef = useRef<number>(initialTime || 0);
   const { sendHeartbeat, saveFinalProgress } = useVideoProgress(courseContentId);
 
-  // Configurar listeners do Panda Video
+  // ✅ CORREÇÃO: Usar useCallback para evitar recriação
   const setupPlayerListeners = useCallback(() => {
+    console.log('🎧 Configurando listeners do Panda Video...');
+
     const handleTimeUpdate = (event: Event) => {
-      const customEvent = event as PandaTimeUpdateEvent;
-      const currentTime = customEvent.detail.currentTime;
+      const customEvent = event as CustomEvent<{ currentTime: number; duration: number }>;
+      const currentTime = customEvent.detail?.currentTime || 0;
       
-      currentTimeRef.current = currentTime;
-      sendHeartbeat(currentTime);
+      if (currentTime > 0) {
+        currentTimeRef.current = currentTime;
+        sendHeartbeat(currentTime);
+      }
     };
 
     const handlePlayerReady = (event: Event) => {
-      const customEvent = event as CustomEvent;
-      playerRef.current = customEvent.detail.player;
+      const customEvent = event as CustomEvent<{ player: any }>;
+      playerRef.current = customEvent.detail?.player;
       
       console.log('🎬 Player pronto - Continuar Assistindo ativo');
       
-      // Se tem tempo inicial, seek para a posição salva
+      // Seek para posição salva apenas se for significativa (> 10 segundos)
       if (initialTime && initialTime > 10) {
         console.log('⏩ Seek para posição:', initialTime, 's');
         setTimeout(() => {
           try {
-            playerRef.current?.setCurrentTime(initialTime);
+            if (playerRef.current && typeof playerRef.current.setCurrentTime === 'function') {
+              playerRef.current.setCurrentTime(initialTime);
+              console.log('✅ Seek realizado com sucesso');
+            }
           } catch (error) {
             console.error('❌ Erro no seek:', error);
           }
-        }, 1500);
+        }, 2000); // Aumentei para 2 segundos para garantir que o player está pronto
       }
     };
 
-    // Listeners customizados do Panda Video
+    // Adicionar listeners
     window.addEventListener('panda_timeupdate', handleTimeUpdate as EventListener);
     window.addEventListener('panda_playerReady', handlePlayerReady as EventListener);
 
-    console.log('🎧 Listeners do Panda Video configurados');
-
+    // Cleanup function
     return () => {
+      console.log('🧹 Limpando listeners do Panda Video');
       window.removeEventListener('panda_timeupdate', handleTimeUpdate as EventListener);
       window.removeEventListener('panda_playerReady', handlePlayerReady as EventListener);
     };
-  }, [sendHeartbeat, initialTime]);
-
-  // Save final quando o componente desmontar
-  useEffect(() => {
-    return () => {
-      const finalTime = currentTimeRef.current;
-      console.log('🔚 Componente desmontando - salvando tempo final:', finalTime);
-      saveFinalProgress(finalTime);
-    };
-  }, [saveFinalProgress]);
+  }, [sendHeartbeat, initialTime]); // ✅ Dependências corretas
 
   return {
     setupPlayerListeners,

@@ -1,8 +1,11 @@
+"use client"
 // components/questions/ProvasFamosasPanel.tsx
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { motion, spring, AnimatePresence, type Variants } from 'framer-motion';
 import { gerarSimuladoDaProva, getAvailableExams, getEditionsByExam, ProvaGroup, ProvaEdition } from '@/lib/questions/provasFamosas';
 import { useSession } from 'next-auth/react';
+import { useRouter  } from "next/navigation";
 
 // Ícones
 const XIcon = ({ className = "w-6 h-6" }) => (
@@ -25,10 +28,17 @@ const BookIcon = ({ className = "w-5 h-5" }) => (
     </svg>
 );
 
+const QuestionIcon = ({ className = "w-5 h-5" }) => (
+    <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="10" />
+        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+        <line x1="12" y1="17" x2="12.01" y2="17" />
+    </svg>
+);
+
 // Variantes de animação
 const dropIn: Variants = {
     hidden: { y: -500, opacity: 0, scale: 0.8 },
-
     visible: {
         y: 0,
         opacity: 1,
@@ -40,7 +50,6 @@ const dropIn: Variants = {
             stiffness: 300,
         }
     },
-
     exit: {
         y: 500,
         opacity: 0,
@@ -57,6 +66,46 @@ const cardVariants = {
     visible: { opacity: 1, y: 0 },
 };
 
+// Função para formatar minutos em horas e minutos
+const formatTime = (minutes: number): string => {
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    
+    if (hours === 0) {
+        return `${mins} min`;
+    } else if (mins === 0) {
+        return `${hours}h`;
+    } else {
+        return `${hours}h ${mins}min`;
+    }
+};
+
+// Função para gerar opções de tempo baseadas no tempo total da prova
+const generateTimeOptions = (baseTime: number) => {
+    const options = [];
+    
+    // Calcular variações de ±10%
+    const timeMinus10 = Math.round(baseTime * 0.9);
+    const timePlus10 = Math.round(baseTime * 1.1);
+    
+    // Adicionar opções em ordem: -10%, original, +10%
+    options.push({
+        value: timeMinus10.toString(),
+        label: `${formatTime(timeMinus10)}`
+    });
+    
+    options.push({
+        value: baseTime.toString(),
+        label: `${formatTime(baseTime)} (recomendado)`
+    });
+    
+    options.push({
+        value: timePlus10.toString(),
+        label: `${formatTime(timePlus10)}`
+    });
+    
+    return options;
+};
 
 interface SimuladoConfigModalProps {
     isOpen: boolean;
@@ -72,48 +121,58 @@ const SimuladoConfigModal = ({
     provaSelecionada,
     edicoes
 }: SimuladoConfigModalProps) => {
-    const timeOptions = [
-        { value: '', label: 'Selecione a quantidade' },
-        { value: '90', label: '90 minutos (1h 30min)' },
-        { value: '120', label: '120 minutos (2h 00min)' },
-        { value: '135', label: '135 minutos (2h 15min - Sugerido)' },
-        { value: '180', label: '180 minutos (3h 00min)' },
-        { value: '240', label: '240 minutos (4h 00min)' },
-    ];
-
-
     const { data: session, status } = useSession();
     const token = session?.laravelToken!;
-    const suggestedTimeText = '02:15:00';
-    const defaultTime = '';
 
     // Estado da configuração
     const [selectedEdition, setSelectedEdition] = useState('');
-    const [selectedTime, setSelectedTime] = useState(defaultTime);
+    const [selectedTime, setSelectedTime] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+
+    const router = useRouter();
+
+    // Obter a edição selecionada
+    const edicaoSelecionada = edicoes.find(ed => ed.id.toString() === selectedEdition);
+    
+    // Gerar opções de tempo baseadas na edição selecionada
+    const timeOptions = useMemo(() => {
+        if (!edicaoSelecionada) return [];
+        
+        const baseTime = edicaoSelecionada.tempo_total;
+        return [
+            { value: '', label: 'Selecione o tempo' },
+            ...generateTimeOptions(baseTime)
+        ];
+    }, [edicaoSelecionada]);
 
     // Resetar seleções quando o modal abrir
     useEffect(() => {
         if (isOpen) {
             setSelectedEdition('');
-            setSelectedTime(defaultTime);
+            setSelectedTime('');
         }
     }, [isOpen]);
+
+    // Resetar tempo quando mudar a edição
+    useEffect(() => {
+        setSelectedTime('');
+    }, [selectedEdition]);
 
     const handleStartSimulado = async () => {
         if (isLoading || !selectedEdition || !selectedTime) return;
 
         setIsLoading(true);
         try {
-            // Aqui você pegaria o token do usuário (ex: do contexto de auth)
-
-            const resultado = await gerarSimuladoDaProva(token, selectedEdition);
+            console.log(selectedEdition, "o que ta mandando")
+            const resultado = await gerarSimuladoDaProva(token, selectedEdition, selectedTime);
             console.log('Simulado criado:', resultado);
-            // Redirecionar para a página do simulado ou mostrar sucesso
+            // enviar para //provas-famosas/resultado.lista_id
+            console.log(resultado, "A resposta")
+            const newListId = resultado.lista_id
+            //router.push(`provas-famosas/${newListId}`);
             onClose();
         } catch (error) {
             console.error('Erro ao criar simulado:', error);
-            // Mostrar mensagem de erro para o usuário
         } finally {
             setIsLoading(false);
         }
@@ -171,57 +230,85 @@ const SimuladoConfigModal = ({
                                     value={edicao.id}
                                     className="bg-slate-900 text-gray-300"
                                 >
-                                    {edicao.ano} {edicao.descricao ? `- ${edicao.descricao}` : ''}
+                                    {edicao.ano} - {edicao.total_questoes} questão{edicao.total_questoes !== 1 ? 'es' : ''}
+                                    {edicao.descricao ? ` - ${edicao.descricao}` : ''}
                                 </option>
                             ))}
                         </select>
                     </div>
 
-                    {/* 2. Tempo para a Resolução */}
-                    <div>
-                        <label className="block text-lg font-normal text-gray-100 mb-2">
-                            Tempo para a resolução
-                        </label>
-                        <select
-                            value={selectedTime}
-                            onChange={(e) => setSelectedTime(e.target.value)}
-                            className={`w-full px-4 py-3 ${inputBg} text-gray-300 ${inputBorder} border rounded-md appearance-none focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer text-base h-12`}
-                        >
-                            {timeOptions.map((option) => (
-                                <option
-                                    key={option.value}
-                                    value={option.value}
-                                    disabled={option.value === ''}
-                                    className="bg-slate-900 text-gray-300"
-                                >
-                                    {option.label}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
+                    {/* 2. Tempo para a Resolução (só aparece quando uma edição é selecionada) */}
+                    {selectedEdition && (
+                        <div>
+                            <label className="block text-lg font-normal text-gray-100 mb-2">
+                                Tempo para a resolução
+                            </label>
+                            <select
+                                value={selectedTime}
+                                onChange={(e) => setSelectedTime(e.target.value)}
+                                className={`w-full px-4 py-3 ${inputBg} text-gray-300 ${inputBorder} border rounded-md appearance-none focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer text-base h-12`}
+                            >
+                                {timeOptions.map((option) => (
+                                    <option
+                                        key={option.value}
+                                        value={option.value}
+                                        disabled={option.value === ''}
+                                        className="bg-slate-900 text-gray-300"
+                                    >
+                                        {option.label}
+                                    </option>
+                                ))}
+                            </select>
+                            
+                            {edicaoSelecionada && (
+                                <p className="text-sm text-gray-400 mt-2">
+                                    Tempo original da prova: <span className="text-indigo-400 font-medium">
+                                        {formatTime(edicaoSelecionada.tempo_total)}
+                                    </span>
+                                </p>
+                            )}
+                        </div>
+                    )}
 
-                    {/* 3. Tempo Sugerido e Aviso */}
+                    {/* 3. Informações da Edição Selecionada */}
+                    {edicaoSelecionada && (
+                        <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
+                            <h3 className="font-medium text-gray-100 mb-2 flex items-center">
+                                <QuestionIcon className="w-4 h-4 mr-2 text-green-400" />
+                                Detalhes da Edição {edicaoSelecionada.ano}
+                            </h3>
+                            <div className="grid grid-cols-2 gap-3 text-sm">
+                                <div className="flex items-center text-gray-300">
+                                    <BookIcon className="w-4 h-4 mr-2 text-blue-400" />
+                                    {edicaoSelecionada.total_questoes} questão{edicaoSelecionada.total_questoes !== 1 ? 'es' : ''}
+                                </div>
+                                <div className="flex items-center text-gray-300">
+                                    <ClockIcon className="w-4 h-4 mr-2 text-orange-400" />
+                                    {formatTime(edicaoSelecionada.tempo_total)}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 4. Aviso */}
                     <div className="pt-2">
-                        <p className="text-sm font-light text-gray-300">
-                            Tempo sugerido: <span className="font-bold text-indigo-400">{suggestedTimeText}</span>
-                        </p>
                         <p className="mt-4 text-sm font-normal text-yellow-500">
                             *Você irá resolver um simulado, diante disso, se prepare semelhante ao dia da prova
                         </p>
                     </div>
 
-                    {/* 4. Botão de Ação */}
-                    <div className='pt-6'>
+                    {/* 5. Botão de Ação */}
+                    <div className='pt-4'>
                         <motion.button
                             onClick={handleStartSimulado}
                             disabled={!isConfigValid || isLoading}
                             className={`
-                w-full py-3 font-normal text-lg rounded-md transition-all duration-200 ease-in-out flex items-center justify-center h-12
-                ${isConfigValid && !isLoading
+                                w-full py-3 font-normal text-lg rounded-md transition-all duration-200 ease-in-out flex items-center justify-center h-12
+                                ${isConfigValid && !isLoading
                                     ? `${pinkButton} hover:bg-[#C2185B] text-white shadow-lg shadow-[#E91E63]/30`
                                     : 'bg-slate-700 text-gray-500 cursor-not-allowed'
                                 }
-              `}
+                            `}
                         >
                             <AnimatePresence mode="wait">
                                 {isLoading ? (
@@ -271,8 +358,6 @@ const ProvasFamosasPanel = () => {
     useEffect(() => {
         const carregarProvas = async () => {
             try {
-                // Aqui você pegaria o token do usuário
-
                 const provasDisponiveis = await getAvailableExams(token);
                 setProvas(provasDisponiveis);
             } catch (error) {
@@ -291,7 +376,6 @@ const ProvasFamosasPanel = () => {
         setLoadingEdicoes(true);
 
         try {
-
             const edicoesDaProva = await getEditionsByExam(token, prova.nome);
             setEdicoes(edicoesDaProva);
             setIsModalOpen(true);
@@ -345,11 +429,23 @@ const ProvasFamosasPanel = () => {
                                 </div>
                             </div>
 
-                            <div className="flex items-center text-gray-400 mb-2">
-                                <ClockIcon className="w-4 h-4 mr-2" />
-                                <span className="text-sm">
-                                    {prova.total_edicoes} edição{prova.total_edicoes !== 1 ? 'es' : ''} disponível{prova.total_edicoes !== 1 ? 's' : ''}
-                                </span>
+                            <div className="space-y-2">
+                                <div className="flex items-center text-gray-400">
+                                    <ClockIcon className="w-4 h-4 mr-2" />
+                                    <span className="text-sm">
+                                        {prova.total_edicoes} edição{prova.total_edicoes !== 1 ? 'es' : ''} disponível{prova.total_edicoes !== 1 ? 's' : ''}
+                                    </span>
+                                </div>
+                                
+                                {/* Mostrar estatísticas das edições se disponíveis */}
+                                {prova.edicoes && prova.edicoes.length > 0 && (
+                                    <div className="flex items-center text-gray-400">
+                                        <QuestionIcon className="w-4 h-4 mr-2 text-green-400" />
+                                        <span className="text-sm">
+                                            {prova.edicoes.length} edição{prova.edicoes.length !== 1 ? 'es' : ''} carregada{prova.edicoes.length !== 1 ? 's' : ''}
+                                        </span>
+                                    </div>
+                                )}
                             </div>
 
                             <p className="text-gray-500 text-sm mt-4 group-hover:text-gray-400 transition-colors">

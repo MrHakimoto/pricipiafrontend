@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import useSWR from 'swr'
 import { Check, X, Flame, Calendar } from 'lucide-react'
-import { checkinStatus, checkinDaily } from '@/lib/dailyCheck/daily'
+import { checkinStatus, checkinDaily, getUser } from '@/lib/dailyCheck/daily'
+import { getUTCDateString, isToday } from '@/utils/dateHelpers' 
 
 interface UserStreak {
   id: number
@@ -32,17 +33,17 @@ const getCheckinCookie = (): string | null => {
   return checkinCookie ? checkinCookie.split('=')[1] : null
 }
 
-const setCheckinCookie = (): void => {
+const setCheckinCookie = (date?: string): void => {
   if (typeof window === 'undefined') return
-  const today = new Date().toDateString()
+  const checkinDate = date || getUTCDateString()
   const expires = new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 horas
-  document.cookie = `daily_checkin=${today}; path=/; expires=${expires.toUTCString()}; SameSite=Lax`
+  document.cookie = `daily_checkin=${checkinDate}; path=/; expires=${expires.toUTCString()}; SameSite=Lax`
 }
 
 export default function WeekProgress() {
   const { data: session } = useSession()
   const token = session?.laravelToken
-  
+
   const [hasAutoCheckedIn, setHasAutoCheckedIn] = useState<boolean>(false)
   const [animatedStreak, setAnimatedStreak] = useState<number>(0)
   const [loaded, setLoaded] = useState<boolean>(false)
@@ -57,47 +58,62 @@ export default function WeekProgress() {
     ([key, token]: [string, string]) => checkinStatus(token)
   )
 
-  // Check-in automático ao carregar a página
+  // Check-in automático RESILIENTE - CORRIGIDO
   useEffect(() => {
     const autoCheckin = async (): Promise<void> => {
-      if (!token || hasAutoCheckedIn || !streakData) return
+      // Verificações iniciais
+      if (!token || !streakData) return;
 
-      const today = new Date().toDateString()
-      const lastCheckinCookie = getCheckinCookie()
+      // Verificar se JÁ temos um check-in bem-sucedido hoje
+      const today = getUTCDateString();
+      const lastCheckinCookie = getCheckinCookie();
 
-      // Se já fez check-in hoje no cookie, não faz nada
-      if (lastCheckinCookie === today) {
-        setHasAutoCheckedIn(true)
-        return
+      // Se já fez check-in hoje (confirmado), não faz nada
+      if (lastCheckinCookie === today && streakData.has_checked_in_today) {
+        setHasAutoCheckedIn(true);
+        return;
       }
 
-      // Se ainda não fez check-in hoje na API
-      if (!streakData.has_checked_in_today) {
-        try {
-          const newStreakData = await checkinDaily(token)
-          mutate(newStreakData.streak, false)
-          setCheckinCookie()
-          setHasAutoCheckedIn(true)
-        } catch (err) {
-          console.error('Falha no check-in automático:', err)
+      try {
+        // Se ainda não fez check-in na API
+        if (!streakData.has_checked_in_today) {
+          const newStreakData = await checkinDaily(token);
+          mutate(newStreakData.streak, false);
+          setCheckinCookie(today);
+          setHasAutoCheckedIn(true);
+        } else {
+          // Sincronizar o cookie se a API já tem o check-in
+          setCheckinCookie(today);
+          setHasAutoCheckedIn(true);
         }
-      } else {
-        setCheckinCookie()
-        setHasAutoCheckedIn(true)
+      } catch (err) {
+        console.error('Falha no check-in automático:', err);
+        // Não marca como concluído para tentar novamente
       }
-    }
+    };
 
     if (streakData && !isLoading) {
-      autoCheckin()
+      autoCheckin();
+
+      // Tentar novamente após 30 segundos se ainda não conseguiu
+      const retryTimeout = setTimeout(() => {
+        const today = getUTCDateString();
+        if (!streakData.has_checked_in_today && getCheckinCookie() !== today && !hasAutoCheckedIn) {
+          console.log('Tentando check-in automático novamente...');
+          autoCheckin();
+        }
+      }, 30000);
+
+      return () => clearTimeout(retryTimeout);
     }
-  }, [streakData, isLoading, token, hasAutoCheckedIn, mutate])
+  }, [streakData, isLoading, token, mutate, hasAutoCheckedIn]); // ✅ CORRETO
 
   // Animação do número
   useEffect(() => {
     if (!streakData || isLoading) return
 
     setLoaded(true)
-    
+
     let start = 0
     const target = streakData.current_streak
     const duration = 1000
@@ -125,10 +141,10 @@ export default function WeekProgress() {
   const getWeekDays = (): WeekDay[] => {
     const days = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
     const today = new Date().getDay()
-    
+
     return days.map((day, index): WeekDay => {
       let status: DayStatus = 'pending'
-      
+
       if (index === today) {
         status = streakData?.has_checked_in_today ? 'done' : 'current'
       } else if (index < today) {
@@ -181,7 +197,7 @@ export default function WeekProgress() {
 
   return (
     <div className={`flex-1 max-w-sm bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-6 shadow-2xl border border-gray-700/50 transition-all duration-700 ${loaded ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
-      
+
       {/* Header elegante */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-2">
@@ -229,19 +245,6 @@ export default function WeekProgress() {
             </span>
           </div>
         ))}
-      </div>
-
-      {/* Status elegante simplificado */}
-      <div className={`p-3 rounded-xl transition-all duration-500 ${
-        hasCheckedIn 
-          ? 'bg-gradient-to-r from-green-500/10 to-green-600/10 border border-green-500/20' 
-          : 'bg-gradient-to-r from-blue-500/10 to-blue-600/10 border border-blue-500/20'
-      }`}>
-        <span className={`text-xs font-semibold block text-center ${
-          hasCheckedIn ? 'text-green-400' : 'text-blue-400'
-        }`}>
-          {hasCheckedIn ? 'Check-in realizado ✓' : 'Estude todos os dias'}
-        </span>
       </div>
 
       {/* Recorde */}

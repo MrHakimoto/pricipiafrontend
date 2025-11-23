@@ -32,7 +32,7 @@ export default function ListaCursePage({ idList }: ListaCursePageProps) {
   const [resolucaoId, setResolucaoId] = useState<number | null>(null);
   const [respostasSalvas, setRespostasSalvas] = useState<Record<number, number>>({});
   const [tentativaAtiva, setTentativaAtiva] = useState<any>(null);
-  
+
   const listaId = idList;
   const fetchDataRef = useRef(false); // ✅ Para evitar loops
 
@@ -51,16 +51,16 @@ export default function ListaCursePage({ idList }: ListaCursePageProps) {
           const token = session.laravelToken;
 
           console.log('Buscando lista com ID:', listaId);
-          
+
           // ✅ BUSCAR EM PARALELO: lista + tentativa ativa
           const [response, tentativaExistente] = await Promise.all([
             getListaById(listaId, token),
             getTentativaAtiva(listaId, token) // ✅ Busca tentativa ativa
           ]);
-          
+
           console.log('Resposta completa da API:', response);
           console.log('Tentativa existente:', tentativaExistente);
-          
+
           let questoesData: Questao[] = [];
           let listaInfoData: ListaCompleta | null = null;
 
@@ -131,7 +131,7 @@ export default function ListaCursePage({ idList }: ListaCursePageProps) {
             setTentativaAtiva(null);
             setRespostasSalvas({});
           }
-          
+
         } catch (err) {
           console.error('Erro detalhado ao carregar lista:', err);
           setError("Falha ao carregar a lista de exercícios. Tente novamente.");
@@ -213,7 +213,7 @@ export default function ListaCursePage({ idList }: ListaCursePageProps) {
       <div className="min-h-screen bg-[#00091A] flex items-center justify-center p-8">
         <div className="text-center text-white">
           <div className="text-xl mb-4">{error}</div>
-          <button 
+          <button
             onClick={() => window.location.reload()}
             className="px-6 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
           >
@@ -231,7 +231,7 @@ export default function ListaCursePage({ idList }: ListaCursePageProps) {
         <div className="text-center text-white">
           <div className="text-xl mb-4">Nenhuma questão encontrada nesta lista</div>
           <p className="text-gray-400 mb-6">A lista pode estar vazia ou ocorreu um problema ao carregar as questões.</p>
-          <button 
+          <button
             onClick={() => window.history.back()}
             className="px-6 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
           >
@@ -245,28 +245,30 @@ export default function ListaCursePage({ idList }: ListaCursePageProps) {
   // Prepara as questões para o formato esperado pelo NavigationProvider
   const questionsFormatted: QuestaoBase[] = questoes.map(questao => {
     const provaInfo = questao.prova ? {
-      banca: { 
-        nome: questao.prova.sigla || questao.prova.nome || 'Banca não informada' 
+      banca: {
+        nome: questao.prova.nome || 'Banca não informada' // ⚠ manter nome real
       },
-      ano: questao.prova.ano || 0
-    } : { 
-      banca: { nome: 'Banca não informada' }, 
-      ano: 0 
+      ano: questao.prova.ano || 0,
+      sigla: questao.prova.sigla || undefined // ✅ incluir sigla
+    } : {
+      banca: { nome: 'Banca não informada' },
+      ano: 0,
+      sigla: undefined
     };
 
-    const topicosFormatados = Array.isArray(questao.topicos) 
+    const topicosFormatados = Array.isArray(questao.topicos)
       ? questao.topicos.map((topico: Topico) => ({
-          id: topico.id,
-          nome: topico.nome
-        }))
+        id: topico.id,
+        nome: topico.nome
+      }))
       : [];
 
     const alternativasFormatadas = Array.isArray(questao.alternativas)
       ? questao.alternativas.map((alt: Alternativa) => ({
-          id: alt.id,
-          letra: alt.letra,
-          texto: alt.texto
-        }))
+        id: alt.id,
+        letra: alt.letra,
+        texto: alt.texto
+      }))
       : [];
 
     return {
@@ -277,6 +279,7 @@ export default function ListaCursePage({ idList }: ListaCursePageProps) {
       alternativas: alternativasFormatadas,
       topicos: topicosFormatados,
       prova: provaInfo,
+      adaptado: !!questao.adaptado,
       gabarito_video: questao.gabarito_video || null,
       gabarito_comentado_texto: questao.gabarito_comentado_texto || 'Gabarito comentado não disponível.'
     };
@@ -292,27 +295,27 @@ export default function ListaCursePage({ idList }: ListaCursePageProps) {
 
   // ✅ VERIFICA SE É SIMULADO/PROVA (igual ao ListaQuestionsPage)
   const isSimuladoOuProva = Boolean(
-  listaInfo?.tipo && ['simulado', 'prova'].includes(listaInfo.tipo)
-);
+    listaInfo?.tipo && ['simulado', 'prova'].includes(listaInfo.tipo)
+  );
 
   return (
     // ✅ ATUALIZE O NavigationProvider com todas as props necessárias
-    <NavigationProvider 
+    <NavigationProvider
       questions={questionsFormatted}
       respostasSalvas={respostasSalvas}
       isSimuladoOuProva={isSimuladoOuProva}
     >
       <div className="flex h-[calc(100vh-245px)] bg-[#00091A] overflow-hidden">
         {/* ✅ ATUALIZE O NavigationSidebar com todas as props */}
-        <NavigationSidebar 
+        <NavigationSidebar
           listaInfo={listaInfo ?? undefined}
           resolucaoId={resolucaoId}
           onFinalizarTentativa={handleFinalizarTentativa}
         />
-        
+
         {/* ✅ ATUALIZE O QuestionsPanel com todas as props */}
-        <QuestionsPanel 
-          className="flex-1 overflow-y-auto" 
+        <QuestionsPanel
+          className="flex-1 overflow-y-auto"
           questions={questionsFormatted}
           resolucaoId={resolucaoId}
           respostasSalvas={respostasSalvas}

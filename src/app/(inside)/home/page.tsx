@@ -23,6 +23,7 @@ export default function HomePage() {
   const [continueWatching, setContinueWatching] = useState(null);
 
   useEffect(() => {
+    console.log(session)
     const fetchContinueWatching = async () => {
       try {
         const response = await fetch('/api/dashboard/continuar-assistindo');
@@ -90,7 +91,10 @@ export default function HomePage() {
             className="mt-6"
           >
 
-            <UserCard nome={session?.user?.name ?? null} />
+            <UserCard
+              nome={session?.user?.name ?? null}
+              token={session?.laravelToken as string}
+            />
           </motion.div>
 
           <section className="mt-12 space-y-12">

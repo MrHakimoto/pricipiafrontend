@@ -14,6 +14,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import ReportarModal from "@/components/questions/ReportModal";
 import OpcoesQuestao from "@/components/questions/OpcoesQuestao";
 import { useSession } from "next-auth/react";
+import { responderQuestaoAvulsa } from '@/lib/respostaAvulsa';
 
 // Componente de Alternativa
 type QuizOptionProps = {
@@ -23,6 +24,7 @@ type QuizOptionProps = {
   selecaoAtual: number | null;
   statusResposta: 'unanswered' | 'correct' | 'incorrect';
   onSelect: (alternativaId: number) => void;
+  serverFeedback?: { is_correct: boolean; gabarito: number };
 };
 
 const QuizOption = ({
@@ -31,11 +33,15 @@ const QuizOption = ({
   alternativaCorretaId,
   selecaoAtual,
   statusResposta,
-  onSelect
-}: QuizOptionProps) => {
+  onSelect,
+  serverFeedback
+}: QuizOptionProps & { serverFeedback?: { is_correct: boolean; gabarito: number } }) => {
   const isSelected = selecaoAtual === alternativa.id;
   const isSubmitted = statusResposta !== 'unanswered';
-  const isCorrectAnswer = alternativa.id === alternativaCorretaId;
+
+  const correctAlternativeId = serverFeedback?.gabarito || alternativaCorretaId;
+  const isCorrectAnswer = alternativa.id === correctAlternativeId;
+
 
   let optionClass = 'hover:bg-blue-800 cursor-pointer';
   let optionClass2 = 'flex items-center justify-center w-12 h-12 rounded-full border-2 border-gray-600 text-white mr-4 text-xl font-bold transition-all duration-200';
@@ -87,7 +93,10 @@ const useQuestoesState = (questions: Questao[]) => {
   const [activeTabs, setActiveTabs] = useState<Record<number, QuestaoTab>>({});
   const [openReportModalId, setOpenReportModalId] = useState<number | null>(null);
   const [topicsVisible, setTopicsVisible] = useState<Record<number, boolean>>({});
+  const [isSubmitting, setIsSubmitting] = useState<Record<number, boolean>>({});
+  const [serverFeedback, setServerFeedback] = useState<Record<number, { is_correct: boolean; gabarito: number }>>({});
 
+  const { data: session } = useSession();
   //const { updateQuestionStatus } = useNavigation();
   const timeoutsRef = useRef<Record<number, NodeJS.Timeout>>({});
 
@@ -109,36 +118,59 @@ const useQuestoesState = (questions: Questao[]) => {
     }));
   };
 
-  const handleConfirmAnswer = (questionId: number, alternativaCorretaId: number) => {
+  const handleConfirmAnswer = async (questionId: number, alternativaCorretaId: number) => {
     const selectedId = selectedAnswers[questionId];
     if (selectedId === undefined || selectedId === null) return;
 
-    const isCorrect = selectedId === alternativaCorretaId;
+    if (!session?.laravelToken) {
+      console.error('Usuário não autenticado');
+      return;
+    }
 
-    // Marca como respondida e mostra feedback
-    setAnsweredQuestions(prev => ({
-      ...prev,
-      [questionId]: true
-    }));
+    setIsSubmitting(prev => ({ ...prev, [questionId]: true }));
 
-    setShowFeedback(prev => ({
-      ...prev,
-      [questionId]: true
-    }));
+    try {
+      // Envia a resposta para o backend
+      const resultado = await responderQuestaoAvulsa(
+        questionId,
+        selectedId,
+        session.laravelToken
+      );
 
-    // Atualiza contexto de navegação
-    //updateQuestionStatus(questionId, isCorrect ? 'correct' : 'incorrect');
+      // Armazena o feedback do servidor
+      setServerFeedback(prev => ({
+        ...prev,
+        [questionId]: resultado
+      }));
 
-    // Remove o feedback após 2 segundos
-    const timeoutId = setTimeout(() => {
+      // Marca como respondida e mostra feedback
+      setAnsweredQuestions(prev => ({
+        ...prev,
+        [questionId]: true
+      }));
+
       setShowFeedback(prev => ({
         ...prev,
-        [questionId]: false
+        [questionId]: true
       }));
-    }, 2000);
 
-    // Armazena o timeout para cleanup
-    timeoutsRef.current[questionId] = timeoutId;
+      // Remove o feedback após 2 segundos
+      const timeoutId = setTimeout(() => {
+        setShowFeedback(prev => ({
+          ...prev,
+          [questionId]: false
+        }));
+      }, 2000);
+
+      // Armazena o timeout para cleanup
+      timeoutsRef.current[questionId] = timeoutId;
+
+    } catch (error) {
+      console.error('Erro ao enviar resposta:', error);
+      // Aqui você pode mostrar um feedback de erro para o usuário
+    } finally {
+      setIsSubmitting(prev => ({ ...prev, [questionId]: false }));
+    }
   };
 
   const openReportModal = (questaoId: number) => {
@@ -183,6 +215,8 @@ const useQuestoesState = (questions: Questao[]) => {
     activeTabs,
     openReportModalId,
     topicsVisible,
+    isSubmitting, // ADICIONE ESTA LINHA
+    serverFeedback, // ADICIONE ESTA LINHA
     handleSelectAnswer,
     handleConfirmAnswer,
     openReportModal,
@@ -413,6 +447,8 @@ export const ModelQuestions: React.FC<QuestionsPanelProps> = ({
     activeTabs,
     openReportModalId,
     topicsVisible,
+    isSubmitting, // ADICIONE ESTA LINHA
+    serverFeedback, // ADICIONE ESTA LINHA
     handleSelectAnswer,
     handleConfirmAnswer,
     openReportModal,
@@ -446,14 +482,19 @@ export const ModelQuestions: React.FC<QuestionsPanelProps> = ({
                 <div className="flex flex-wrap items-center justify-between gap-3 text-sm font-medium my-4 px-6 border-b border-white pb-4">
                   {/* Badges da Prova */}
                   <div className="flex flex-wrap gap-3">
-                    {questao.prova?.banca?.nome && (
+                    {questao.prova?.sigla && (
                       <span className="px-3 py-1 bg-gray-700 rounded-full text-gray-300">
-                        {questao.prova.banca.nome}
+                        {questao.prova?.sigla}
                       </span>
                     )}
                     {questao.prova?.ano && (
                       <span className="px-3 py-1 bg-gray-700 rounded-full text-gray-300">
                         {questao.prova.ano}
+                      </span>
+                    )}
+                    {questao.adaptado && (
+                      <span className="px-3 py-1 bg-gray-700 rounded-full text-gray-300">
+                        Questão Adaptada
                       </span>
                     )}
                   </div>
@@ -481,18 +522,19 @@ export const ModelQuestions: React.FC<QuestionsPanelProps> = ({
                         alternativaCorretaId={questao.alternativa_correta_id}
                         selecaoAtual={selectedAnswers[questao.id] || null}
                         statusResposta={isQuestionAnswered(questao.id) ?
-                          (selectedAnswers[questao.id] === questao.alternativa_correta_id ? 'correct' : 'incorrect')
+                          (serverFeedback[questao.id]?.is_correct ? 'correct' : 'incorrect') // CORREÇÃO AQUI
                           : 'unanswered'
                         }
                         onSelect={(alternativaId) => handleSelectAnswer(questao.id, alternativaId)}
+                        serverFeedback={serverFeedback[questao.id]} // ADICIONE ESTA LINHA
                       />
                     ))}
 
                     {/* Overlay de feedback */}
                     {showFeedback[questao.id] && (
                       <AnswerFeedbackOverlay
-                        status={selectedAnswers[questao.id] === questao.alternativa_correta_id ? 'correct' : 'incorrect'}
-                        onAnimationEnd={() => { }} // ADICIONE ESTA LINHA
+                        status={serverFeedback[questao.id]?.is_correct ? 'correct' : 'incorrect'} // CORREÇÃO AQUI
+                        onAnimationEnd={() => { }}
                       />
                     )}
                   </div>
@@ -500,10 +542,14 @@ export const ModelQuestions: React.FC<QuestionsPanelProps> = ({
                   {/* Botão Responder */}
                   <button
                     onClick={() => handleConfirmAnswer(questao.id, questao.alternativa_correta_id)}
-                    disabled={isQuestionAnswered(questao.id) || selectedAnswers[questao.id] == null}
+                    disabled={
+                      isQuestionAnswered(questao.id) ||
+                      selectedAnswers[questao.id] == null ||
+                      isSubmitting[questao.id] // ADICIONE ESTA CONDIÇÃO
+                    }
                     className="cursor-pointer mt-8 ml-4 px-8 py-3 bg-[#0E00D0] text-white rounded-lg hover:bg-blue-600 transition duration-200 text-2xl font-bold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Responder
+                    {isSubmitting[questao.id] ? 'Enviando...' : 'Responder'} {/* ADICIONE ESTE TEXTO DINÂMICO */}
                   </button>
                 </section>
 

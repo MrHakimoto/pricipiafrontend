@@ -9,6 +9,9 @@ import { ModelQuestions } from "@/components/questions/ModelQuestions";
 import { getFilterOptionsByIds, getFilteredQuestions, getAssuntosByFrentes, getTopicosByAssuntos } from "@/lib/filtra";
 import { ExercisesHeader } from "@/components/questions/ExercisesHeader";
 
+ // faz a requisição pra essa   Route::post('/questoes/{questao}/responder-avulsa', [ResolucaoController::class, 'responderAvulsa']);
+
+
 export type FilterPanelProps = {
   initialSelectedFronts?: any[];
   initialSelectedExams?: any[];

@@ -14,6 +14,7 @@ import CommentSection from "@/components/modules/CommentSection";
 import { useVideoProgress } from '@/hooks/useVideoProgress';
 import { usePandaPlayer } from '@/hooks/usePandaPlayer';
 import { DuvidaCard } from "@/components/modules/DuvidaCard";
+import { toggleLike } from "@/lib/course/like";
 
 
 
@@ -67,44 +68,37 @@ export default function ConteudoPage() {
   );
 
   useEffect(() => {
+    console.log('🎬 Iniciando configuração do player...');
+
     const cleanup = setupPlayerListeners();
 
-    // Save final quando o usuário sair da página
     const handleBeforeUnload = () => {
       const finalTime = currentTimeRef.current;
-      console.log('🚪 Usuário saindo - salvando tempo:', finalTime);
+      console.log('🚪 Usuário saindo - salvando tempo final:', finalTime);
       saveFinalProgress(finalTime);
     };
-
 
     window.addEventListener('beforeunload', handleBeforeUnload);
 
     return () => {
+      console.log('🔚 Desmontando componente...');
       cleanup();
       window.removeEventListener('beforeunload', handleBeforeUnload);
 
-      // Save final na desmontagem do componente
+      // Save final na desmontagem
       const finalTime = currentTimeRef.current;
-      console.log('🔚 Saindo da aula - salvando tempo final:', finalTime);
-      saveFinalProgress(finalTime);
+      if (finalTime > 5) { // Só salva se assistiu pelo menos 5 segundos
+        console.log('💾 Salvando progresso final na desmontagem:', finalTime);
+        saveFinalProgress(finalTime);
+      }
     };
-  }, [setupPlayerListeners, saveFinalProgress, conteudoId, session, thisDataD]);
+  }, [setupPlayerListeners]);
 
   // Ref para guardar o último tempo conhecido (fallback)
   const lastKnownTimeRef = useRef<number>(0);
 
   // 🔥 EFFECT PARA ATUALIZAR O LAST KNOWN TIME
-  useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      // Listen para mensagens do Panda Video
-      if (event.data && event.data.type === 'panda_timeupdate') {
-        currentTimeRef.current = event.data.currentTime;
-      }
-    };
 
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, []);
   // 🔥 ATUALIZA O STORE QUANDO O CONTEÚDO MUDA
   useEffect(() => {
     if (thisDataD) {
@@ -303,9 +297,24 @@ export default function ConteudoPage() {
           <div className="w-full mt-4 flex flex-col gap-4">
             <div className="flex flex-col sm:flex-row sm:justify-between gap-4">
               <div className="flex gap-4">
-                <button className="cursor-pointer flex items-center gap-2 px-6 py-2 rounded-md border border-gray-600 hover:bg-gray-700/30 transition">
-                  <Star size={18} />
-                  Estrelas
+                <button
+                  onClick={async () => {
+                    if (!session?.laravelToken) return;
+                    try {
+                      const result = await toggleLike(session.laravelToken, {
+                        entity_type: 'aula',
+                        entity_id: Number(conteudoId),
+                      });
+                      // Você pode mostrar um toast ou atualizar o estado visual
+                      console.log('Like da aula:', result);
+                    } catch (error) {
+                      console.error('Erro ao curtir aula:', error);
+                    }
+                  }}
+                  className="cursor-pointer flex items-center gap-2 px-6 py-2 rounded-md border border-gray-600 hover:bg-gray-700/30 transition"
+                >
+                  <Heart size={18} />
+                  Curtir Aula
                 </button>
                 <button className="cursor-pointer flex items-center gap-2 px-6 py-2 rounded-md border border-gray-600 hover:bg-gray-700/30 transition">
                   <Heart size={18} />

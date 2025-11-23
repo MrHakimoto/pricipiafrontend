@@ -8,12 +8,14 @@ import { FormEvent, useState } from "react";
 import ProProgressiveBar from "@/components/Motions/ProProgressiveBar"
 
 import TopProgressBar from "@/components/Motions/TopProgressBar";
+import { Eye, EyeOff } from "lucide-react";
 
 const Page = () => {
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const [email, setEmailField] = useState('');
     const [password, setPasswordField] = useState('');
+     const [showPassword, setShowPassword] = useState(false);
     const router = useRouter();
 
 
@@ -88,15 +90,25 @@ const Page = () => {
 
                         <div>
                             <label htmlFor="password" className="block ml-2 my-4 font-bold text-white">Senha</label>
+                            <div className="relative">
                             <input
                                 id="password"
-                                type="password"
+                                 type={showPassword ? "text" : "password"}
                                 placeholder="Digite a sua senha"
                                 className="w-full px-8 py-4 rounded-lg bg-[#1B1F27] placeholder-[#3A4252] focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 onChange={e => setPasswordField(e.target.value)}
                                 value={password}
                                 disabled={loading}
                             />
+
+                            <button
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                className="cursor-pointer absolute right-4 top-1/2 -translate-y-1/2 text-[#3A4252] hover:text-white"
+                            >
+                                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                            </button>
+                            </div>
                         </div>
                         {error && <p className='text-red-600 ml-5 mt-2'>{error}</p>}
 

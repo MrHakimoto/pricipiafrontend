@@ -21,6 +21,7 @@ export const ModelQuestionsWithNavigation: React.FC<ModelQuestionsWithNavigation
   // Converter Questao para QuestaoBase
   const convertedQuestions = questions.map(questao => ({
     ...questao,
+    adaptado: questao.adaptado ?? false,
     prova: questao.prova ? {
       banca: { nome: questao.prova.banca?.nome || '' },
       ano: questao.prova.ano
@@ -37,7 +38,7 @@ export const ModelQuestionsWithNavigation: React.FC<ModelQuestionsWithNavigation
             <ModelQuestions questions={questions} />
           </div>
         </div>
-        
+
         {/* Barra lateral de navegação */}
         {showSidebar && <QuestionNavigationSidebar />}
       </div>

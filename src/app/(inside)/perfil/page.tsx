@@ -2,11 +2,37 @@
 
 import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { fetchMyProfile, saveMyProfile, setPassword, unlinkGoogleAccount, checkGoogleStatus } from "@/lib/perfil/userData";
+import { fetchMyProfile, saveMyProfile, setPassword, unlinkGoogleAccount, checkGoogleStatus, removerAvatar, salvarAvatar } from "@/lib/perfil/userData";
 import { useSession, signIn } from "next-auth/react"; // <--- Importei signIn
 
 import type { UserProfile } from "@/lib/perfil/userData";
 import ProfileSkeleton from "@/components/Skeletons/ProfileCardSkeleton";
+import ProfileEditorModal from "@/components/editor/ProfileEditorModal";
+import { useImageUpload } from "@/hooks/useImageUpload";
+import { getUser } from '@/lib/dailyCheck/daily'; // Importe a função getUser
+
+
+const CameraIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+    <circle cx="12" cy="13" r="4" />
+  </svg>
+);
+
+const TrashIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+  </svg>
+);
+
+const EditIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+  </svg>
+);
+
+
 
 type ProfileForm = UserProfile & {
   celular: string;
@@ -43,7 +69,78 @@ export default function Profile() {
     message: ""
   });
 
+  // const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [isAvatarLoading, setIsAvatarLoading] = useState<boolean>(false);
+  const [isHoveringAvatar, setIsHoveringAvatar] = useState<boolean>(false);
+  const [avatarAction, setAvatarAction] = useState<'idle' | 'uploading' | 'removing'>('idle');
+  const currentAvatar = session?.user?.image || null;
+
+
+
+
+  const {
+    isUploading,
+    editingImageFile,
+    fileInputRef,
+    handleFileSelect,
+    openFileSelector,
+    confirmImageUpload,
+    setEditingImageFile
+  } = useImageUpload();
+
   const sessionAny = session as any;
+
+
+  // useEffect(() => {
+  //   if (status === "authenticated" && sessionAny?.laravelToken) {
+  //     if (session?.user?.image) {
+  //       setAvatarUrl(session?.user?.image)
+  //     }
+  //   }
+
+
+  // }, [status, session, sessionAny?.laravelToken, update])
+
+  // useEffect(() => {
+  //   const syncImageWithBackend = async () => {
+  //     // Só roda se estiver autenticado e tiver o token
+  //     if (status === "authenticated" && sessionAny?.laravelToken) {
+  //       try {
+  //         // 1. Busca o perfil no backend
+  //         const profile = await getUser(sessionAny.laravelToken);
+
+  //         // O avatar que veio do banco (pode ser uma URL string ou null)
+  //         const backendAvatar = profile?.avatar || null;
+
+  //         // A imagem que está na sessão agora
+  //         const sessionAvatar = session?.user?.image || null;
+
+  //         // Atualiza o estado local do avatar
+  //         setAvatarUrl(backendAvatar);
+
+  //         // 2. COMPARAÇÃO INTELIGENTE:
+  //         // Só chamamos o update se os valores forem DIFERENTES.
+  //         if (backendAvatar !== sessionAvatar) {
+  //           console.log("Layout: Sincronizando imagem da sessão...");
+
+  //           await update({
+  //             ...session,
+  //             user: {
+  //               ...session?.user,
+  //               image: backendAvatar,
+  //             },
+  //           });
+  //         }
+  //       } catch (error) {
+  //         console.error("Layout: Erro ao sincronizar imagem:", error);
+  //       }
+  //     }
+  //   };
+
+  //   syncImageWithBackend();
+  // }, [status, session, sessionAny?.laravelToken, update]);
+
+
 
   useEffect(() => {
     const loadData = async (): Promise<void> => {
@@ -119,6 +216,86 @@ export default function Profile() {
       return "A senha deve ter pelo menos 6 caracteres";
     }
     return null;
+  };
+
+
+
+  const handleSaveAvatar = async (file: File) => {
+    if (!sessionAny?.laravelToken || !form.id) return;
+
+    setAvatarAction('uploading');
+    try {
+      const imageUrl = await confirmImageUpload(file);
+      const response = await salvarAvatar(sessionAny.laravelToken, form.id, imageUrl);
+
+      if (response) {
+        // ✅ Atualiza apenas a session - remove estado local
+        await update({
+          user: {
+            ...session?.user,
+            image: imageUrl,
+          },
+        });
+
+        setPopup({
+          open: true,
+          title: "Sucesso!",
+          message: "Avatar atualizado com sucesso."
+        });
+      }
+    } catch (error) {
+      console.error("Erro ao salvar avatar:", error);
+      setPopup({
+        open: true,
+        title: "Erro",
+        message: "Não foi possível atualizar o avatar."
+      });
+    } finally {
+      setAvatarAction('idle');
+    }
+  };
+
+
+  const handleRemoveAvatar = async () => {
+    if (!sessionAny?.laravelToken || !form.id) return;
+
+    setAvatarAction('removing');
+    try {
+      const response = await removerAvatar(sessionAny.laravelToken, form.id);
+
+      if (response !== null) {
+        // ✅ CORREÇÃO: Atualiza a session corretamente
+        await update({
+          user: {
+            ...session?.user,
+            image: undefined, // Remove a imagem
+          },
+        });
+
+        setPopup({
+          open: true,
+          title: "Sucesso!",
+          message: "Avatar removido com sucesso."
+        });
+
+      } else {
+        throw new Error("Falha ao remover avatar no servidor");
+      }
+    } catch (error: any) {
+      console.error("Erro ao remover avatar:", error);
+      setPopup({
+        open: true,
+        title: "Erro",
+        message: error.message || "Não foi possível remover o avatar."
+      });
+    } finally {
+      setAvatarAction('idle');
+    }
+  };
+
+  // Função para selecionar imagem
+  const handleImageSelect = (file: File) => {
+    setEditingImageFile(file);
   };
 
   const handleSetPassword = async () => {
@@ -374,7 +551,13 @@ export default function Profile() {
 
   return (
     <div className="min-h-screen bg-white text-black dark:bg-[#00091A] dark:text-white font-sans relative">
-
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={(e) => handleFileSelect(e, handleImageSelect)}
+        accept="image/*"
+        className="hidden"
+      />
       {/* Main */}
       <main className="flex flex-col md:flex-row gap-8 mx-auto p-6 md:p-8 max-w-5xl items-start">
 
@@ -385,12 +568,95 @@ export default function Profile() {
           transition={{ duration: 0.5 }}
           className="bg-[#1b1f27] p-8 md:p-12 rounded-lg w-full md:w-64 text-center"
         >
-          <motion.div whileHover={{ scale: 1.05 }} className="w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center text-3xl">
-            {/* SVG */}
-            <svg width="94" height="93" viewBox="0 0 94 93" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M94 46.5C94 20.8785 72.897 0 47 0C21.103 0 0 20.8785 0 46.5C0 59.985 5.875 72.1215 15.181 80.631C15.181 80.6775 15.181 80.6775 15.134 80.724C15.604 81.189 16.168 81.561 16.638 81.9795C16.92 82.212 17.155 82.4445 17.437 82.6305C18.283 83.328 19.223 83.979 20.116 84.63C20.445 84.8625 20.727 85.0485 21.056 85.281C21.949 85.8855 22.889 86.4435 23.876 86.955C24.205 87.141 24.581 87.3735 24.91 87.5595C25.85 88.071 26.837 88.536 27.871 88.9545C28.247 89.1405 28.623 89.3265 28.999 89.466C30.033 89.8845 31.067 90.2565 32.101 90.582C32.477 90.7215 32.853 90.861 33.229 90.954C34.357 91.2795 35.485 91.5585 36.613 91.8375C36.942 91.9305 37.271 92.0235 37.647 92.07C38.963 92.349 40.279 92.535 41.642 92.6745C41.83 92.6745 42.018 92.721 42.206 92.7675C43.804 92.907 45.402 93 47 93C48.598 93 50.196 92.907 51.747 92.7675C51.935 92.7675 52.123 92.721 52.311 92.6745C53.674 92.535 54.99 92.349 56.306 92.07C56.635 92.0235 56.964 91.884 57.34 91.8375C58.468 91.5585 59.643 91.326 60.724 90.954C61.1 90.8145 61.476 90.675 61.852 90.582C62.886 90.21 63.967 89.8845 64.954 89.466C65.33 89.3265 65.706 89.1405 66.082 88.9545C67.069 88.536 68.056 88.071 69.043 87.5595C69.419 87.3735 69.748 87.141 70.077 86.955C71.017 86.397 71.957 85.8855 72.897 85.281C73.226 85.095 73.508 84.8625 73.837 84.63C74.777 83.979 75.67 83.328 76.516 82.6305C76.798 82.398 77.033 82.1655 77.315 81.9795C77.832 81.561 78.349 81.1425 78.819 80.724C78.819 80.6775 78.819 80.6775 78.772 80.631C88.125 72.1215 94 59.985 94 46.5ZM70.218 69.6105C57.481 61.1475 36.613 61.1475 23.782 69.6105C21.714 70.959 20.022 72.54 18.612 74.2605C11.468 67.0995 7.05 57.288 7.05 46.5C7.05 24.6915 24.957 6.975 47 6.975C69.043 6.975 86.95 24.6915 86.95 46.5C86.95 57.288 82.532 67.0995 75.388 74.2605C74.025 72.54 72.286 70.959 70.218 69.6105Z" fill="white" />
-            </svg>
-          </motion.div>
+          {/* Container do Avatar com Hover */}
+          <div
+            className="relative w-20 h-20 mx-auto mb-4 group"
+            onMouseEnter={() => setIsHoveringAvatar(true)}
+            onMouseLeave={() => setIsHoveringAvatar(false)}
+          >
+            <motion.div
+              whileHover={{ scale: 1.05 }}
+              className="w-full h-full rounded-full overflow-hidden bg-gray-700 flex items-center justify-center relative"
+            >
+              {/* ✅ Use apenas session?.user?.image para consistência */}
+              {currentAvatar ? (
+                <img
+                  src={currentAvatar}
+                  alt="Avatar do usuário"
+                  className="w-full h-full object-cover rounded-full"
+                />
+              ) : (
+                <svg width="64" height="64" viewBox="0 0 94 93" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M94 46.5C94 20.8785 72.897 0 47 0C21.103 0 0 20.8785 0 46.5C0 59.985 5.875 72.1215 15.181 80.631C15.181 80.6775 15.181 80.6775 15.134 80.724C15.604 81.189 16.168 81.561 16.638 81.9795C16.92 82.212 17.155 82.4445 17.437 82.6305C18.283 83.328 19.223 83.979 20.116 84.63C20.445 84.8625 20.727 85.0485 21.056 85.281C21.949 85.8855 22.889 86.4435 23.876 86.955C24.205 87.141 24.581 87.3735 24.91 87.5595C25.85 88.071 26.837 88.536 27.871 88.9545C28.247 89.1405 28.623 89.3265 28.999 89.466C30.033 89.8845 31.067 90.2565 32.101 90.582C32.477 90.7215 32.853 90.861 33.229 90.954C34.357 91.2795 35.485 91.5585 36.613 91.8375C36.942 91.9305 37.271 92.0235 37.647 92.07C38.963 92.349 40.279 92.535 41.642 92.6745C41.83 92.6745 42.018 92.721 42.206 92.7675C43.804 92.907 45.402 93 47 93C48.598 93 50.196 92.907 51.747 92.7675C51.935 92.7675 52.123 92.721 52.311 92.6745C53.674 92.535 54.99 92.349 56.306 92.07C56.635 92.0235 56.964 91.884 57.34 91.8375C58.468 91.5585 59.643 91.326 60.724 90.954C61.1 90.8145 61.476 90.675 61.852 90.582C62.886 90.21 63.967 89.8845 64.954 89.466C65.33 89.3265 65.706 89.1405 66.082 88.9545C67.069 88.536 68.056 88.071 69.043 87.5595C69.419 87.3735 69.748 87.141 70.077 86.955C71.017 86.397 71.957 85.8855 72.897 85.281C73.226 85.095 73.508 84.8625 73.837 84.63C74.777 83.979 75.67 83.328 76.516 82.6305C76.798 82.398 77.033 82.1655 77.315 81.9795C77.832 81.561 78.349 81.1425 78.819 80.724C78.819 80.6775 78.819 80.6775 78.772 80.631C88.125 72.1215 94 59.985 94 46.5ZM70.218 69.6105C57.481 61.1475 36.613 61.1475 23.782 69.6105C21.714 70.959 20.022 72.54 18.612 74.2605C11.468 67.0995 7.05 57.288 7.05 46.5C7.05 24.6915 24.957 6.975 47 6.975C69.043 6.975 86.95 24.6915 86.95 46.5C86.95 57.288 82.532 67.0995 75.388 74.2605C74.025 72.54 72.286 70.959 70.218 69.6105Z" fill="white" />
+                </svg>
+              )}
+
+              {/* Overlay de Hover */}
+              <AnimatePresence>
+                {isHoveringAvatar && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="absolute inset-0 bg-black bg-opacity-60 rounded-full flex items-center justify-center"
+                  >
+                    <div className="flex gap-2">
+                      {/* Botão Alterar */}
+                      <motion.button
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.9 }}
+                        onClick={openFileSelector}
+                        disabled={avatarAction !== 'idle'}
+                        className="p-2 cursor-pointer bg-blue-600 rounded-full text-white hover:bg-blue-700 transition-colors"
+                        title="Alterar avatar"
+                      >
+                        <EditIcon />
+                      </motion.button>
+
+                      {/* Botão Remover (só aparece se tiver avatar) */}
+                      {currentAvatar && (
+                        <motion.button
+                          whileHover={{ scale: 1.1 }}
+                          whileTap={{ scale: 0.9 }}
+                          onClick={handleRemoveAvatar}
+                          disabled={avatarAction !== 'idle'}
+                          className="p-2 cursor-pointer bg-red-600 rounded-full text-white hover:bg-red-700 transition-colors"
+                          title="Remover avatar"
+                        >
+                          <TrashIcon />
+                        </motion.button>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Loading Overlay - ✅ Usando avatarAction */}
+              {avatarAction !== 'idle' && (
+                <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center rounded-full">
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                    className="w-6 h-6 border-2 border-white border-t-transparent rounded-full"
+                  />
+                </div>
+              )}
+            </motion.div>
+
+            {/* Ícone da Câmera (sempre visível quando não há hover e não há avatar) */}
+            {!isHoveringAvatar && !currentAvatar && (
+              <motion.button
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
+                onClick={openFileSelector}
+                disabled={avatarAction !== 'idle'}
+                className="absolute -bottom-1 -right-1 p-2 bg-[#0e00d0] rounded-full text-white hover:bg-blue-700 transition-colors shadow-lg"
+                title="Adicionar avatar"
+              >
+                <CameraIcon />
+              </motion.button>
+            )}
+          </div>
 
           <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }} className="font-semibold text-white">
             {sessionAny?.user?.name ?? "Usuário"}
@@ -522,15 +788,24 @@ export default function Profile() {
 
                   {/* Gênero */}
                   <motion.div variants={itemVariants}>
-                    <label className="block mb-1 text-sm text-black dark:text-gray-300">Gênero</label>
+                    <label className="block mb-1 text-sm text-black dark:text-gray-300">
+                      Gênero
+                    </label>
+
                     <select
                       name="gender"
                       value={form.gender}
                       onChange={handleChange}
-                      className="    w-full rounded p-2 bg-white text-gray-900
-    placeholder-gray-400
-    border border-gray-600 focus:outline-none focus:ring-2 focus:ring-[#0e00d0]
-    dark:bg-transparent dark:text-white dark:placeholder-gray-500 dark:border-gray-600"
+                      className="
+      w-full rounded p-2 
+      bg-white text-gray-900 
+      border border-gray-300
+      focus:outline-none focus:ring-2 focus:ring-[#0e00d0]
+
+      dark:bg-[#0A0F1F] dark:text-white 
+      dark:border-gray-700 
+      dark:focus:ring-[#4e4cff]
+    "
                     >
                       <option value="">Selecione</option>
                       <option value="masculino">Masculino</option>
@@ -538,6 +813,7 @@ export default function Profile() {
                       <option value="nao-informar">Prefiro não dizer</option>
                     </select>
                   </motion.div>
+
 
                   {/* Celular */}
                   <motion.div variants={itemVariants}>
@@ -809,6 +1085,14 @@ export default function Profile() {
           </motion.div>
         )}
       </AnimatePresence>
+      {editingImageFile && (
+        <ProfileEditorModal
+          image={editingImageFile}
+          open={!!editingImageFile}
+          onOpenChange={(isOpen) => !isOpen && setEditingImageFile(null)}
+          onConfirm={handleSaveAvatar}
+        />
+      )}
     </div>
   );
 }

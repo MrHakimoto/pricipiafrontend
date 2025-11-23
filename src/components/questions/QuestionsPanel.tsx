@@ -146,15 +146,15 @@ export const QuestionsPanel: React.FC<QuestionsPanelProps> = ({
     }, [respostasSalvas, questions, updateQuestionStatus]);
 
     useEffect(() => {
-        if (currentResolucaoId  === null && Object.keys(respostasSalvas).length > 0) {
+        if (currentResolucaoId === null && Object.keys(respostasSalvas).length > 0) {
             console.log('🎯 Tentativa finalizada detectada - mostrando botão refazer');
             setTentativaFinalizada(true);
         } else {
             setTentativaFinalizada(false);
         }
-    }, [currentResolucaoId , respostasSalvas]);
+    }, [currentResolucaoId, respostasSalvas]);
 
-    
+
 
     const handleRefazerLista = async () => {
         setIsRefazendoLista(true);
@@ -354,6 +354,7 @@ export const QuestionsPanel: React.FC<QuestionsPanelProps> = ({
                 <EstatisticasQuestao
                     questaoId={questao.id}
                     dificuldade={questao.dificuldade}
+                    token={userToken}
                 />
             )
         };
@@ -462,16 +463,23 @@ export const QuestionsPanel: React.FC<QuestionsPanelProps> = ({
 
                                         {/* Badges da Prova */}
                                         <div className="flex flex-wrap gap-3">
-                                            {questao.prova?.banca?.nome && (
+                                            {questao.prova?.sigla && (
                                                 <span className="px-3 py-1 bg-gray-700 rounded-full text-gray-300">
-                                                    {questao.prova.banca.nome}
+                                                    {questao.prova.sigla}
                                                 </span>
                                             )}
                                             {questao.prova?.ano && (
                                                 <span className="px-3 py-1 bg-gray-700 rounded-full text-gray-300">
                                                     {questao.prova.ano}
                                                 </span>
+
                                             )}
+                                            {questao.adaptado && (
+
+                                                <span className="px-3 py-1 bg-gray-700 rounded-full text-gray-300">
+                                                    (Questão Adapitada)
+                                                </span>)
+                                            }
                                         </div>
 
 
@@ -615,7 +623,7 @@ export const QuestionsPanel: React.FC<QuestionsPanelProps> = ({
                 </div>
             </div>
             {deveMostrarBotaoRefazer && (
-                <RefazerListaButton 
+                <RefazerListaButton
                     onRefazerLista={handleRefazerLista}
                     isLoading={isRefazendoLista}
                     isTentativaFinalizada={tentativaFinalizada}

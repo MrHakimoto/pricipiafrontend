@@ -19,6 +19,7 @@ export const NavBarComponent = () => {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const { data: session, status, update } = useSession();
     const sessionAny = session as any;
+    console.log(sessionAny, "se liga nisso aqui")
     useEffect(() => {
         document.body.style.overflow = isMobileMenuOpen ? 'hidden' : '';
         document.body.style.position = isMobileMenuOpen ? 'fixed' : '';

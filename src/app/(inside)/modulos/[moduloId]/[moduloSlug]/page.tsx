@@ -30,43 +30,48 @@ export default function ModuloRedirectPage() {
       .replace(/\s+/g, "-");
   }
 
-  useEffect(() => {
-    // Condições mais rigorosas para redirecionamento
-    const shouldRedirect = 
-      !initialLoading && 
-      !hasRedirected && 
-      loadedModuloId === moduloId && 
-      contents.length > 0;
+ useEffect(() => {
+  // 1. Espera terminar o carregamento inicial
+  if (initialLoading) return;
 
-    console.log("=== CONDIÇÕES DE REDIRECIONAMENTO ===");
-    console.log("initialLoading:", initialLoading);
-    console.log("hasRedirected:", hasRedirected);
-    console.log("loadedModuloId:", loadedModuloId);
-    console.log("moduloId:", moduloId);
-    console.log("contents.length:", contents.length);
-    console.log("shouldRedirect:", shouldRedirect);
+  // 2. Garante que o módulo certo foi carregado no store
+  if (loadedModuloId !== moduloId) return;
 
-    if (shouldRedirect) {
-      const primeiro = contents[0];
-      const redirectUrl = `/modulos/${moduloId}/${moduloSlug}/${primeiro.id}/${toSlug(primeiro.title)}`;
-      
-      console.log(" REDIRECIONANDO PARA:", redirectUrl);
-      
-      setHasRedirected(true); // Marca como redirecionado
-      router.replace(redirectUrl);
-    } else if (!initialLoading && contents.length === 0 && !hasRedirected) {
-      console.log(" Módulo vazio ou sem conteúdos.");
-      // router.replace("/home");
-    }
-  }, [
-    initialLoading, 
-    contents, 
-    moduloId, 
-    moduloSlug, 
-    router, 
-    hasRedirected,
-    loadedModuloId
-  ]);
+  // 3. Evita redirecionamento duplo
+  if (hasRedirected) return;
+
+  // 4. Só segue se houver conteúdos
+  if (!contents || contents.length === 0) return;
+
+  // 5. Encontrar a primeira aula NÃO concluída
+  const firstUncompleted = contents.find(
+    (lesson) => !lesson.user_progress?.is_completed
+  );
+
+  // 6. Fallback: se todas concluídas, vai para a primeira do módulo
+  const targetLesson = firstUncompleted ?? contents[0];
+
+  // 7. Gerar slug
+  const slug = toSlug(targetLesson.title);
+
+  // 8. Montar URL final
+  const url = `/modulos/${moduloId}/${moduloSlug}/${targetLesson.id}/${slug}`;
+
+  console.log("🔥 Redirecionando para:", url);
+
+  // 9. Marcar como redirecionado e enviar
+  setHasRedirected(true);
+  router.replace(url);
+
+}, [
+  initialLoading,
+  contents,
+  loadedModuloId,
+  moduloId,
+  moduloSlug,
+  hasRedirected,
+  router
+]);
 
   // Log para debug
   useEffect(() => {

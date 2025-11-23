@@ -109,6 +109,56 @@ export default function ModuloLayout({
     }
   }, [status, moduloId, session, loadedModuloId, contents.length, setContents, setLoadedModuloId, setInitialLoading, setCurrentLink]);
 
+
+useEffect(() => {
+  if (!contents || contents.length === 0) return;
+
+  // Se já estamos visualizando uma aula, não faz redirect automático
+ const isInsideLessonPage = params?.contentId != null;
+  if (isInsideLessonPage) return;
+
+   if (currentContentId) return;
+
+  // Encontrar a primeira aula não concluída
+  const firstUncompleted = contents.find(
+    lesson => !lesson.user_progress?.is_completed
+  );
+
+  if (firstUncompleted) {
+    // Redirecionar para essa aula
+    const slug = firstUncompleted.title
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9\s-]/g, "")
+      .trim()
+      .replace(/\s+/g, "-");
+
+    router.replace(
+      `/modulos/${moduloId}/${moduloSlug}/${firstUncompleted.id}/${slug}`,
+      { scroll: false }
+    );
+  } else {
+    // Se todas concluídas → ir para a última
+    const lastLesson = contents[contents.length - 1];
+
+    const slug = lastLesson.title
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9\s-]/g, "")
+      .trim()
+      .replace(/\s+/g, "-");
+
+    router.replace(
+      `/modulos/${moduloId}/${moduloSlug}/${lastLesson.id}/${slug}`,
+      { scroll: false }
+    );
+  }
+}, [contents, currentContentId, moduloId, moduloSlug, router]);
+
+
+
   const goToLesson = (lesson: any) => {
     const slug = lesson.title
       .toLowerCase()

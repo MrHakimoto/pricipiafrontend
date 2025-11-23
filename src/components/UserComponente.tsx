@@ -12,6 +12,7 @@ interface UserMenuProps {
     user: {
       name: string;
       email: string;
+      image?: string;
     };
   };
   hoverColor?: string; // ✅ <-- adiciona isso
@@ -23,7 +24,8 @@ export function UserMenu({ mobile = false, session, hoverColor = "#0E00D0" }: Us
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const { theme, setTheme } = useTheme();
-
+  const user = session?.user;
+  const image = user?.image;
   useEffect(() => setMounted(true), []);
 
   // Fechar dropdown ao clicar fora
@@ -117,27 +119,47 @@ export function UserMenu({ mobile = false, session, hoverColor = "#0E00D0" }: Us
         onClick={() => setIsOpen(!isOpen)}
         className="cursor-pointer flex items-center justify-center w-12 h-12 lg:w-14 lg:h-14 rounded-full bg-gray-100 dark:bg-[#1F293C] hover:bg-gray-200 dark:hover:bg-[#2A374B] focus:outline-none transition-all duration-300 border border-gray-300 dark:border-[#555555] hover:border-blue-500 dark:hover:border-[#0E00D0] hover:shadow-lg hover:shadow-blue-500/20 group"
       >
-        <div className="relative">
-          <CircleUserRound
-            className={`cursor-pointer w-6 h-6 lg:w-7 lg:h-7 transition-colors duration-300
-            ${active
-                ? "text-blue-600 dark:text-[#0E00D0]"
-                : "text-gray-700 dark:text-white group-hover:text-blue-600 dark:group-hover:text-[#0E00D0]"
-              }`}
-          />
-
+        <div className="relative w-full h-full">
+          {image ? (
+            <img
+              src={image}
+              alt={session?.user.name}
+              className={`w-full h-full transition-all duration-300 rounded-full object-cover
+          ${active ? "ring-2 ring-blue-600 dark:ring-[#0E00D0]" : "ring-0"}`
+              }
+              referrerPolicy="no-referrer"
+            />
+          ) : (
+            <CircleUserRound
+              className={`w-full h-full transition-colors duration-300
+          ${active
+                  ? "text-blue-600 dark:text-[#0E00D0]"
+                  : "text-gray-700 dark:text-white group-hover:text-blue-600 dark:group-hover:text-[#0E00D0]"
+                }`}
+            />
+          )}
           <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-blue-600 dark:bg-[#0E00D0] rounded-full border-2 border-gray-100 dark:border-[#1F293C]"></div>
         </div>
       </button>
+
 
       {isOpen && (
         <div className="absolute right-0 top-full mt-2 w-80 bg-white dark:bg-[#00091A] text-gray-900 dark:text-white border border-gray-300 dark:border-[#555555] shadow-2xl rounded-lg overflow-hidden z-50">
           <div className="p-4 bg-gray-100 dark:bg-[#1F293C] border-b border-gray-300 dark:border-[#555555] flex items-center gap-3">
             <div className="relative flex flex-col">
               <span className="inline-flex items-center justify-center rounded-full border-2 border-blue-600 dark:border-[#0E00D0] w-12 h-12">
-                <span className="w-full h-full rounded-full bg-blue-600 dark:bg-[#0E00D0] flex items-center justify-center font-semibold text-white text-sm">
-                  {session?.user?.name ? getInitials(session.user.name) : <User className="w-5 h-5" />}
-                </span>
+                {session?.user?.image ? (
+                  <img
+                    src={session.user.image}
+                    alt="Avatar"
+                    className="w-full h-full rounded-full object-cover"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <span className="w-full h-full rounded-full bg-blue-600 dark:bg-[#0E00D0] flex items-center justify-center font-semibold text-white text-sm">
+                    {session?.user?.name ? getInitials(session.user.name) : <User className="w-5 h-5" />}
+                  </span>
+                )}
               </span>
               <div className="absolute -bottom-1 self-center text-[10px] py-0.5 px-1 rounded-sm bg-blue-600 dark:bg-[#0E00D0] text-white">16</div>
             </div>

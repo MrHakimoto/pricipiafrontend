@@ -224,3 +224,15 @@ export const getTentativaAtiva = async (listaId: number | string,
     throw new Error("Falha ao buscar a tentativa ativa.");
   }
 };
+
+
+
+
+// Para question PANEL
+export const responderQuestaoAvulsa = async (token: string, questaoId: number | string, alternativaId: number | string) => {
+    const response = await api.post(`/questoes/${questaoId}/responder-avulsa`, 
+        { alternativa_id: alternativaId }, 
+        { headers: { Authorization: `Bearer ${token}` } }
+    );
+    return response.data; // Retorna { is_correct: true/false, gabarito: 123 }
+}

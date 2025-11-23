@@ -38,6 +38,20 @@ export const checkinStatus = async (token: string) => {
   }
 };
 
+export const getUser = async (token: string) => {
+  if (!token) throw new Error("Token não fornecido.");
+
+  try {
+    const response = await api.get("/user", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Erro ao buscar status do check-in:", error);
+    throw new Error("Falha ao buscar o status do check-in.");
+  }
+};
+
 /**
  * Tenta realizar o check-in diário para o utilizador logado.
  * Rota: POST /api/checkin

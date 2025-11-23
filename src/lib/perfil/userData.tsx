@@ -8,6 +8,7 @@ export interface UserProfile {
   gender?: string;
   cpf?: string;
   phone?: string;
+  avatar?: string;
 }
 
 export const linkGoogleAccount = async (token: string, googleData: { email: string; google_id: string; avatar?: string }) => {
@@ -117,4 +118,34 @@ const formatarDataParaISO = (dataBR?: string | null): string | null => {
   if (partes.length !== 3) return null;
   const [dia, mes, ano] = partes;
   return `${ano}-${mes}-${dia}`;
+};
+
+
+
+export const salvarAvatar = async (token: string, id: string | number, avatar: string) => {
+  try {
+    const response = await api.post("/salvarAvatar", { user_id: id, avatar: avatar }, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return response.data;
+  } catch (error: any) {
+    if (error.response?.status === 404) return null;
+    console.error("Erro ao setar o avatar:", error);
+    throw new Error("Falha ao setar o novo avatar.");
+  }
+};
+
+
+
+export const removerAvatar = async (token: string, id: string | number) => {
+  try {
+    const response = await api.post("/removerAvatar", { user_id: id }, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return response.data;
+  } catch (error: any) {
+    if (error.response?.status === 404) return null;
+    console.error("Erro ao remover o avatar:", error);
+    throw new Error("Falha ao remover o avatar.");
+  }
 };
