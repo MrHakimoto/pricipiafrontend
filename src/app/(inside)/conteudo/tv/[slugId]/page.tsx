@@ -161,7 +161,7 @@ export default function ConteudoPage({ params }: PageProps) {
   }
 
   return (
-    <div className="w-full flex flex-col items-center text-white">
+    <div className="w-full flex flex-col items-center text-white pb-5">
       {/* Cabeçalho */}
       <h1 className="text-2xl font-bold mt-4">{courseInfo.name}</h1>
       <p className="mt-2 mb-6 text-center max-w-2xl text-gray-300">
@@ -202,7 +202,7 @@ export default function ConteudoPage({ params }: PageProps) {
 
       {/* Conteúdo */}
       {tvTipo === "curso" ? (
-        <div className="w-full max-w-5xl mx-auto space-y-5">
+        <div className="w-full max-w-5xl mx-auto space-y-5 pb-8">
           {dataB.map((course) => {
             const totais = calcularTotaisFrente(course);
 
@@ -407,8 +407,7 @@ export default function ConteudoPage({ params }: PageProps) {
           />
 
           <p className="text-[28px] font-semibold text-white max-w-2xl leading-snug">
-            Para criar o seu cronograma personalizado G.E.P,
-            clique no botão abaixo e defina suas configurações
+          (EM BREVE)
           </p>
 
           <button className="cursor-pointer flex items-center justify-center gap-3 w-full md:w-auto px-8 py-5 rounded-2xl bg-[#0E00D0] text-white font-semibold text-lg hover:bg-[#1400FF] transition-all shadow-md">

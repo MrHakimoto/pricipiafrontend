@@ -76,7 +76,7 @@ export default function Profile() {
   const currentAvatar = session?.user?.image || null;
 
 
-
+//console.log("CDN PUBLIC:", process.env.NEXT_PUBLIC_CDN_URL);
 
   const {
     isUploading,

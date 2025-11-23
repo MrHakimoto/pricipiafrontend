@@ -92,13 +92,13 @@ export default function HomePage() {
           <section className="mt-12 space-y-12">
             <div className="flex gap-6">
               <WeekProgress />
-              <ContinueWatchingCard />
+              {/* <ContinueWatchingCard /> */}
             </div>
-            <GoalsSection />
+           
           </section>
         </div>
 
-        <section className="mt-12">
+        {/* <section className="mt-12">
           <div className="max-w-7xl mx-auto space-y-12">
             <motion.div
               initial={{ opacity: 0, y: 40 }}
@@ -118,7 +118,7 @@ export default function HomePage() {
               />
             </motion.div>
           </div>
-        </section>
+        </section> */}
       </main>
       <FooterHome />
     </>
