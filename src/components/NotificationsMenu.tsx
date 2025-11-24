@@ -198,7 +198,7 @@ export function NotificationsMenu({ hoverColor = "#0E00D0" }: { hoverColor?: str
           </div>
 
           {/* Banner push (Design 100% mantido) */}
-          <div className="bg-yellow-50 dark:bg-yellow-500/10 p-3 border-b border-yellow-100 dark:border-yellow-500/20 flex gap-3 border-l-4 border-l-yellow-500">
+          {/* <div className="bg-yellow-50 dark:bg-yellow-500/10 p-3 border-b border-yellow-100 dark:border-yellow-500/20 flex gap-3 border-l-4 border-l-yellow-500">
             <TriangleAlert className="w-4 h-4 text-yellow-500 shrink-0 mt-0.5" />
             <div className="flex flex-col gap-2">
               <p className="text-sm text-yellow-800 dark:text-yellow-200">
@@ -213,7 +213,7 @@ export function NotificationsMenu({ hoverColor = "#0E00D0" }: { hoverColor?: str
                 </button>
               </div>
             </div>
-          </div>
+          </div> */}
 
           {/* Lista de notificações (Design 100% mantido, dados conectados) */}
           <div className="max-h-80 overflow-y-auto">

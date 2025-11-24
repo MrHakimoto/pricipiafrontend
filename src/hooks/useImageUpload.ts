@@ -1,3 +1,4 @@
+//hook/useImageUpload.ts
 "use client";
 
 import { useState, useRef } from "react";

@@ -1,49 +1,53 @@
-"use client";
+'use client';
 
 import { ReactNode, useEffect, useState } from "react";
+import Head from "next/head";
 import { useSession } from "next-auth/react";
 import { NavBarComponent } from "@/components/NavBarComponent/NavBarComponent";
 import { useProgressBar } from "@/components/Context/ProgressBarContext";
-import { getUser } from '@/lib/dailyCheck/daily'
-import { StreakProvider } from '@/contexts/StreakContext' // 👈 Importar o Provider
+import { getUser } from '@/lib/dailyCheck/daily';
+import { StreakProvider } from '@/contexts/StreakContext';
 
-export default function InsideLayout({ children }: { children: ReactNode }) {
+interface InsideLayoutProps {
+  children: ReactNode;
+  pageTitle?: string; // título opcional por página
+}
+
+export default function InsideLayout({ children, pageTitle }: InsideLayoutProps) {
   const { data: session, status, update } = useSession(); 
   const { done } = useProgressBar();
   const [lastSyncedAvatar, setLastSyncedAvatar] = useState<string | null>(null);
 
+  // 🔒 Desativar console em produção
+  useEffect(() => {
+    if (process.env.NODE_ENV === "production") {
+      console.log = () => {};
+      console.warn = () => {};
+      console.error = () => {};
+      console.info = () => {};
+      console.debug = () => {};
+    }
+  }, []);
+
+  // ✅ Marca progresso quando sessão está pronta
   useEffect(() => {
     if (status !== "loading") {
       done();
     }
   }, [status, done]);
 
-  // 🔥 LÓGICA CORRIGIDA DE SINCRONIZAÇÃO 🔥
+  // 🔥 Sincronização de avatar com backend
   useEffect(() => {
     const syncImageWithBackend = async () => {
       const sessionAny = session as any;
-      console.log(session);
-      
-      // Só roda se estiver autenticado e tiver o token
+
       if (status === "authenticated" && sessionAny?.laravelToken) {
         try {
-          // 1. Busca o perfil no backend
           const profile = await getUser(sessionAny.laravelToken);
           const backendAvatar = profile?.avatar || null;
-          
-          // 2. VERIFICAÇÃO MAIS ROBUSTA:
-          // - Evita loops comparando com o último valor sincronizado
-          // - Só atualiza se realmente houver mudança
           const currentSessionImage = session?.user?.image || null;
-          
-          // Se o backend mudou E é diferente do que já temos na session
+
           if (backendAvatar !== currentSessionImage && backendAvatar !== lastSyncedAvatar) {
-            console.log("Layout: Sincronizando imagem da sessão...", {
-              backend: backendAvatar,
-              session: currentSessionImage,
-              lastSynced: lastSyncedAvatar
-            });
-            
             await update({
               ...session,
               user: {
@@ -51,34 +55,28 @@ export default function InsideLayout({ children }: { children: ReactNode }) {
                 image: backendAvatar,
               },
             });
-
-            // Atualiza o último valor sincronizado
             setLastSyncedAvatar(backendAvatar);
           }
         } catch (error) {
-          console.error("Layout: Erro ao sincronizar imagem:", error);
+          // console.error está desativado em produção
+          console.error("Erro ao sincronizar imagem:", error);
         }
       }
     };
 
     syncImageWithBackend();
-    
   }, [status, session?.user?.image, lastSyncedAvatar, session, update]);
 
-  // Se está carregando, retorna null (ou um loading global se preferir)
-  if (status === "loading") {
-    return null;
-  }
-
-  // Como você já tem middleware, essa verificação visual é apenas um fallback rápido
-  // para não piscar a tela antes do middleware chutar
-  if (status === "unauthenticated") {
-    return null; 
+  if (status === "loading" || status === "unauthenticated") {
+    return null; // fallback visual
   }
 
   return (
-    // 👈 Envolver com StreakProvider
     <StreakProvider>
+      <Head>
+        <title>{pageTitle || "Meu App"}</title>
+      </Head>
+
       <div className="min-h-screen bg-[#F6F6F6] dark:bg-[#00091A] dark:text-white flex flex-col w-full overflow-hidden">
         <NavBarComponent />
         <main className="flex-1 w-full overflow-hidden">
