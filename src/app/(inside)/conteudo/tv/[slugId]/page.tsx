@@ -297,7 +297,7 @@ export default function ConteudoPage({ params }: PageProps) {
                             const tempoModulo = Math.round(
                               mod.contents?.reduce((total: number, content: any) =>
                                 total + (content.estimated_time_minutes || 0), 0
-                              ) / 60
+                              ) / 3600
                             );
 
                             const progresso = calcularProgressoModulo(mod);
