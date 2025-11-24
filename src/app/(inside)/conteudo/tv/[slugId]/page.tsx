@@ -309,7 +309,7 @@ export default function ConteudoPage({ params }: PageProps) {
                             };
 
                             const totalSegundos = mod.contents?.reduce(
-                              (total: number, content: any) => total + (content.estimated_seconds || 0),
+                              (total: number, content: any) => total + (content.estimated_time_minutes || 0),
                               0
                             ) || 0;
 
