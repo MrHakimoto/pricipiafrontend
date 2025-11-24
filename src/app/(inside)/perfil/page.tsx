@@ -76,7 +76,7 @@ export default function Profile() {
   const currentAvatar = session?.user?.image || null;
 
 
-//console.log("CDN PUBLIC:", process.env.NEXT_PUBLIC_CDN_URL);
+  //console.log("CDN PUBLIC:", process.env.NEXT_PUBLIC_CDN_URL);
 
   const {
     isUploading,
@@ -164,12 +164,10 @@ export default function Profile() {
 
           const mapearGender = (gender?: string | null): string => {
             switch (gender?.toUpperCase()) {
-              case "M":
-                return "masculino";
-              case "F":
-                return "feminino";
-              default:
-                return "nao-informar";
+              case "M": return "masculino";
+              case "F": return "feminino";
+              case "O": return "nao-informar"; // ← Usar "O" do backend
+              default: return "nao-informar";
             }
           };
 
@@ -218,7 +216,14 @@ export default function Profile() {
     return null;
   };
 
-
+  const converterGenderParaBackend = (gender: string): string | undefined => {
+    switch (gender) {
+      case "masculino": return "M";
+      case "feminino": return "F";
+      case "nao-informar": return "O"; // ← Corrigido para "O"
+      default: return undefined;
+    }
+  };
 
   const handleSaveAvatar = async (file: File) => {
     if (!sessionAny?.laravelToken || !form.id) return;
@@ -462,7 +467,7 @@ export default function Profile() {
       name: (form.name ?? "").trim(),
       cpf: (form.cpf ?? "").replace(/\D/g, ""),
       phone: form.celular.replace(/\D/g, ""),
-      gender: form.gender ? form.gender[0].toUpperCase() : undefined,
+      gender: form.gender ? converterGenderParaBackend(form.gender) : undefined,
       birth_date: converterDataParaISO(form.birth_date),
     };
 
