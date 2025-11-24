@@ -98,7 +98,7 @@ export default function ConteudoPage({ params }: PageProps) {
       modulo.contents?.forEach((conteudo: any) => {
         if (conteudo.content_type === "aula") {
           totalAulas++;
-          totalHoras += conteudo.estimated_time_minutes || 0;
+          totalHoras += conteudo.estimated_time_minutes / 60 || 0;
         } else if (conteudo.content_type === "lista") {
           totalListas++;
         }
