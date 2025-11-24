@@ -35,7 +35,7 @@ export function StreakProvider({ children }: { children: React.ReactNode }) {
     isLoading,
     mutate,
   } = useSWR<UserStreak>(
-    token ? ['/api/checkin-status', token] : null,
+    token ? ['/checkin-status', token] : null,
     ([url, token]: [string, string]) => checkinStatus(token),
     {
       revalidateOnFocus: true,

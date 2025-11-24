@@ -69,11 +69,11 @@ export default function ConteudoPage({ params }: PageProps) {
   // Função para calcular progresso do módulo
   const calcularProgressoModulo = (modulo: any) => {
     if (!modulo.contents || modulo.contents.length === 0) return 0;
-    
-    const aulasCompletas = modulo.contents.filter((content: any) => 
+
+    const aulasCompletas = modulo.contents.filter((content: any) =>
       content.user_progress?.is_completed === 1
     ).length;
-    
+
     const progresso = (aulasCompletas / modulo.contents.length) * 100;
     return Math.round(progresso);
   };
@@ -81,8 +81,8 @@ export default function ConteudoPage({ params }: PageProps) {
   // Função para verificar se módulo está totalmente completo
   const isModuloCompleto = (modulo: any) => {
     if (!modulo.contents || modulo.contents.length === 0) return false;
-    
-    return modulo.contents.every((content: any) => 
+
+    return modulo.contents.every((content: any) =>
       content.user_progress?.is_completed === 1
     );
   };
@@ -294,11 +294,31 @@ export default function ConteudoPage({ params }: PageProps) {
                               (content: any) => content.content_type === "lista"
                             ).length || 0;
 
-                            const tempoModulo = Math.round(
-                              mod.contents?.reduce((total: number, content: any) =>
-                                total + (content.estimated_time_minutes || 0), 0
-                              ) / 3600
-                            );
+                            const formatTime = (totalSeconds: number): string => {
+                              if (totalSeconds === 0) return "0m";
+
+                              const hours = Math.floor(totalSeconds / 3600);
+                              const minutes = Math.floor((totalSeconds % 3600) / 60);
+
+                              let result = "";
+
+                              if (hours > 0) result += `${hours}h `;
+                              if (minutes > 0) result += `${minutes}m`;
+
+                              return result.trim();
+                            };
+
+                            const totalSegundos = mod.contents?.reduce(
+                              (total: number, content: any) => total + (content.estimated_seconds || 0),
+                              0
+                            ) || 0;
+
+                            const tempoModulo = formatTime(totalSegundos);
+                            // const tempoModulo = Math.round(
+                            //   mod.contents?.reduce((total: number, content: any) =>
+                            //     total + (content.estimated_time_minutes || 0), 0
+                            //   ) / 3600
+                            // );
 
                             const progresso = calcularProgressoModulo(mod);
                             const moduloCompleto = isModuloCompleto(mod);
@@ -308,14 +328,13 @@ export default function ConteudoPage({ params }: PageProps) {
                                 key={mod.id}
                                 href={`/modulos/${mod.id}/${toSlug(mod.name)}`}
                               >
-                                <div 
-                                  className={`flex-shrink-0 w-80 flex bg-[#0c0f1a] rounded-xl shadow-md hover:shadow-lg transition-all duration-300 overflow-hidden border-2 ${
-                                    moduloCompleto 
-                                      ? "border-green-500 border-2" 
-                                      : hoveredModule === mod.id 
-                                        ? "border-blue-400 border-2" 
-                                        : "border-blue-800/30"
-                                  }`}
+                                <div
+                                  className={`flex-shrink-0 w-80 flex bg-[#0c0f1a] rounded-xl shadow-md hover:shadow-lg transition-all duration-300 overflow-hidden border-2 ${moduloCompleto
+                                    ? "border-green-500 border-2"
+                                    : hoveredModule === mod.id
+                                      ? "border-blue-400 border-2"
+                                      : "border-blue-800/30"
+                                    }`}
                                   onMouseEnter={() => setHoveredModule(mod.id)}
                                   onMouseLeave={() => setHoveredModule(null)}
                                 >
@@ -340,7 +359,7 @@ export default function ConteudoPage({ params }: PageProps) {
                                       <div className="space-y-1">
                                         <div className="flex items-center gap-2 text-gray-400 text-xs">
                                           <Clock className="w-3 h-3" />
-                                          <span>{tempoModulo}h</span>
+                                          <span>{tempoModulo}</span>
                                         </div>
                                         <div className="flex items-center gap-2 text-gray-400 text-xs">
                                           <Video className="w-3 h-3" />
@@ -352,15 +371,14 @@ export default function ConteudoPage({ params }: PageProps) {
                                         </div>
                                       </div>
                                     </div>
-                                    <div className="flex gap-1 mt-2">
+                                    <div className="flex flex-wrap gap-1 mt-2">
                                       {mod.contents?.map((content: any, index: number) => (
                                         <div
                                           key={content.id}
-                                          className={`h-2 w-3 rounded-sm ${
-                                            content.user_progress?.is_completed === 1
-                                              ? "bg-green-500"
-                                              : "bg-gray-600"
-                                          }`}
+                                          className={`h-2 w-3 rounded-sm ${content.user_progress?.is_completed === 1
+                                            ? "bg-green-500"
+                                            : "bg-gray-600"
+                                            }`}
                                           title={content.title}
                                         />
                                       ))}
@@ -407,7 +425,7 @@ export default function ConteudoPage({ params }: PageProps) {
           />
 
           <p className="text-[28px] font-semibold text-white max-w-2xl leading-snug">
-          (EM BREVE)
+            (EM BREVE)
           </p>
 
           <button className="cursor-pointer flex items-center justify-center gap-3 w-full md:w-auto px-8 py-5 rounded-2xl bg-[#0E00D0] text-white font-semibold text-lg hover:bg-[#1400FF] transition-all shadow-md">
