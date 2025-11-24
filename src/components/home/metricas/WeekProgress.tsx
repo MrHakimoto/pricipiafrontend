@@ -31,7 +31,6 @@ export default function WeekProgress() {
 
   const [animatedStreak, setAnimatedStreak] = useState<number>(0)
   const [loaded, setLoaded] = useState<boolean>(false)
-  const [needsRefresh, setNeedsRefresh] = useState<boolean>(true)
 
   const {
     data: streakData,
@@ -44,23 +43,9 @@ export default function WeekProgress() {
     {
       revalidateOnFocus: true,
       revalidateOnReconnect: true,
-      refreshInterval: 300000,
-      // Forçar refresh se detectarmos inconsistência
-      revalidateIfStale: true,
+      refreshInterval: 300000, // 5 minutos
     }
   )
-
-  // DEBUG: Log para verificar os dados recebidos
-  useEffect(() => {
-    if (streakData) {
-      console.log('📊 Dados do Streak recebidos:', {
-        current_streak: streakData.current_streak,
-        longest_streak: streakData.longest_streak,
-        last_checkin_date: streakData.last_checkin_date,
-        has_checked_in_today: streakData.has_checked_in_today
-      })
-    }
-  }, [streakData])
 
   // Check-in automático SIMPLIFICADO
   useEffect(() => {
@@ -77,16 +62,14 @@ export default function WeekProgress() {
 
       try {
         if (!streakData.has_checked_in_today) {
-          console.log('🔄 Tentando check-in automático...')
           await checkinDaily(token)
-          // Força uma revalidação completa
-          mutate(undefined, { revalidate: true })
+          mutate() // Revalida os dados
         }
         
         // Marca como feito
         localStorage.setItem('daily_checkin_date', today)
       } catch (err) {
-        console.error('❌ Falha no check-in automático:', err)
+        console.error('Falha no check-in automático:', err)
       }
     }
 
@@ -95,29 +78,23 @@ export default function WeekProgress() {
     }
   }, [token, streakData, isLoading, mutate])
 
-  // Animação do número - CORRIGIDA para forçar atualização
+  // Animação do número
   useEffect(() => {
     if (!streakData || isLoading) return
 
     setLoaded(true)
 
+    let start = 0
     const target = streakData.current_streak
-    
-    // Se o streak mudou drasticamente, anima do zero
-    if (Math.abs(target - animatedStreak) > 1) {
-      setAnimatedStreak(0)
-    }
-
     const duration = 1000
     const startTime = performance.now()
-    const startValue = animatedStreak
 
     const animateNumber = (timestamp: number): void => {
       const elapsed = timestamp - startTime
       const progress = Math.min(1, elapsed / duration)
       const eased = 1 - Math.pow(1 - progress, 3)
 
-      const current = Math.floor(startValue + (eased * (target - startValue)))
+      const current = Math.floor(eased * target)
       setAnimatedStreak(current)
 
       if (progress < 1) {
@@ -128,15 +105,9 @@ export default function WeekProgress() {
     }
 
     requestAnimationFrame(animateNumber)
-  }, [streakData?.current_streak, isLoading])
+  }, [streakData, isLoading])
 
-  // Função para forçar refresh dos dados
-  const forceRefresh = () => {
-    mutate(undefined, { revalidate: true })
-    setNeedsRefresh(false)
-  }
-
-  // Gerar dias da semana baseado no estado atual - MELHORADA
+  // Gerar dias da semana baseado no estado atual - CORRIGIDO
   const getWeekDays = (): WeekDay[] => {
     const days = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
     const today = new Date().getDay()
@@ -145,13 +116,14 @@ export default function WeekProgress() {
       let status: DayStatus = 'pending'
 
       if (index === today) {
-        // Dia atual
+        // Dia atual: mostra como "current" se não fez check-in, "done" se fez
         status = streakData?.has_checked_in_today ? 'done' : 'current'
       } else if (index < today) {
-        // Dias passados - simplificado por enquanto
-        // Em uma versão futura, você pode verificar datas específicas
-        status = 'missed'
+        // Dias passados: verifica se fez check-in baseado no histórico
+        // Esta é uma simplificação - em produção você precisaria do histórico completo
+        status = 'missed' // Por padrão marca como missed, poderia ser refinado
       }
+      // Dias futuros permanecem como 'pending'
 
       return { name: day, status }
     })
@@ -163,11 +135,6 @@ export default function WeekProgress() {
   const getStreakText = (streak: number): string => {
     return streak === 1 ? 'dia' : 'dias'
   }
-
-  // Detectar inconsistência nos dados
-  const hasDataInconsistency = streakData && 
-    streakData.current_streak === 1 && 
-    streakData.longest_streak >= 5
 
   if (isLoading) {
     return (
@@ -196,12 +163,6 @@ export default function WeekProgress() {
           <span className="text-sm">Ofensiva</span>
         </div>
         <p className="text-xs text-gray-500">Não foi possível carregar</p>
-        <button 
-          onClick={forceRefresh}
-          className="mt-2 px-3 py-1 text-xs bg-orange-500 hover:bg-orange-600 rounded transition-colors"
-        >
-          Tentar Novamente
-        </button>
       </div>
     )
   }
@@ -209,41 +170,17 @@ export default function WeekProgress() {
   return (
     <div className={`flex-1 max-w-sm bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-6 shadow-2xl border border-gray-700/50 transition-all duration-700 ${loaded ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
 
-      {/* Header elegante com botão de refresh */}
+      {/* Header elegante */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-2">
           <Flame size={20} className="text-orange-400" />
           <span className="text-sm font-semibold text-white">Ofensiva</span>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="text-xs text-gray-400 flex items-center gap-1">
-            <Calendar size={12} />
-            <span>Hoje</span>
-          </div>
-          {(hasDataInconsistency || needsRefresh) && (
-            <button 
-              onClick={forceRefresh}
-              className="text-xs bg-orange-500 hover:bg-orange-600 px-2 py-1 rounded transition-colors"
-              title="Atualizar dados"
-            >
-              ↻
-            </button>
-          )}
+        <div className="text-xs text-gray-400 flex items-center gap-1">
+          <Calendar size={12} />
+          <span>Hoje</span>
         </div>
       </div>
-
-      {/* Aviso de inconsistência */}
-      {hasDataInconsistency && (
-        <div className="mb-4 p-2 bg-yellow-500/20 border border-yellow-500/30 rounded text-xs text-yellow-200">
-          ⚠️ Dados inconsistentes detectados. 
-          <button 
-            onClick={forceRefresh}
-            className="ml-1 underline hover:text-yellow-100"
-          >
-            Clique para corrigir
-          </button>
-        </div>
-      )}
 
       {/* Streak principal */}
       <div className="text-center mb-6">
@@ -254,11 +191,6 @@ export default function WeekProgress() {
           <span className="text-lg text-gray-400">{getStreakText(animatedStreak)}</span>
         </div>
         <p className="text-xs text-gray-500">sequência atual</p>
-        
-        {/* Debug info - remover em produção */}
-        <div className="mt-2 text-xs text-gray-600">
-          Último check-in: {streakData.last_checkin_date}
-        </div>
       </div>
 
       {/* Semana estilizada */}
@@ -292,14 +224,6 @@ export default function WeekProgress() {
         <span className="text-gray-500">Melhor sequência</span>
         <span className="text-orange-400 font-semibold">
           {streakData.longest_streak} {getStreakText(streakData.longest_streak)}
-        </span>
-      </div>
-
-      {/* Status do check-in hoje */}
-      <div className="flex items-center justify-between mt-3 text-xs">
-        <span className="text-gray-500">Check-in hoje</span>
-        <span className={`font-semibold ${streakData.has_checked_in_today ? 'text-green-400' : 'text-red-400'}`}>
-          {streakData.has_checked_in_today ? '✅ Realizado' : '❌ Pendente'}
         </span>
       </div>
     </div>
