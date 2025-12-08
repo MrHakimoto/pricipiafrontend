@@ -15,6 +15,27 @@ import {
   createForumThread
 } from "@/lib/forum/forum";
 import { X, MessageCircle, Send, Loader2, CheckCircle } from "lucide-react";
+import dynamic from "next/dynamic";
+import { processMarkdown } from "@/utils/markdownProcessor";
+
+// Definindo a interface do MarkdownEditor
+interface MarkdownEditorProps {
+  initialContent?: string;
+  onChange?: (content: string) => void;
+}
+
+// Importação dinâmica com tipo
+const MarkdownEditor = dynamic<MarkdownEditorProps>(
+  () => import("@/components/editor/MarkDownEditor").then(mod => mod.default),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-48 bg-[#0F172A] rounded-md border border-[#2F3541] animate-pulse flex items-center justify-center">
+        <Loader2 className="animate-spin text-blue-500" size={24} />
+      </div>
+    )
+  }
+);
 
 interface ModalDuvidaProps {
   isOpen: boolean;
@@ -39,10 +60,16 @@ export const ModalDuvidaContent: React.FC<ModalDuvidaProps> = ({
   const [mensagem, setMensagem] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [editorKey, setEditorKey] = useState(0);
+  const [processingContent, setProcessingContent] = useState(false);
+  const [threadHtml, setThreadHtml] = useState<string>('');
+  const [repliesHtml, setRepliesHtml] = useState<Record<number, string>>({});
+  const [zoomedImageUrl, setZoomedImageUrl] = useState<string | null>(null);
   
   const token = session?.laravelToken;
   const user = session?.user;
 
+  // Efeito para carregar a thread quando abrir modal em modo discussão
   useEffect(() => {
     if (isOpen) {
       if (modo === "discussao" && threadId && token) {
@@ -52,6 +79,35 @@ export const ModalDuvidaContent: React.FC<ModalDuvidaProps> = ({
       }
     }
   }, [isOpen, threadId, modo, token]);
+
+  // Efeito para processar markdown quando thread mudar
+  useEffect(() => {
+    if (thread) {
+      processThreadContent();
+    }
+  }, [thread]);
+
+  // Efeito para lidar com clique em imagens
+  useEffect(() => {
+    const handleImageClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      
+      if (target.tagName === 'IMG') {
+        const src = target.getAttribute('src');
+        if (src) {
+          setZoomedImageUrl(src);
+        }
+      }
+    };
+
+    if (isOpen && (threadHtml || Object.keys(repliesHtml).length > 0)) {
+      document.addEventListener('click', handleImageClick);
+    }
+
+    return () => {
+      document.removeEventListener('click', handleImageClick);
+    };
+  }, [isOpen, threadHtml, repliesHtml]);
 
   const carregarThread = async () => {
     if (!token || !threadId) return;
@@ -64,6 +120,31 @@ export const ModalDuvidaContent: React.FC<ModalDuvidaProps> = ({
       console.error('Erro ao carregar thread:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const processThreadContent = async () => {
+    if (!thread) return;
+
+    setProcessingContent(true);
+    try {
+      // Processar o conteúdo da thread principal
+      const processedThread = await processMarkdown(thread.body);
+      setThreadHtml(processedThread);
+
+      // Processar o conteúdo de cada resposta
+      const repliesHtmlMap: Record<number, string> = {};
+      if (thread.replies?.length) {
+        for (const reply of thread.replies) {
+          const processedReply = await processMarkdown(reply.body);
+          repliesHtmlMap[reply.id] = processedReply;
+        }
+      }
+      setRepliesHtml(repliesHtmlMap);
+    } catch (error) {
+      console.error('Erro ao processar conteúdo Markdown:', error);
+    } finally {
+      setProcessingContent(false);
     }
   };
 
@@ -86,6 +167,7 @@ export const ModalDuvidaContent: React.FC<ModalDuvidaProps> = ({
       
       console.log("Dúvida enviada com sucesso!", { courseContentId, mensagem });
       setMensagem("");
+      setEditorKey(prev => prev + 1);
       
       // Mudar para modo de discussão com a nova thread
       setThread(novaThread);
@@ -108,6 +190,7 @@ export const ModalDuvidaContent: React.FC<ModalDuvidaProps> = ({
     try {
       await postForumReply(token, thread.id, mensagem);
       setMensagem('');
+      setEditorKey(prev => prev + 1);
       await carregarThread();
     } catch (error) {
       console.error('Erro ao postar resposta:', error);
@@ -162,6 +245,11 @@ export const ModalDuvidaContent: React.FC<ModalDuvidaProps> = ({
       setThread(null);
       setMensagem("");
       setLoading(true);
+      setEditorKey(0);
+      setThreadHtml('');
+      setRepliesHtml({});
+      setProcessingContent(false);
+      setZoomedImageUrl(null);
     }
   }, [isOpen]);
 
@@ -228,14 +316,13 @@ export const ModalDuvidaContent: React.FC<ModalDuvidaProps> = ({
                       <label className="block text-white text-sm font-medium mb-2">
                         Sua Dúvida *
                       </label>
-                      <textarea
-                        value={mensagem}
-                        onChange={(e) => setMensagem(e.target.value)}
-                        placeholder="Descreva sua dúvida em detalhes... O que você não entendeu? Em qual parte da aula está com dificuldade?"
-                        rows={6}
-                        className="w-full px-4 py-3 rounded-lg border border-[#4A5260] bg-[#0F172A] text-white focus:outline-none focus:border-[#0E00D0] transition-colors resize-none"
-                        required
-                      />
+                      <div className="min-h-[192px]">
+                        <MarkdownEditor
+                          key={`nova-duvida-${editorKey}`}
+                          initialContent={mensagem}
+                          onChange={(content: string) => setMensagem(content)}
+                        />
+                      </div>
                     </div>
 
                     {/* Dicas */}
@@ -317,9 +404,19 @@ export const ModalDuvidaContent: React.FC<ModalDuvidaProps> = ({
                           </div>
                         </div>
                         
-                        <p className="text-gray-300 leading-relaxed whitespace-pre-wrap">
-                          {thread.body}
-                        </p>
+                        {/* Conteúdo processado da thread */}
+                        <div className="text-gray-300 leading-relaxed">
+                          {processingContent ? (
+                            <div className="flex items-center justify-center py-8">
+                              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white mr-2"></div>
+                              <span>Processando conteúdo...</span>
+                            </div>
+                          ) : (
+                            <div className="markdown-body wmde-markdown wmde-markdown-color">
+                              <div dangerouslySetInnerHTML={{ __html: threadHtml }} />
+                            </div>
+                          )}
+                        </div>
                         
                         <div className="flex flex-wrap items-center gap-4 mt-4 text-sm text-gray-400">
                           <span>Por {thread.author.name}</span>
@@ -410,9 +507,21 @@ export const ModalDuvidaContent: React.FC<ModalDuvidaProps> = ({
                                 </span>
                               </div>
                               
-                              <p className="text-gray-300 leading-relaxed whitespace-pre-wrap">
-                                {reply.body}
-                              </p>
+                              {/* Conteúdo processado da resposta */}
+                              <div className="text-gray-300 leading-relaxed">
+                                {processingContent ? (
+                                  <div className="flex items-center justify-center py-4">
+                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-400 mr-2"></div>
+                                    <span className="text-sm text-gray-400">Processando...</span>
+                                  </div>
+                                ) : repliesHtml[reply.id] ? (
+                                  <div className="markdown-body wmde-markdown wmde-markdown-color">
+                                    <div dangerouslySetInnerHTML={{ __html: repliesHtml[reply.id] }} />
+                                  </div>
+                                ) : (
+                                  <div dangerouslySetInnerHTML={{ __html: reply.body }} />
+                                )}
+                              </div>
                               
                               {/* Botão Marcar como Melhor Resposta */}
                               {isAuthor && !thread.is_closed && reply.id !== thread.best_reply_id && (
@@ -444,14 +553,13 @@ export const ModalDuvidaContent: React.FC<ModalDuvidaProps> = ({
                       <h3 className="text-lg font-semibold mb-4">Sua Resposta</h3>
                       
                       <form onSubmit={handlePostReply} className="space-y-4">
-                        <textarea
-                          value={mensagem}
-                          onChange={(e) => setMensagem(e.target.value)}
-                          placeholder="Compartilhe sua solução ou insight sobre esta dúvida..."
-                          rows={4}
-                          className="w-full px-4 py-3 rounded-lg border border-[#4A5260] bg-[#00091A] text-white focus:outline-none focus:border-[#0E00D0] transition-colors resize-none"
-                          required
-                        />
+                        <div className="min-h-[128px]">
+                          <MarkdownEditor
+                            key={`resposta-${editorKey}`}
+                            initialContent={mensagem}
+                            onChange={(content: string) => setMensagem(content)}
+                          />
+                        </div>
                         
                         <div className="flex justify-end">
                           <button
@@ -476,6 +584,28 @@ export const ModalDuvidaContent: React.FC<ModalDuvidaProps> = ({
                 </div>
               )}
             </div>
+
+            {/* Lightbox para imagens (adicione este componente) */}
+            {zoomedImageUrl && (
+              <div
+                className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 cursor-pointer"
+                onClick={() => setZoomedImageUrl(null)}
+              >
+                <img
+                  src={zoomedImageUrl}
+                  alt="Visualização ampliada"
+                  className="max-w-[90vw] max-h-[90vh] object-contain"
+                  onClick={(e: React.MouseEvent<HTMLImageElement>) => e.stopPropagation()}
+                />
+                <button
+                  onClick={() => setZoomedImageUrl(null)}
+                  className="absolute top-4 right-4 text-white hover:text-gray-300 cursor-pointer bg-black/50 rounded-full p-2 border border-white/20"
+                  aria-label="Fechar"
+                >
+                  <X size={32} />
+                </button>
+              </div>
+            )}
           </motion.div>
         </motion.div>
       )}

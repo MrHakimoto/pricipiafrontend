@@ -1,0 +1,713 @@
+/* styles/markdown-styles.css */
+
+/* ===========================================
+   ✅ 1. VARIÁVEIS CSS (GitHub Theme)
+=========================================== */
+:root {
+    /* Cores modo claro */
+    --color-canvas-default: #ffffff;
+    --color-fg-default: #24292f;
+    --color-border-muted: #d0d7de;
+    --color-border-default: #d0d7de;
+    --color-neutral-muted: rgba(175, 184, 193, 0.2);
+
+    /* Cores de syntax highlighting (Prettylights) */
+    --color-prettylights-syntax-comment: #6e7781;
+    --color-prettylights-syntax-constant: #0550ae;
+    --color-prettylights-syntax-entity: #8250df;
+    --color-prettylights-syntax-storage-modifier-import: #24292f;
+    --color-prettylights-syntax-entity-tag: #116329;
+    --color-prettylights-syntax-keyword: #cf222e;
+    --color-prettylights-syntax-string: #0a3069;
+    --color-prettylights-syntax-variable: #953800;
+    --color-prettylights-syntax-brackethighlighter-unmatched: #82071e;
+    --color-prettylights-syntax-string-regexp: #116329;
+    --color-prettylights-syntax-markup-heading: #0550ae;
+}
+
+/* ===========================================
+   ✅ 2. CONTAINER PRINCIPAL WMDE-MARKDOWN
+=========================================== */
+.wmde-markdown {
+    -webkit-text-size-adjust: 100%;
+    word-wrap: break-word;
+    color: var(--color-fg-default);
+    background-color: var(--color-canvas-default);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji';
+    font-size: 16px;
+    line-height: 1.5;
+}
+
+/* ===========================================
+   ✅ 3. HEADINGS
+=========================================== */
+.wmde-markdown h1,
+.wmde-markdown h2,
+.wmde-markdown h3,
+.wmde-markdown h4,
+.wmde-markdown h5,
+.wmde-markdown h6 {
+    margin-top: 24px;
+    margin-bottom: 16px;
+    font-weight: 600;
+    line-height: 1.25;
+}
+
+.wmde-markdown h1 {
+    font-size: 2em;
+}
+
+.wmde-markdown h2 {
+    font-size: 1.5em;
+    border-bottom: 1px solid var(--color-border-muted);
+    padding-bottom: 0.3em;
+}
+
+.wmde-markdown h3 {
+    font-size: 1.25em;
+}
+
+.wmde-markdown h4 {
+    font-size: 1em;
+}
+
+.wmde-markdown h5 {
+    font-size: 0.875em;
+}
+
+.wmde-markdown h6 {
+    font-size: 0.85em;
+    color: #57606a;
+}
+
+/* ===========================================
+   ✅ 4. CÓDIGO (inline e blocos)
+=========================================== */
+.wmde-markdown code,
+.wmde-markdown tt {
+    background-color: var(--color-neutral-muted);
+    border-radius: 6px;
+    margin: 0;
+    padding: 0.2em 0.4em;
+    font-size: 85%;
+    font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
+}
+
+.wmde-markdown pre {
+    margin-top: 0;
+    margin-bottom: 16px;
+    overflow: auto;
+    font-size: 85%;
+    line-height: 1.45;
+    background-color: #f6f8fa;
+    border-radius: 6px;
+}
+
+.wmde-markdown pre>code {
+    padding: 16px !important;
+    display: block;
+    overflow: auto;
+    word-break: normal;
+    white-space: pre;
+    background: transparent !important;
+    border: 0;
+    margin: 0;
+    font-size: 100%;
+    line-height: inherit;
+}
+
+/* ===========================================
+   ✅ 5. SYNTAX HIGHLIGHTING (Prism)
+=========================================== */
+.wmde-markdown .token.comment,
+.wmde-markdown .token.prolog,
+.wmde-markdown .token.doctype,
+.wmde-markdown .token.cdata {
+    color: var(--color-prettylights-syntax-comment);
+}
+
+.wmde-markdown .token.punctuation {
+    color: var(--color-prettylights-syntax-storage-modifier-import);
+}
+
+.wmde-markdown .token.property,
+.wmde-markdown .token.tag,
+.wmde-markdown .token.boolean,
+.wmde-markdown .token.number,
+.wmde-markdown .token.constant,
+.wmde-markdown .token.symbol,
+.wmde-markdown .token.deleted {
+    color: var(--color-prettylights-syntax-constant);
+}
+
+.wmde-markdown .token.selector,
+.wmde-markdown .token.attr-name,
+.wmde-markdown .token.string,
+.wmde-markdown .token.char,
+.wmde-markdown .token.builtin,
+.wmde-markdown .token.inserted {
+    color: var(--color-prettylights-syntax-string);
+}
+
+.wmde-markdown .token.operator,
+.wmde-markdown .token.entity,
+.wmde-markdown .token.url {
+    color: var(--color-prettylights-syntax-keyword);
+}
+
+.wmde-markdown .token.atrule,
+.wmde-markdown .token.attr-value,
+.wmde-markdown .token.keyword {
+    color: var(--color-prettylights-syntax-keyword);
+}
+
+.wmde-markdown .token.function,
+.wmde-markdown .token.class-name {
+    color: var(--color-prettylights-syntax-entity);
+}
+
+.wmde-markdown .token.regex,
+.wmde-markdown .token.important,
+.wmde-markdown .token.variable {
+    color: var(--color-prettylights-syntax-variable);
+}
+
+/* ===========================================
+   ✅ 6. TABELAS
+=========================================== */
+.wmde-markdown table {
+    border-spacing: 0;
+    border-collapse: collapse;
+    width: max-content;
+    max-width: 100%;
+    display: block;
+    overflow: auto;
+    margin-top: 0;
+    margin-bottom: 16px;
+}
+
+.wmde-markdown table th,
+.wmde-markdown table td {
+    padding: 6px 13px;
+    border: 1px solid var(--color-border-default);
+}
+
+.wmde-markdown table th {
+    font-weight: 600;
+    background-color: #f6f8fa;
+}
+
+.wmde-markdown table tr {
+    background-color: var(--color-canvas-default);
+    border-top: 1px solid var(--color-border-muted);
+}
+
+.wmde-markdown table tr:nth-child(2n) {
+    background-color: #f6f8fa;
+}
+
+/* ===========================================
+   ✅ 7. LINHA HORIZONTAL
+=========================================== */
+.wmde-markdown hr {
+    box-sizing: content-box;
+    border: 0;
+    border-bottom: 1px solid var(--color-border-muted);
+    background-color: var(--color-border-default);
+    height: 0.25em;
+    margin: 24px 0;
+    padding: 0;
+    overflow: hidden;
+}
+
+/* ===========================================
+   ✅ 8. BLOCKQUOTE
+=========================================== */
+.wmde-markdown blockquote {
+    margin: 0;
+    padding: 0 1em;
+    color: #57606a;
+    border-left: 0.25em solid #d0d7de;
+}
+
+.wmde-markdown blockquote> :first-child {
+    margin-top: 0;
+}
+
+.wmde-markdown blockquote> :last-child {
+    margin-bottom: 0;
+}
+
+/* ===========================================
+   ✅ 9. LISTAS
+=========================================== */
+.wmde-markdown ul,
+.wmde-markdown ol {
+    margin-top: 0;
+    margin-bottom: 16px;
+    padding-left: 2em;
+}
+
+.wmde-markdown ul ul,
+.wmde-markdown ul ol,
+.wmde-markdown ol ul,
+.wmde-markdown ol ol {
+    margin-top: 0;
+    margin-bottom: 0;
+}
+
+.wmde-markdown li {
+    word-wrap: break-all;
+}
+
+.wmde-markdown li>p {
+    margin-top: 16px;
+}
+
+.wmde-markdown li+li {
+    margin-top: 0.25em;
+}
+
+/* ===========================================
+   ✅ 10. TAREFAS (task lists)
+=========================================== */
+.wmde-markdown .contains-task-list {
+    padding-left: 0;
+}
+
+.wmde-markdown .task-list-item {
+    list-style-type: none;
+    margin-left: -1.5em;
+}
+
+.wmde-markdown .task-list-item input[type="checkbox"] {
+    margin: 0 0.2em 0.25em -1.6em;
+    vertical-align: middle;
+}
+
+
+/* ===========================================
+   ✅ 11. MODOS CLARO/ESCURO
+=========================================== */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --color-canvas-default: #0d1117;
+        --color-fg-default: #c9d1d9;
+        --color-border-muted: #30363d;
+        --color-border-default: #30363d;
+        --color-neutral-muted: rgba(110, 118, 129, 0.4);
+
+        /* Cores de syntax highlighting - Modo Escuro */
+        --color-prettylights-syntax-comment: #8b949e;
+        --color-prettylights-syntax-constant: #79c0ff;
+        --color-prettylights-syntax-entity: #d2a8ff;
+        --color-prettylights-syntax-storage-modifier-import: #c9d1d9;
+        --color-prettylights-syntax-entity-tag: #7ee787;
+        --color-prettylights-syntax-keyword: #ff7b72;
+        --color-prettylights-syntax-string: #a5d6ff;
+        --color-prettylights-syntax-variable: #ffa657;
+    }
+
+    .wmde-markdown pre {
+        background-color: #161b22;
+    }
+
+    .wmde-markdown table th {
+        background-color: #161b22;
+    }
+
+    .wmde-markdown table tr:nth-child(2n) {
+        background-color: #161b22;
+    }
+
+    .wmde-markdown blockquote {
+        color: #8b949e;
+        border-left-color: #3b434b;
+    }
+}
+
+/* ===========================================
+   ✅ 12. CLASSES ESPECÍFICAS DO SEU PROJETO
+=========================================== */
+.code-highlight {
+    font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
+    font-size: 85%;
+    line-height: 1.45;
+}
+
+.code-line {
+    display: block;
+    min-height: 1rem;
+}
+
+.katex-block {
+    margin: 1em 0;
+    text-align: center;
+}
+
+/* Container de imagens personalizado */
+.block.mt-3.mb-3[role="region"] {
+    margin: 1rem 0;
+}
+
+
+
+/* Tema do CodeMirror */
+.cm-editor {
+    background-color: #0F172A;
+    height: 100% !important;
+}
+
+.cm-content {
+    background-color: #0F172A;
+    caret-color: black !important;
+    padding: 8px 12px !important;
+    min-height: 200px !important;
+}
+
+.cm-line {
+    padding: 0 2px !important;
+}
+
+/* Backtick pairing */
+.cm-backtick-paired {
+    color: #9ca3af !important;
+    font-weight: bold !important;
+}
+
+.cm-backtick-unpaired {
+    color: #ffffff !important;
+    font-weight: normal !important;
+}
+
+/* Math delimiters */
+.cm-math-delimiter {
+    color: #f14e4e !important;
+    font-weight: bold !important;
+}
+
+.cm-math-content {
+    color: #4ec9b0 !important;
+    font-family: 'Consolas', 'Monaco', monospace !important;
+}
+
+/* Preview images */
+.wmde-markdown img {
+    cursor: pointer;
+    transition: transform 0.2s ease;
+    max-width: 100%;
+    height: auto;
+    border-radius: 6px;
+}
+
+.wmde-markdown img:hover {
+    transform: scale(1.01);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Estilos para as fórmulas KaTeX */
+.wmde-markdown .katex {
+    font-size: 1.05em;
+}
+
+.wmde-markdown .katex-display {
+    margin: 0.5em 0;
+    overflow: auto hidden;
+}
+
+/* Estilo para código inline */
+.wmde-markdown code {
+    background-color: rgba(0, 0, 0, 0.05);
+    padding: 0.2em 0.4em;
+    border-radius: 3px;
+    font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
+}
+
+/* Estilo para links */
+.wmde-markdown a {
+    color: #2563eb;
+    text-decoration: underline;
+}
+
+.wmde-markdown a:hover {
+    color: #1d4ed8;
+}
+
+/* Estilo para tabelas */
+.wmde-markdown table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 1em 0;
+}
+
+.wmde-markdown table th,
+.wmde-markdown table td {
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    padding: 0.5em;
+}
+
+.wmde-markdown table th {
+    background-color: rgba(0, 0, 0, 0.05);
+    font-weight: 600;
+}
+
+/* Estilo para blockquotes */
+.wmde-markdown blockquote {
+    border-left: 4px solid rgba(0, 0, 0, 0.1);
+    padding-left: 1em;
+    margin-left: 0;
+    color: rgba(0, 0, 0, 0.7);
+}
+
+/* Modo escuro */
+@media (prefers-color-scheme: dark) {
+    .wmde-markdown code {
+        background-color: rgba(255, 255, 255, 0.1);
+    }
+
+    .wmde-markdown a {
+        color: #60a5fa;
+    }
+
+    .wmde-markdown a:hover {
+        color: #93c5fd;
+    }
+
+    .wmde-markdown table th,
+    .wmde-markdown table td {
+        border-color: rgba(255, 255, 255, 0.1);
+    }
+
+    .wmde-markdown table th {
+        background-color: rgba(255, 255, 255, 0.05);
+    }
+
+    .wmde-markdown blockquote {
+        border-left-color: rgba(255, 255, 255, 0.1);
+        color: rgba(255, 255, 255, 0.7);
+    }
+}
+
+
+/* ===========================================
+   ✅ 13. EDITOR MARKDOWN - CORREÇÕES
+=========================================== */
+
+/* Container principal do editor */
+.markdown-editor-container {
+    border: 1px solid hsl(var(--border));
+}
+
+.markdown-editor-container:focus-within {
+    border-color: hsl(var(--ring));
+    box-shadow: 0 0 0 2px rgba(var(--ring-rgb, 59, 130, 246), 0.1);
+    outline: none;
+}
+
+/* Abas ativas */
+/* [data-state="on"] {
+    background-color: hsl(var(--input)) !important;
+    border: 1px solid hsl(var(--border)) !important;
+    border-bottom-color: transparent !important;
+    position: relative;
+    z-index: 10;
+}
+
+[data-state="off"] {
+    border-bottom: 1px solid hsl(var(--border)) !important;
+} */
+
+/* Botões com borda */
+#editor-options button,
+[aria-label*="Adicionar imagem"] {
+    border: 1px solid transparent;
+    transition: all 0.2s ease;
+}
+
+#editor-options button:hover,
+[aria-label*="Adicionar imagem"]:hover {
+    border-color: hsl(var(--border));
+}
+
+/* Área do editor */
+.cm-editor {
+    background-color: hsl(var(--input)) !important;
+    user-select: text !important;
+    pointer-events: auto !important;
+}
+
+.cm-editor.cm-focused {
+    outline: none;
+}
+
+/* Cursor */
+.cm-cursor {
+    border-left-color: hsl(var(--primary)) !important;
+}
+
+/* Seleção */
+.cm-selectionBackground {
+    background-color: rgba(var(--primary-rgb, 59, 130, 246), 0.15) !important;
+}
+
+/* Preview area - Foco visual */
+.wmde-markdown-color {
+    background-color: hsl(var(--input));
+}
+
+.wmde-markdown img {
+    transition: transform 0.2s ease;
+    max-width: 100%;
+    height: auto;
+    border-radius: 6px;
+    border: 1px solid hsl(var(--border));
+}
+
+.wmde-markdown img:hover {
+    transform: scale(1.01);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Blockquotes com borda */
+.wmde-markdown blockquote {
+    border-left: 3px solid hsl(var(--border));
+    padding-left: 1em;
+    color: hsl(var(--muted-foreground));
+    background: rgba(var(--muted-rgb, 244, 244, 245), 0.1);
+}
+
+/* Tabelas com borda */
+.wmde-markdown table {
+    border: 1px solid hsl(var(--border));
+    border-collapse: collapse;
+}
+
+.wmde-markdown table th,
+.wmde-markdown table td {
+    border: 1px solid hsl(var(--border));
+    padding: 0.5em;
+}
+
+/* Code blocks */
+.wmde-markdown pre {
+    background: hsl(var(--muted)) !important;
+    border: 1px solid hsl(var(--border)) !important;
+    border-radius: 6px;
+}
+
+.wmde-markdown code {
+    background: rgba(var(--muted-rgb, 244, 244, 245), 0.3);
+    padding: 0.2em 0.4em;
+    border-radius: 3px;
+    border: 1px solid rgba(var(--border-rgb, 228, 228, 231), 0.3);
+}
+
+/* Links */
+.wmde-markdown a {
+    color: hsl(var(--primary));
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+    transition: all 0.2s ease;
+}
+
+.wmde-markdown a:hover {
+    border-bottom-color: hsl(var(--primary));
+}
+
+/* Popovers com borda */
+[role="dialog"] {
+    border: 1px solid hsl(var(--border)) !important;
+}
+
+/* Botões do popover */
+[role="dialog"] button {
+    border: 1px solid hsl(var(--border)) !important;
+}
+
+[role="dialog"] button:hover {
+    background-color: hsl(var(--accent)) !important;
+}
+
+/* Modo escuro */
+@media (prefers-color-scheme: dark) {
+    .wmde-markdown blockquote {
+        background: rgba(var(--muted-rgb, 39, 39, 42), 0.2);
+    }
+
+    .wmde-markdown code {
+        background: rgba(var(--muted-rgb, 39, 39, 42), 0.4);
+        border-color: rgba(var(--border-rgb, 63, 63, 70), 0.4);
+    }
+}
+
+/* Lightbox border */
+/* .fixed.inset-0 button {
+    border: 1px solid rgba(255, 255, 255, 0.2);
+} */
+
+
+/* ===============================
+   🔥 TABS ATIVAS - DESTAQUE REAL
+=============================== */
+
+[data-state="on"] {
+    /* background: linear-gradient(180deg,
+            hsl(var(--primary)) 0%,
+            hsl(var(--primary)) 100%) !important;
+
+    color: hsl(var(--primary-foreground)) !important;
+
+    border: 1px solid hsl(var(--primary)) !important; */
+    /* border-bottom: none !important; */
+
+    box-shadow:
+        0 -2px 10px rgba(var(--primary-rgb, 59, 130, 246), 0.35),
+        inset 0 -2px 0 rgba(255, 255, 255, 0.15);
+
+    border-radius: 10px 10px 0 0;
+    z-index: 20;
+    font-weight: 600;
+}
+
+/* Aba inativa */
+/* [data-state="off"] {
+    background: transparent !important;
+    color: hsl(var(--muted-foreground)) !important;
+    border-bottom: 1px solid hsl(var(--border)) !important;
+    opacity: 0.8;
+} */
+
+/* Hover da aba inativa */
+/* [data-state="off"]:hover {
+    background: hsl(var(--muted)) !important;
+    opacity: 1;
+}  */
+
+
+/* ===============================
+   🎯 FOCO NO EDITOR INTEIRO
+=============================== */
+
+.markdown-editor-container {
+    border: 1px solid hsl(var(--border));
+    border-radius: 10px;
+    transition: all 0.2s ease;
+}
+
+.markdown-editor-container:focus-within {
+    border-color: hsl(var(--primary));
+    box-shadow:
+        0 0 0 2px rgba(var(--primary-rgb, 59, 130, 246), 0.25),
+        0 6px 20px rgba(0, 0, 0, 0.15);
+}
+
+
+.cm-editor {
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+.cm-editor.cm-focused {
+    outline: none;
+    box-shadow: inset 0 0 0 1px hsl(var(--primary));
+}

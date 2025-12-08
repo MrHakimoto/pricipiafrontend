@@ -23,6 +23,35 @@ export interface ForumReply {
   author: Author; // O autor da resposta
 }
 
+export type LinkableContent = {
+  id: number;
+  title: string;
+  module_id?: number;
+  content_type?: string;
+  estimated_time_minutes?: number;
+  content_url?: string;
+  list_id?: number | null;
+  order?: number;
+  created_at?: string;
+  updated_at?: string;
+  duration_in_seconds?: number;
+} | null;
+
+
+export interface CourseContent {
+  id: number;
+  module_id: number;
+  title: string;
+  content_type: string;
+  estimated_time_minutes: number;
+  content_url: string;
+  list_id: number | null;
+  order: number;
+  created_at: string;
+  updated_at: string;
+  duration_in_seconds: number;
+}
+
 // Define a estrutura de um Tópico (Dúvida)
 export interface ForumThread {
   id: number;
@@ -32,12 +61,12 @@ export interface ForumThread {
   is_closed: boolean;
   best_reply_id: number | null;
   created_at: string;
-  author: Author; // O autor do tópico
-  replies_count?: number; // Contagem (vem no 'index')
-  replies?: ForumReply[]; // Array de respostas (vem no 'show')
-  linkable_type: string | null; // "App\Models\Questao" ou "App\Models\CourseContent"
+  author: Author;
+  replies_count?: number;
+  replies?: ForumReply[];
+  linkable_type: string | null;
   linkable_id: number | null;
-  linkable: object | null; // O objeto da Questão ou Aula (vem no 'show')
+  linkable: CourseContent | null; // Atualize para usar o tipo específico
 }
 
 // Define a estrutura do payload para criar um novo tópico

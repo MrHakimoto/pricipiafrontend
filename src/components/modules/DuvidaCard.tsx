@@ -8,6 +8,8 @@ import { useState, useEffect } from "react";
 import { createForumThread, getForumThreads, type ForumThread, type CreateThreadData } from "@/lib/forum/forum";
 import { useSession } from "next-auth/react";
 import { ModalDuvidaContent } from "@/components/modules/ModalDuvidaContent"
+import { processMarkdownPreview } from "@/utils/markdownProcessorPreview";
+
 
 interface DuvidaQuestaoProps {
     courseContentId?: number;
@@ -27,9 +29,36 @@ export const DuvidaCard: React.FC<DuvidaQuestaoProps> = ({
     const [modalAberto, setModalAberto] = useState(false);
     const [threadSelecionada, setThreadSelecionada] = useState<string>("");
     const { data: session, status } = useSession();
+    const [threadsPreview, setThreadsPreview] = useState<Record<number, string>>({});
+    const [processandoPreview, setProcessandoPreview] = useState(false);
+
+
 
     const token = session?.laravelToken;
     const user = session?.user;
+
+
+    const processarPreviewThreads = async (threads: ForumThread[]) => {
+        setProcessandoPreview(true);
+
+        try {
+            const mapa: Record<number, string> = {};
+
+            for (const thread of threads) {
+                mapa[thread.id] = await processMarkdownPreview(thread.body);
+            }
+
+            setThreadsPreview(mapa);
+        } catch (err) {
+            console.error("Erro ao gerar preview das threads:", err);
+        } finally {
+            setProcessandoPreview(false);
+        }
+    };
+
+
+
+
 
     // Buscar threads relacionadas quando o componente montar ou courseContentId mudar
     useEffect(() => {
@@ -50,6 +79,8 @@ export const DuvidaCard: React.FC<DuvidaQuestaoProps> = ({
                 thread.linkable_id === courseContentId
             );
             setThreadsRelacionadas(threadsDaAula);
+            processarPreviewThreads(threadsDaAula);
+
         } catch (error) {
             console.error("Erro ao carregar threads relacionadas:", error);
         } finally {
@@ -192,7 +223,7 @@ export const DuvidaCard: React.FC<DuvidaQuestaoProps> = ({
                                                 </div>
                                             </div>
                                             <p className="text-gray-300 text-sm mb-2 line-clamp-2">
-                                                {thread.body}
+                                                {threadsPreview[thread.id] ?? "Gerando preview..."}
                                             </p>
                                             <div className="flex justify-between items-center text-xs text-gray-400">
                                                 <div className="flex items-center gap-4">
@@ -242,16 +273,15 @@ export const DuvidaCard: React.FC<DuvidaQuestaoProps> = ({
                                 <label className="block text-white text-sm font-medium mb-2">
                                     Sua Dúvida *
                                 </label>
-
-                                <MarkdownEditor
-                                    editorStyle={{ height: "180px" }}
-                                    initialContent={mensagem}
-                                    onChange={handleMensagemChange}
-                                />
+                                    <MarkdownEditor
+                                        initialContent={mensagem}
+                                        onChange={handleMensagemChange}
+                                    />
+                               
                             </div>
 
                             {/* Dicas */}
-                            <div className="bg-yellow-900/20 rounded-lg p-3 border border-yellow-700">
+                            <div className="bg-yellow-900/20 rounded-lg p-3 border mt-5 border-yellow-700">
                                 <div className="flex items-center gap-2 text-yellow-300 text-sm font-medium mb-1">
                                     <span>💡</span>
                                     Dicas para uma boa pergunta:

@@ -1,3 +1,4 @@
+//UserComponente.tsx
 "use client";
 
 import { CircleUserRound, User, Mail, LogOut, Moon, Sun } from "lucide-react";

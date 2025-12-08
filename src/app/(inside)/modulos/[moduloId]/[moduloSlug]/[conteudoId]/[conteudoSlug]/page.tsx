@@ -230,12 +230,12 @@ export default function ConteudoPage() {
             </span>
           )}
         </div>
-        {thisDataD.user_progress?.last_watched_timestamp && (
+        {/* {thisDataD.user_progress?.last_watched_timestamp && (
           <p className="text-gray-400 text-sm mt-1">
             Continuar de {Math.floor(thisDataD.user_progress.last_watched_timestamp / 60)}:
             {(thisDataD.user_progress.last_watched_timestamp % 60).toString().padStart(2, '0')}
           </p>
-        )}
+        )} */}
       </div>
 
       {/* CONTEÚDO DINÂMICO */}
@@ -282,21 +282,22 @@ export default function ConteudoPage() {
                 )}
 
                 {/* Badge de "Continuar de..." */}
-                {thisDataD.user_progress?.last_watched_timestamp &&
+                {/* {thisDataD.user_progress?.last_watched_timestamp &&
                   thisDataD.user_progress.last_watched_timestamp > 10 && (
                     <div className="absolute top-4 left-4 bg-blue-600/90 text-white px-3 py-1 rounded-full text-sm">
                       ▶ Continuar de {Math.floor(thisDataD.user_progress.last_watched_timestamp / 60)}:
                       {(thisDataD.user_progress.last_watched_timestamp % 60).toString().padStart(2, '0')}
                     </div>
-                  )}
+                  )} */}
               </div>
             )}
           </div>
 
           {/* BOTÕES DE NAVEGAÇÃO */}
           <div className="w-full mt-4 flex flex-col gap-4">
-            <div className="flex flex-col sm:flex-row sm:justify-between gap-4">
-              <div className="flex gap-4">
+            <div className="flex flex-wrap sm:flex-nowrap sm:justify-between gap-2 sm:gap-4">
+              {/* 🔹 Botões de Like / Favoritar / Anexo */}
+              <div className="flex flex-wrap gap-2 sm:gap-4">
                 <button
                   onClick={async () => {
                     if (!session?.laravelToken) return;
@@ -305,68 +306,73 @@ export default function ConteudoPage() {
                         entity_type: 'aula',
                         entity_id: Number(conteudoId),
                       });
-                      // Você pode mostrar um toast ou atualizar o estado visual
                       console.log('Like da aula:', result);
                     } catch (error) {
                       console.error('Erro ao curtir aula:', error);
                     }
                   }}
-                  className="cursor-pointer flex items-center gap-2 px-6 py-2 rounded-md border border-gray-600 hover:bg-gray-700/30 transition"
+                  className="cursor-pointer flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-2 rounded-md border border-gray-600 hover:bg-gray-700/30 transition text-sm sm:text-base"
                 >
-                  <Heart size={18} />
+                  <Heart size={16} />
                   Curtir Aula
                 </button>
-                <button className="cursor-pointer flex items-center gap-2 px-6 py-2 rounded-md border border-gray-600 hover:bg-gray-700/30 transition">
-                  <Heart size={18} />
+
+                <button className="cursor-pointer flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-2 rounded-md border border-gray-600 hover:bg-gray-700/30 transition text-sm sm:text-base">
+                  <Heart size={16} />
                   Favoritar
                 </button>
 
                 {attachmentsCount > 0 && (
                   <button
-                    onClick={() => thisDataD.attachments && thisDataD.attachments.length > 0 &&
-                      handleOpenPdf(thisDataD.attachments[0].file_url, thisDataD.attachments[0].file_name)}
-                    className="cursor-pointer flex items-center gap-2 px-6 py-2 rounded-md border border-gray-600 hover:bg-gray-700/30 transition"
+                    onClick={() =>
+                      thisDataD.attachments &&
+                      thisDataD.attachments.length > 0 &&
+                      handleOpenPdf(
+                        thisDataD.attachments[0].file_url,
+                        thisDataD.attachments[0].file_name
+                      )
+                    }
+                    className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-2 rounded-md border border-gray-600 hover:bg-gray-700/30 transition text-sm sm:text-base"
                   >
-                    <Link2 size={18} />
+                    <Link2 size={16} />
                     Anexo ({attachmentsCount})
                   </button>
                 )}
               </div>
-              <div className="flex gap-4">
+
+              {/* 🔹 Botões de Navegação / Toggle */}
+              <div className="flex flex-wrap gap-2 sm:gap-4 items-center">
                 <button
                   onClick={handlePreviousLesson}
                   disabled={currentIndex <= 0}
-                  className="cursor-pointer flex items-center gap-2 px-5 py-2 rounded-md bg-gray-800 hover:bg-gray-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="cursor-pointer flex-1 sm:flex-none flex items-center justify-center gap-1 px-2 py-2 rounded-md bg-gray-800 hover:bg-gray-700 transition disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
                 >
-                  <ChevronLeft size={18} />
+                  <ChevronLeft size={16} />
                   Aula anterior
                 </button>
 
-                {/* 🔥 TOGGLE DE CONCLUSÃO */}
-                <div className="flex items-center gap-2">
+                <div className="flex-1 sm:flex-none flex items-center justify-center gap-1 text-sm sm:text-base">
                   <LessonCompletionToggle
                     lessonId={thisDataD.id}
                     isCompleted={isCompleted}
                     onCompletionChange={handleCompletionChange}
-                    size={40}
+                    size={30}
                   />
-                  <span className="text-white text-sm font-medium">
-                    {isCompleted ? 'Concluída' : 'Marcar como concluída'}
-                  </span>
+                  <span>{isCompleted ? 'Concluída' : 'Marcar como concluída'}</span>
                 </div>
 
                 <button
                   onClick={handleNextLesson}
                   disabled={currentIndex >= contents.length - 1}
-                  className="cursor-pointer flex items-center gap-2 px-5 py-2 rounded-md bg-gray-800 hover:bg-gray-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="cursor-pointer flex-1 sm:flex-none flex items-center justify-center gap-1 px-2 py-2 rounded-md bg-gray-800 hover:bg-gray-700 transition disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
                 >
                   Próxima aula
-                  <ChevronRight size={18} />
+                  <ChevronRight size={16} />
                 </button>
               </div>
             </div>
 
-            {/* 🔥 INDICADOR DE PROGRESSO */}
+            {/* 🔹 Indicador de progresso */}
             {hasProgress && !isCompleted && (
               <div className="text-blue-400 text-sm bg-blue-900/20 p-3 rounded-md">
                 📚 Continue assistindo para concluir esta aula
@@ -374,49 +380,59 @@ export default function ConteudoPage() {
             )}
           </div>
 
+
           {/* SEÇÃO DE COMENTÁRIOS */}
           <div className="mt-8">
             <div className="flex border-b border-gray-700 max-w-6xl">
-              <button
-                onClick={() => setActiveTab("detalhes")}
-                className={`cursor-pointer px-4 py-2 text-2xl font-semibold transition ${activeTab === "detalhes"
-                  ? "text-white border-b-2 border-white"
-                  : "text-gray-400 hover:text-white"
-                  }`}
-              >
-                Detalhes
-              </button>
+              {/* Mostrar "Detalhes" apenas se houver description */}
+              {thisDataD.description && (
+                <button
+                  onClick={() => setActiveTab("detalhes")}
+                  className={`cursor-pointer px-4 py-2 text-2xl font-semibold transition ${activeTab === "detalhes"
+                      ? "text-white border-b-2 border-white"
+                      : "text-gray-400 hover:text-white"
+                    }`}
+                >
+                  Detalhes
+                </button>
+              )}
+
+              {/* Sempre mostrar "Dúvidas" */}
               <button
                 onClick={() => setActiveTab("duvidas")}
                 className={`cursor-pointer px-4 py-2 text-2xl font-semibold transition ${activeTab === "duvidas"
-                  ? "text-white border-b-2 border-white"
-                  : "text-gray-400 hover:text-white"
+                    ? "text-white border-b-2 border-white"
+                    : "text-gray-400 hover:text-white"
                   }`}
               >
                 Dúvidas
               </button>
             </div>
+
             <div className="bg-[#1f1f23] border border-gray-800 mt-2 p-4 rounded-sm text-sm text-gray-300 max-w-6xl">
-              {activeTab === "detalhes" ? (
+              {activeTab === "detalhes" && thisDataD.description ? (
                 <div className="space-y-4">
-                  {thisDataD.description && (
-                    <div>
-                      <p className="leading-relaxed">{thisDataD.description}</p>
-                    </div>
-                  )}
+                  <p className="leading-relaxed">{thisDataD.description}</p>
 
                   {attachmentsCount > 0 && (
                     <div className="pt-4 border-t border-gray-700">
-                      <h4 className="text-white font-semibold mb-3">Arquivos da Aula ({attachmentsCount})</h4>
+                      <h4 className="text-white font-semibold mb-3">
+                        Arquivos da Aula ({attachmentsCount})
+                      </h4>
                       <div className="space-y-2">
                         {thisDataD.attachments?.map((attachment, index) => (
-                          <div key={attachment.id || index} className="flex items-center gap-3 p-3 bg-gray-800/50 rounded-md">
+                          <div
+                            key={attachment.id || index}
+                            className="flex items-center gap-3 p-3 bg-gray-800/50 rounded-md"
+                          >
                             <FileText size={20} className="text-blue-400" />
                             <div className="flex-1">
                               <p className="text-white text-sm">{attachment.file_name}</p>
                             </div>
                             <button
-                              onClick={() => handleOpenPdf(attachment.file_url, attachment.file_name)}
+                              onClick={() =>
+                                handleOpenPdf(attachment.file_url, attachment.file_name)
+                              }
                               className="cursor-pointer text-blue-400 hover:text-blue-300 transition text-sm"
                             >
                               Visualizar
@@ -430,14 +446,13 @@ export default function ConteudoPage() {
               ) : (
                 <DuvidaCard
                   courseContentId={Number(conteudoId)}
-                  enunciado={thisDataD.title} // ← ADICIONAR ESTA PROP
+                  enunciado={thisDataD.title} // sempre mostra o Dúvidas
                 />
               )}
             </div>
+
+
             <section className="mt-8">
-              <h3 className="text-white font-semibold mb-4 text-3xl mt-10">
-                Digite aqui seu comentário
-              </h3>
 
               <section className="mt-8 max-w-6xl">
                 <h3 className="text-white font-semibold mb-6 text-2xl max-w-6xl">

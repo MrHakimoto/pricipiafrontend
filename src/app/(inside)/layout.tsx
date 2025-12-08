@@ -1,19 +1,25 @@
 'use client';
 
 import { ReactNode, useEffect, useState } from "react";
-import Head from "next/head";
 import { useSession } from "next-auth/react";
 import { NavBarComponent } from "@/components/NavBarComponent/NavBarComponent";
 import { useProgressBar } from "@/components/Context/ProgressBarContext";
 import { getUser } from '@/lib/dailyCheck/daily';
 import { StreakProvider } from '@/contexts/StreakContext';
+import { Metadata } from "next";
+
+// ✅ Metadata do Next.js: título padrão do layout
+export const metadata: Metadata = {
+  title: "Principia Matemática",
+};
 
 interface InsideLayoutProps {
   children: ReactNode;
-  pageTitle?: string; // título opcional por página
+  params?: any;       // compatível com Next.js
+  searchParams?: any; // compatível com Next.js
 }
 
-export default function InsideLayout({ children, pageTitle }: InsideLayoutProps) {
+export default function InsideLayout({ children }: InsideLayoutProps) {
   const { data: session, status, update } = useSession(); 
   const { done } = useProgressBar();
   const [lastSyncedAvatar, setLastSyncedAvatar] = useState<string | null>(null);
@@ -58,7 +64,6 @@ export default function InsideLayout({ children, pageTitle }: InsideLayoutProps)
             setLastSyncedAvatar(backendAvatar);
           }
         } catch (error) {
-          // console.error está desativado em produção
           console.error("Erro ao sincronizar imagem:", error);
         }
       }
@@ -73,10 +78,6 @@ export default function InsideLayout({ children, pageTitle }: InsideLayoutProps)
 
   return (
     <StreakProvider>
-      <Head>
-        <title>{pageTitle || "Meu App"}</title>
-      </Head>
-
       <div className="min-h-screen bg-[#F6F6F6] dark:bg-[#00091A] dark:text-white flex flex-col w-full overflow-hidden">
         <NavBarComponent />
         <main className="flex-1 w-full overflow-hidden">

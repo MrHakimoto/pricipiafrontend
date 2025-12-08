@@ -13,6 +13,48 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+/* ================================
+   ✅ SCROLLBAR DARK FIXA — FUNDO #29292e
+   (Anti overlay branco do Windows)
+================================ */
+
+/* Evita shift e bloqueia overlay automático */
+
+html, body {
+  background-color: #29292e !important;
+}
+
+html {
+  scrollbar-gutter: stable;
+}
+
+/* Chrome, Edge, Brave */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+  background: #29292e; /* integra com o fundo */
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: #5a5a66; /* cinza azulado bonito pro dark */
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: #7a7a8a;
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #5a5a66 transparent;
+}
+
+
 
 a {
   color: inherit;

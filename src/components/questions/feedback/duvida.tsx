@@ -244,7 +244,7 @@ export const DuvidaQuestao: React.FC<DuvidaQuestaoProps> = ({
                                 </label>
 
                                 <MarkdownEditor
-                                    editorStyle={{ height: "180px" }}
+                                    
                                     initialContent={mensagem}
                                     onChange={handleMensagemChange}
                                 />

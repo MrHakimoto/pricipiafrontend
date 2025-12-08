@@ -261,7 +261,7 @@ useEffect(() => {
         </button>
       )}
 
-      <div className="px-6 outfit w-full">
+      <div className="lg:px-6 px-1 outfit w-full">
         {/* 🔥 HEADER FIXO COM BOTÃO FECHAR/ABRIR ASIDE */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4 flex-1">

@@ -4,10 +4,10 @@ import { ThemeProvider } from "@/components/ThemeProvider"
 import "./globals.css";
 import { SessionProvider } from "next-auth/react"
 import PandaVideoScript from "@/components/PandaVideoScript";
-
+import "@/styles/markdown-styles.css"
+import 'katex/dist/katex.min.css';
 import 'nprogress/nprogress.css';
 import '../styles/nprogress-custom.css';
-
 import '@fontsource/roboto/300.css';
 import '@fontsource/roboto/400.css';
 import '@fontsource/roboto/500.css';
