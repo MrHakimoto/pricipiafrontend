@@ -55,7 +55,7 @@ export const NavBarComponent = () => {
     return (
         <>
             {/* Navbar Principal */}
-            <nav className="flex items-center justify-between bg-[#F8F8F8] dark:bg-[#00091A] px-4 lg:px-6 py-3 shadow-md border-b border-[#555555]">
+            <nav className="flex items-center justify-between bg-[#F8F8F8] dark:bg-[#00091A] px-4 lg:px-6 py-1 shadow-md border-b border-[#555555]">
 
                 {/* Logo e Botão Mobile */}
                 <div className="flex items-center space-x-4">

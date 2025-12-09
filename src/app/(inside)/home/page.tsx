@@ -1,4 +1,4 @@
-// app/home/page.tsx
+// app/(inside)/home/page.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -16,13 +16,13 @@ import MyLists from '@/components/home/metricas/MyLists'
 import MetricsSection from '@/components/home/metricas/MetricsSection'
 import { FooterHome } from '@/components/home/FooterHome'
 import ContinueWatchingCard from '@/components/home/ContinueWatchingCard';
-import { fetchStudentStats, type StudentStats } from "@/lib/dashboard/stats";
+import { getHomeStats, type HomeStats } from "@/lib/dashboard/homeStats";
 
 export default function HomePage() {
   const { done } = useProgressBar();
   const { data: session, status } = useSession();
   const [continueWatching, setContinueWatching] = useState(null);
-  const [stats, setStats] = useState<StudentStats | null>(null)
+  const [stats, setStats] = useState<HomeStats | null>(null)
   const [loadingStats, setLoadingStats] = useState(true)
 
   useEffect(() => {
@@ -47,7 +47,7 @@ export default function HomePage() {
       if (session?.laravelToken) {
         try {
           setLoadingStats(true)
-          const data = await fetchStudentStats(session.laravelToken)
+          const data = await getHomeStats(session.laravelToken)
           setStats(data)
         } catch (error) {
           console.error('Erro ao carregar stats:', error)
@@ -94,11 +94,10 @@ export default function HomePage() {
               <WeekProgress />
               {/* <ContinueWatchingCard /> */}
             </div>
-           
           </section>
         </div>
 
-        {/* <section className="mt-12">
+        <section className="mt-12">
           <div className="max-w-7xl mx-auto space-y-12">
             <motion.div
               initial={{ opacity: 0, y: 40 }}
@@ -106,19 +105,19 @@ export default function HomePage() {
               transition={{ duration: 0.7 }}
               className="grid grid-cols-1 md:grid-cols-2 gap-6"
             >
-              <MyLists
-                totalListas={stats?.listas?.total_listas_concluidas}
-                totalSimulados={stats?.listas?.total_simulados}
-              />
-              <MetricsSection
-                acertos={stats?.acertos?.acertos}
-                erros={stats?.acertos?.erros}
-                total={stats?.acertos?.total}
-                taxaAcerto={stats?.acertos?.taxa_acerto}
-              />
+              {stats && (
+                <>
+                  <MyLists
+                    dados={stats.listas_stats}
+                  />
+                  <MetricsSection
+                    dados={stats.questoes_stats}
+                  />
+                </>
+              )}
             </motion.div>
           </div>
-        </section> */}
+        </section>
       </main>
       <FooterHome />
     </>
