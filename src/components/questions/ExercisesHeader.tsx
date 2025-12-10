@@ -4,10 +4,10 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 const tabs = [
-    { href: '/exercicios', label: 'Todas Questões' },
+    // { href: '/exercicios', label: 'Todas Questões' },
     { href: '/exercicios/listas-oficiais', label: 'Listas Oficiais' },
-    { href: '/exercicios/provas-famosas', label: 'Provas Famosas' },
-    { href: '/exercicios/minhas-listas', label: 'Minhas Listas' },
+    // { href: '/exercicios/provas-famosas', label: 'Provas Famosas' },
+    // { href: '/exercicios/minhas-listas', label: 'Minhas Listas' },
 ];
 
 export function ExercisesHeader() {

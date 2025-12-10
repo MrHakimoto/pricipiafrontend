@@ -29,6 +29,7 @@ const ThreadDetail = () => {
   const [threadHtml, setThreadHtml] = useState<string>('');
   const [repliesHtml, setRepliesHtml] = useState<Record<number, string>>({});
   const [zoomedImageUrl, setZoomedImageUrl] = useState<string | null>(null);
+  
 
   const threadId = params.slug as string;
 

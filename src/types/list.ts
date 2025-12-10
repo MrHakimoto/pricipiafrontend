@@ -80,6 +80,55 @@ export type Questao = {
   topicos: Topico[];
 };
 
+// types/list.ts - ADICIONAR ESTES TIPOS
+
+export type Assunto = {
+  id: number;
+  frente_id: number;
+  nome: string;
+  created_at?: string;
+  updated_at?: string;
+  pivot?: {
+    listable_type: string;
+    lista_id: number;
+    listable_id: number;
+  };
+  frente?: {
+    id: number;
+    nome: string;
+    disciplina_id?: number;
+    created_at?: string;
+    updated_at?: string;
+  };
+};
+
+export type Frente = {
+  id: number;
+  disciplina_id: number;
+  nome: string;
+  created_at?: string;
+  updated_at?: string;
+  pivot?: {
+    listable_type: string;
+    lista_id: number;
+    listable_id: number;
+  };
+};
+
+export type TopicoCompleto = {
+  id: number;
+  assunto_id: number;
+  nome: string;
+  created_at?: string;
+  updated_at?: string;
+  pivot?: {
+    listable_type: string;
+    lista_id: number;
+    listable_id: number;
+  };
+  assunto?: Assunto;
+};
+
 export type ListaCompleta = {
   id: number;
   nome: string;
@@ -93,4 +142,8 @@ export type ListaCompleta = {
   updated_at?: string;
   average_difficulty?: number;
   most_frequent_assunto?: string | null;
+  // ✅ ADICIONAR AS RELAÇÕES
+  assuntos?: Assunto[];
+  frentes?: Frente[];
+  topicos?: TopicoCompleto[];
 };

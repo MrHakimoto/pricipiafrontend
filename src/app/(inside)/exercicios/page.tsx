@@ -1,9 +1,21 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {ModelQuestions} from "@/components/questions/ModelQuestions"
 import {FilterPanel} from "@/components/Panel/PanelFilter"
 import {ExercisesHeader} from "@/components/questions/ExercisesHeader"
+import { useRouter } from "next/navigation";
+
 export default function ExercisesPanel() {
+
+
+
+  const router = useRouter();
+
+  useEffect(() => {
+    router.replace("/exercicios/listas-oficiais/");
+  }, [router]);
+
+  return null; // Nada é exibido porque redireciona imediatamente
 
 
   return (

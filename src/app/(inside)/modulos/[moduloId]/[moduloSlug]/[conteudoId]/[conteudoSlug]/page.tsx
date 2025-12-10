@@ -206,7 +206,7 @@ export default function ConteudoPage() {
       {isMobile && !showAside && (
         <button
           onClick={() => setShowAside(true)}
-          className="mb-4 flex items-center gap-2 px-4 py-2 rounded-md bg-gray-800 hover:bg-gray-700 transition cursor-pointer"
+          className="flex items-center gap-2 px-4 py-2 rounded-md bg-gray-800 hover:bg-gray-700 transition cursor-pointer"
         >
           <Menu size={18} />
           Ver Aulas
@@ -216,9 +216,11 @@ export default function ConteudoPage() {
       {/* TÍTULO */}
       <div className="mb-4">
         <div className="flex items-center gap-3">
-          <h2 className="text-white text-2xl font-semibold outfit">
-            {thisDataD.title}
-          </h2>
+          {!(isMobile && currentContentType !== "aula") && (
+            <h2 className="text-white text-2xl font-semibold outfit">
+              {thisDataD.title}
+            </h2>
+          )}
           {isCompleted && (
             <span className="text-sm bg-green-600 text-white px-2 py-1 rounded-full flex items-center gap-1">
               Concluída
@@ -389,8 +391,8 @@ export default function ConteudoPage() {
                 <button
                   onClick={() => setActiveTab("detalhes")}
                   className={`cursor-pointer px-4 py-2 text-2xl font-semibold transition ${activeTab === "detalhes"
-                      ? "text-white border-b-2 border-white"
-                      : "text-gray-400 hover:text-white"
+                    ? "text-white border-b-2 border-white"
+                    : "text-gray-400 hover:text-white"
                     }`}
                 >
                   Detalhes
@@ -401,8 +403,8 @@ export default function ConteudoPage() {
               <button
                 onClick={() => setActiveTab("duvidas")}
                 className={`cursor-pointer px-4 py-2 text-2xl font-semibold transition ${activeTab === "duvidas"
-                    ? "text-white border-b-2 border-white"
-                    : "text-gray-400 hover:text-white"
+                  ? "text-white border-b-2 border-white"
+                  : "text-gray-400 hover:text-white"
                   }`}
               >
                 Dúvidas

@@ -1,7 +1,7 @@
 // components/questions/QuestionsPanel.tsx
 'use client';
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import type { Questao, Alternativa, Topico } from '@/types/list';
 import { Newspaper, ChartColumn, MessageCircle, ChevronDown, ChevronUp, HelpCircle, Loader2 } from 'lucide-react'; // Adicionei Loader2
 import { AnswerFeedbackOverlay } from '@/components/questions/AnswerFeedbackOverlay';
@@ -18,12 +18,17 @@ import { useSession } from "next-auth/react";
 import type { NavigationQuestion } from '@/components/questions/CurseList';
 import type { QuestaoBase } from '@/types/questions';
 import { RefazerListaButton } from "./RefazerListaButton";
+import { processMarkdown } from "@/utils/markdownProcessor";
+import { markdownProcessorAlternativas } from "@/utils/markdownProcessorAlternativas";
+import { MultipleQuestionSkeleton } from "../Skeletons/QuestionSkeleton";
+import { ImageLightbox } from "@/components/editor/ImageLightbox";
 
 // Componente de Alternativa
 type SimpleAlternativa = {
     id: number;
     letra: string;
     texto: string;
+    processedText?: string;
 };
 
 type QuizOptionProps = {
@@ -43,39 +48,112 @@ const QuizOption = ({
     statusResposta,
     onSelect
 }: QuizOptionProps) => {
+    const [isCut, setIsCut] = useState(false);
+    const [showScissors, setShowScissors] = useState(false);
+
     const isSelected = selecaoAtual === alternativa.id;
     const isSubmitted = statusResposta !== 'unanswered';
     const isCorrectAnswer = alternativa.id === alternativaCorretaId;
 
-    let optionClass = 'hover:bg-blue-800 cursor-pointer';
-    let optionClass2 = 'flex items-center justify-center w-12 h-12 rounded-full border-2 border-gray-600 text-white mr-4 text-xl font-bold transition-all duration-200';
+    // Classes base
+    let optionClass = 'hover:bg-blue-800 cursor-pointer transition-all duration-200';
+    let optionClass2 = 'flex items-center justify-center w-8 h-8 rounded-full border-2 border-gray-600 text-white mr-3 text-base font-bold transition-all duration-200 flex-shrink-0';
+    let textClass = 'text-white font-light transition-all duration-200';
 
+    // Ajustes para estado selecionado
     if (isSelected && !isSubmitted) {
         optionClass = 'bg-blue-900 border-blue-500';
-        optionClass2 = 'flex items-center justify-center w-12 h-12 rounded-full border-2 border-blue-500 text-white mr-4 text-xl font-bold transition-all duration-200 bg-blue-900';
+        optionClass2 = 'flex items-center justify-center w-8 h-8 rounded-full border-2 border-blue-500 text-white mr-3 text-base font-bold transition-all duration-200 bg-blue-900 flex-shrink-0';
     }
 
+    // Ajustes para resposta submetida
     if (isSubmitted) {
         if (isCorrectAnswer) {
             optionClass = 'bg-green-900 border-green-500 cursor-default';
-            optionClass2 = 'flex items-center justify-center w-12 h-12 rounded-full border-2 border-green-500 text-white mr-4 text-xl font-bold transition-all duration-200 bg-green-900';
+            optionClass2 = 'flex items-center justify-center w-8 h-8 rounded-full border-2 border-green-500 text-white mr-3 text-base font-bold transition-all duration-200 bg-green-900 flex-shrink-0';
         } else if (isSelected && !isCorrectAnswer) {
             optionClass = 'bg-red-900 border-red-500 cursor-default';
-            optionClass2 = 'flex items-center justify-center w-12 h-12 rounded-full border-2 border-red-500 text-white mr-4 text-xl font-bold transition-all duration-200 bg-red-900';
+            optionClass2 = 'flex items-center justify-center w-8 h-8 rounded-full border-2 border-red-500 text-white mr-3 text-base font-bold transition-all duration-200 bg-red-900 flex-shrink-0';
         } else {
             optionClass = 'cursor-default opacity-70';
         }
     }
 
+    // Efeito de "cortado"
+    if (isCut) {
+        optionClass += ' opacity-40';
+        textClass += ' line-through text-gray-400';
+    }
+
+    const handleToggleCut = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        setIsCut(!isCut);
+    };
+
+    const handleSelect = () => {
+        if (!isSubmitted) {
+            if (isCut) {
+                // Se estiver cortada, clicar remove o corte
+                setIsCut(false);
+            } else {
+                // Se não estiver cortada, seleciona normalmente
+                onSelect(alternativa.id);
+            }
+        }
+    };
+
     return (
         <div
-            onClick={() => !isSubmitted && onSelect(alternativa.id)}
-            className={`flex items-center p-4 my-3 rounded-lg transition-all duration-200 border-2 border-transparent ${optionClass}`}
+            onClick={handleSelect}
+            onMouseEnter={() => !isSubmitted && setShowScissors(true)}
+            onMouseLeave={() => setShowScissors(false)}
+            className={`flex items-center p-3 my-2 rounded-lg border-2 border-transparent relative group ${optionClass}`}
         >
+            {/* Letra da alternativa */}
             <div className={optionClass2}>
                 {alternativa.letra.toUpperCase()}
             </div>
-            <span className="text-white text-lg font-light">{alternativa.texto}</span>
+
+            {/* Texto da alternativa */}
+            <div
+                className={`${textClass} markdown-body wmde-markdown wmde-markdown-color flex-1 min-w-0 overflow-hidden pr-2`}
+                style={{
+                    fontSize: '0.875rem',
+                    lineHeight: '1.25rem',
+                    '--color-canvas-default': 'transparent',
+                    '--color-fg-default': isCut ? '#9CA3AF' : 'currentColor'
+                } as React.CSSProperties}
+                dangerouslySetInnerHTML={{
+                    __html: alternativa.processedText || alternativa.texto
+                }}
+            />
+
+            {/* Botão de cortar (lado direito - aparece ao passar o mouse) */}
+            {!isSubmitted && showScissors && (
+                <button
+                    onClick={handleToggleCut}
+                    className="flex-shrink-0 ml-2 bg-gray-800 hover:bg-gray-700 rounded-full p-1.5 
+                             border border-gray-600 shadow-lg transition-all duration-200 z-10"
+                    title={isCut ? "Recuperar alternativa" : "Cortar alternativa"}
+                >
+                    <svg
+                        className={`w-4 h-4 ${isCut ? 'text-green-400 hover:text-green-300' : 'text-gray-300 hover:text-white'}`}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                    >
+                        {isCut ? (
+                            // Ícone de restaurar (seta de voltar)
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                        ) : (
+                            // Ícone de tesoura
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879M12 12L9.121 9.121m0 5.758a3 3 0 10-4.243 4.243 3 3 0 004.243-4.243zm0-5.758a3 3 0 10-4.243-4.243 3 3 0 004.243 4.243z" />
+                        )}
+                    </svg>
+                </button>
+            )}
         </div>
     );
 };
@@ -120,7 +198,13 @@ export const QuestionsPanel: React.FC<QuestionsPanelProps> = ({
     const { data: session, status } = useSession();
     const userToken = session?.laravelToken!
     const { updateQuestionStatus } = useNavigation();
-
+    // Dentro do componente QuestionsPanel, junto com os outros estados
+    const [processedContent, setProcessedContent] = useState<Record<number, {
+        enunciado: string;
+        alternativas: Record<number, string>;
+    }>>({});
+    const [isProcessingContent, setIsProcessingContent] = useState(true);
+    const [zoomedImageUrl, setZoomedImageUrl] = useState<string | null>(null);
     const isSimuladoOuProva = listaTipo && ['simulado', 'prova'].includes(listaTipo);
 
     useEffect(() => {
@@ -144,6 +228,57 @@ export const QuestionsPanel: React.FC<QuestionsPanelProps> = ({
             setAnsweredQuestions(newAnsweredQuestions);
         }
     }, [respostasSalvas, questions, updateQuestionStatus]);
+
+
+
+    // ZOOM DE IMAGEM!!!
+
+    useEffect(() => {
+        const handleImageClick = (event: MouseEvent) => {
+            const target = event.target as HTMLElement;
+
+            // Verificar se o clique foi em uma imagem
+            if (target.tagName === 'IMG') {
+                // Verificar se NÃO está em um menu do usuário, notificações, ou nav
+                const isInUserMenu = target.closest('[class*="UserMenu"]') ||
+                    target.closest('[class*="user-menu"]') ||
+                    target.closest('[class*="notification"]') ||
+                    target.closest('nav') ||
+                    target.closest('button') ||
+                    target.closest('[role="menu"]') ||
+                    target.closest('[role="dialog"]');
+
+                // Verificar se está no conteúdo das questões
+                const isInQuestionContent = target.closest('.markdown-body') ||
+                    target.closest('[class*="question"]') ||
+                    target.closest('[class*="questao"]') ||
+                    target.closest('[class*="gabarito"]') ||
+                    target.closest('[class*="alternativa"]') ||
+                    target.closest('[class*="explicacao"]');
+
+                // Só abrir lightbox se estiver no conteúdo da questão e NÃO em um menu
+                if (isInQuestionContent && !isInUserMenu) {
+                    const src = target.getAttribute('src');
+                    if (src) {
+                        setZoomedImageUrl(src);
+                        event.preventDefault();
+                        event.stopPropagation();
+                    }
+                }
+            }
+        }
+
+        // Usar capture: true para pegar o evento antes dos menus
+        document.addEventListener('click', handleImageClick, true);
+
+        return () => {
+            document.removeEventListener('click', handleImageClick, true);
+        };
+    }, []);
+
+    const closeLightbox = useCallback(() => {
+        setZoomedImageUrl(null);
+    }, []);
 
     useEffect(() => {
         if (currentResolucaoId === null && Object.keys(respostasSalvas).length > 0) {
@@ -204,6 +339,54 @@ export const QuestionsPanel: React.FC<QuestionsPanelProps> = ({
     useEffect(() => {
         setCurrentResolucaoId(propResolucaoId);
     }, [propResolucaoId]);
+
+    // Logo após os outros useEffects no componente QuestionsPanel
+    useEffect(() => {
+        const processQuestionsContent = async () => {
+            setIsProcessingContent(true);
+            const contentMap: Record<number, {
+                enunciado: string;
+                alternativas: Record<number, string>;
+            }> = {};
+
+            for (const questao of questions) {
+                try {
+                    // Processar enunciado (usa processMarkdown)
+                    const enunciadoProcessado = await processMarkdown(questao.enunciado);
+
+                    // Processar cada alternativa (usa markdownProcessorAlternativas)
+                    const alternativasProcessadas: Record<number, string> = {};
+                    for (const alternativa of questao.alternativas) {
+                        // USANDO O PROCESSADOR DE ALTERNATIVAS AQUI!
+                        const altProcessada = await markdownProcessorAlternativas(alternativa.texto);
+                        alternativasProcessadas[alternativa.id] = altProcessada;
+                    }
+
+                    contentMap[questao.id] = {
+                        enunciado: enunciadoProcessado,
+                        alternativas: alternativasProcessadas
+                    };
+                } catch (error) {
+                    console.error(`Erro ao processar conteúdo da questão ${questao.id}:`, error);
+                    contentMap[questao.id] = {
+                        enunciado: questao.enunciado,
+                        alternativas: questao.alternativas.reduce((acc, alt) => {
+                            acc[alt.id] = alt.texto;
+                            return acc;
+                        }, {} as Record<number, string>)
+                    };
+                }
+            }
+
+            setProcessedContent(contentMap);
+            setIsProcessingContent(false);
+        };
+
+        processQuestionsContent();
+    }, [questions]);
+
+
+
 
     const handleSelectAnswer = (questionId: number, alternativaId: number) => {
         if (answeredQuestions[questionId]) return;
@@ -370,263 +553,288 @@ export const QuestionsPanel: React.FC<QuestionsPanelProps> = ({
         answeredQuestionsCount: Object.keys(answeredQuestions).length
     });
     return (
-        <div className={`flex-1 flex flex-col min-h-0 ${className} scrollbar-hide`}>
+        <div className={`flex-1 flex flex-col min-h-0 ${className}`}>
             {/* Container das questões com scroll próprio */}
-            <div className="flex-1 overflow-y-auto scrollbar-hide">
-                <div className="max-w-7xl mx-auto p-6">
-                    <main>
-                        {todasQuestoesRespondidas && (
-                            <div className="fixed bottom-6 right-6 z-50">
-                                <motion.button
-                                    initial={{ scale: 0, opacity: 0 }}
-                                    animate={{ scale: 1, opacity: 1 }}
-                                    transition={{
-                                        type: "spring",
-                                        stiffness: 300,
-                                        damping: 20
-                                    }}
-                                    onClick={handleRefazerLista}
-                                    className="px-6 py-3 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg shadow-lg hover:from-green-700 hover:to-green-800 transition-all duration-300 font-bold text-lg flex items-center gap-2 border-2 border-green-500 hover:shadow-xl transform hover:scale-105"
-                                >
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                    </svg>
-                                    Refazer Lista
-                                </motion.button>
-                            </div>
-                        )}
-                        {questions.map((questao, index) => (
-                            <QuestionWrapper key={questao.id}
-                                questionId={questao.id}>
+            <div className="flex-1 overflow-y-auto">
+                {isProcessingContent ? (
+                    <MultipleQuestionSkeleton count={questions.length} />
+                ) : (
 
-                                <div
-
-                                    className="bg-[#00091A] rounded-lg shadow-xl mb-8 border border-[#616161]"
-                                >
-                                    {/* Cabeçalho da Questão - MODIFICADO */}
-                                    <div className="w-full bg-blue-950 border-b border-gray-700">
-                                        <div className="flex items-center bg-gray-800 overflow-hidden w-full">
-                                            <div className="bg-gradient-to-br from-[#1F293C] to-[#2D3748] text-white px-6 py-4 flex items-center gap-4 flex-shrink-0">
-                                                <div className="flex flex-col items-center">
-                                                    <span className="text-xs text-gray-400 font-medium">QUESTÃO</span>
-                                                    <span className="text-2xl font-bold text-white">{index + 1}</span>
-                                                </div>
-                                                <div className="h-8 w-px bg-gray-600"></div>
-                                                <div className="flex flex-col items-center">
-                                                    <span className="text-xs text-gray-400 font-medium">ID</span>
-                                                    <span className="text-lg font-semibold text-blue-300">#{questao.id}</span>
-                                                </div>
-                                            </div>
-
-                                            <div className="flex-grow rounded-l-md relative bg-white text-xl text-gray-800 px-6 py-3 flex items-center justify-between">
-
-                                                <div className="text-lg font-medium ">
-                                                    <button onClick={() => toggleTopics(questao.id)} className="cursor-pointer text-blue-800 hover:text-blue-600 flex items-center gap-2">
-                                                        {topicsVisible ? <>Ocultar tópicos <ChevronUp className="w-4 h-4" /></> : <>Ver tópicos <ChevronDown className="w-4 h-4" /></>}
-                                                    </button>
-
-                                                    <AnimatePresence>
-                                                        {topicsVisible && questao.topicos && (
-                                                            <motion.div
-                                                                initial={{ x: 100, opacity: 0 }}
-                                                                animate={{ x: 0, opacity: 1 }}
-                                                                exit={{ x: 100, opacity: 0 }}
-                                                                transition={{ duration: 0.3 }}
-                                                                className="absolute top-0 right-0 h-full bg-blue-900 text-white text-sm px-4 py-3 flex items-center gap-2 rounded-l-xl shadow-lg"
-                                                            >
-                                                                <div className="flex flex-wrap items-center gap-2">
-
-
-                                                                    {questao.topicos.map(t => (
-                                                                        <span
-                                                                            key={t.id}
-                                                                            className="bg-blue-700 text-white text-xs font-semibold px-2 py-1 rounded-full whitespace-nowrap shadow-md"
-                                                                        >
-                                                                            {t.nome}
-                                                                        </span>
-                                                                    ))}
-
-                                                                    <div className="ml-3">
-                                                                        {getDifficultyBadge(questao.dificuldade)}
-                                                                    </div>
-                                                                </div>
-                                                            </motion.div>
-                                                        )}
-                                                    </AnimatePresence>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Metadados */}
-                                    <div className="flex flex-wrap items-center justify-between gap-3 text-sm font-medium my-4 px-6 border-b border-white pb-4">
-
-                                        {/* Badges da Prova */}
-                                        <div className="flex flex-wrap gap-3">
-                                            {questao.prova?.sigla && (
-                                                <span className="px-3 py-1 bg-gray-700 rounded-full text-gray-300">
-                                                    {questao.prova.sigla}
-                                                </span>
-                                            )}
-                                            {questao.prova?.ano && (
-                                                <span className="px-3 py-1 bg-gray-700 rounded-full text-gray-300">
-                                                    {questao.prova.ano}
-                                                </span>
-
-                                            )}
-                                            {questao.adaptado && (
-
-                                                <span className="px-3 py-1 bg-gray-700 rounded-full text-gray-300">
-                                                    (Questão Adapitada)
-                                                </span>)
-                                            }
-                                        </div>
-
-
-                                        <OpcoesQuestao
-                                            questao={questao}
-                                            onReport={() => openReportModal(questao.id)}
-                                        />
-                                    </div>
-
-                                    {/* Corpo da Questão */}
-                                    <section className="p-6 relative">
-                                        <div
-                                            className="text-gray-200 mb-6 leading-relaxed text-lg"
-                                            dangerouslySetInnerHTML={{ __html: questao.enunciado }}
-                                        />
-
-                                        {/* Alternativas */}
-                                        <div className="relative">
-                                            {questao.alternativas.map((alt) => (
-                                                <QuizOption
-                                                    key={alt.id}
-                                                    alternativa={alt}
-                                                    questaoId={questao.id}
-                                                    alternativaCorretaId={questao.alternativa_correta_id}
-                                                    selecaoAtual={selectedAnswers[questao.id] || null}
-                                                    statusResposta={isQuestionAnswered(questao.id) ?
-                                                        (isSimuladoOuProva ? 'unanswered' : // Não revela se é correto/incorreto
-                                                            (selectedAnswers[questao.id] === questao.alternativa_correta_id ? 'correct' : 'incorrect'))
-                                                        : 'unanswered'
-                                                    }
-                                                    onSelect={(alternativaId) => handleSelectAnswer(questao.id, alternativaId)}
-                                                />
-                                            ))}
-
-                                            {/* Overlay de feedback */}
-                                            {!isSimuladoOuProva && showFeedback[questao.id] && (
-                                                <AnswerFeedbackOverlay
-                                                    status={selectedAnswers[questao.id] === questao.alternativa_correta_id ? 'correct' : 'incorrect'}
-                                                    onAnimationEnd={() => { }}
-                                                />
-                                            )}
-                                        </div>
-
-                                        {/* Botão Responder */}
-
-
-                                        <button
-                                            onClick={() => handleConfirmAnswer(questao.id, questao.alternativa_correta_id)}
-                                            disabled={isQuestionAnswered(questao.id) || selectedAnswers[questao.id] == null}
-                                            className=" cursor-pointer mt-8 ml-4 px-8 py-3 bg-[#0E00D0] text-white rounded-lg hover:bg-blue-600 transition duration-200 text-2xl font-bold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                                        >
-                                            {isSaving[questao.id] ? (
-                                                <>
-                                                    <Loader2 className="animate-spin w-5 h-5" />
-                                                    Salvando...
-                                                </>
-                                            ) : (
-                                                'Responder'
-                                            )}
-                                        </button>
-
-                                    </section>
-
-                                    {/* Rodapé e Ações */}
-                                    <div className="w-full bg-gray-800 rounded-b-lg">
-                                        <div className="w-full rounded-lg overflow-hidden flex flex-col sm:flex-row justify-around items-center py-4">
-                                            {/* Botão Gabarito Comentado */}
-                                            <button
-                                                onClick={() => toggleTab(questao.id, 'gabarito')}
-                                                disabled={!isQuestionAnswered(questao.id)}
-                                                className={`font-bold flex flex-row items-center justify-center cursor-pointer p-2 transition duration-200 ease-in-out w-full sm:w-1/3 text-center space-x-2 ${activeTabs[questao.id] === 'gabarito'
-                                                    ? 'text-white bg-blue-900'
-                                                    : 'text-gray-300 hover:text-white'
-                                                    }`}
-                                            >
-                                                <MessageCircle className="w-6 h-6" />
-                                                <span className="text-lg">Gabarito comentado</span>
-                                                {getTabIcon(questao.id, 'gabarito')}
-                                            </button>
-
-                                            {/* Botão Estatísticas */}
-                                            <button
-                                                onClick={() => toggleTab(questao.id, 'estatisticas')}
-                                                disabled={!isQuestionAnswered(questao.id)}
-                                                className={`font-bold flex flex-row items-center justify-center cursor-pointer p-2 transition duration-200 ease-in-out w-full sm:w-1/3 text-center border-t sm:border-t-0 sm:border-l border-gray-700 space-x-2 ${activeTabs[questao.id] === 'estatisticas'
-                                                    ? 'text-white bg-blue-900'
-                                                    : 'text-gray-300 hover:text-white'
-                                                    }`}
-
-                                            >
-                                                <ChartColumn className="w-6 h-6" />
-                                                <span className="text-lg">Estatísticas</span>
-                                                {getTabIcon(questao.id, 'estatisticas')}
-                                            </button>
-
-                                            {/* Botão Dúvida */}
-                                            <button
-                                                onClick={() => toggleTab(questao.id, 'duvida')}
-                                                disabled={!isQuestionAnswered(questao.id)}
-                                                className={`font-bold flex flex-row items-center justify-center cursor-pointer p-2 transition duration-200 ease-in-out w-full sm:w-1/3 text-center border-t sm:border-t-0 sm:border-l border-gray-700 space-x-2 ${activeTabs[questao.id] === 'duvida'
-                                                    ? 'text-white bg-blue-900'
-                                                    : 'text-gray-300 hover:text-white'
-                                                    }`}
-                                            >
-                                                <HelpCircle className="w-6 h-6" />
-                                                <span className="text-lg">Dúvida</span>
-                                                {getTabIcon(questao.id, 'duvida')}
-                                            </button>
-                                        </div>
-
-                                        {/* Conteúdo das Abas com Animação */}
-                                        <AnimatePresence>
-                                            {activeTabs[questao.id] && (
-                                                <motion.div
-                                                    initial={{ opacity: 0, height: 0 }}
-                                                    animate={{ opacity: 1, height: "auto" }}
-                                                    exit={{ opacity: 0, height: 0 }}
-                                                    transition={{ duration: 0.3, ease: "easeInOut" }}
-                                                    className="overflow-hidden"
-                                                >
-                                                    <div className="px-6 pb-6">
-                                                        {renderActiveTabContent(questao)}
-                                                    </div>
-                                                </motion.div>
-                                            )}
-
-                                        </AnimatePresence>
-                                        {openReportModalId && (
-                                            <ReportarModal
-                                                questaoId={openReportModalId}
-                                                onClose={closeReportModal}
-                                                token={userToken || ""}
-                                            />
-                                        )}
-                                    </div>
+                    <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-6 pt-2 lg:pt-6">
+                        <main>
+                            {todasQuestoesRespondidas && (
+                                <div className="fixed bottom-6 right-6 z-50">
+                                    <motion.button
+                                        initial={{ scale: 0, opacity: 0 }}
+                                        animate={{ scale: 1, opacity: 1 }}
+                                        transition={{
+                                            type: "spring",
+                                            stiffness: 300,
+                                            damping: 20
+                                        }}
+                                        onClick={handleRefazerLista}
+                                        className="px-4 py-2 sm:px-6 sm:py-3 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg shadow-lg hover:from-green-700 hover:to-green-800 transition-all duration-300 font-bold text-sm sm:text-lg flex items-center gap-2 border-2 border-green-500 hover:shadow-xl transform hover:scale-105"
+                                    >
+                                        <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                        </svg>
+                                        Refazer Lista
+                                    </motion.button>
                                 </div>
+                            )}
+                            {questions.map((questao, index) => (
+                                <QuestionWrapper key={questao.id}
+                                    questionId={questao.id}>
 
-                            </QuestionWrapper>
-                        ))}
-                    </main>
-                </div>
+                                    <div
+                                        className="bg-[#00091A] rounded-lg shadow-xl mb-6 sm:mb-8 border border-[#616161]"
+                                    >
+                                        {/* Cabeçalho da Questão - MODIFICADO */}
+                                        <div className="w-full bg-blue-950 border-b border-gray-700">
+                                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center bg-gray-800 overflow-hidden w-full">
+                                                <div className="bg-gradient-to-br from-[#1F293C] to-[#2D3748] text-white px-3 py-3 sm:px-6 sm:py-4 flex items-center gap-3 sm:gap-4 flex-shrink-0">
+                                                    <div className="flex flex-col items-center">
+                                                        <span className="text-xs text-gray-400 font-medium">QUESTÃO</span>
+                                                        <span className="text-xl sm:text-2xl font-bold text-white">{index + 1}</span>
+                                                    </div>
+                                                    <div className="h-8 w-px bg-gray-600"></div>
+                                                    <div className="flex flex-col items-center">
+                                                        <span className="text-xs text-gray-400 font-medium">ID</span>
+                                                        <span className="text-base sm:text-lg font-semibold text-blue-300">#{questao.id}</span>
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex-grow rounded-bl-md sm:rounded-bl-none sm:rounded-l-md relative bg-white text-gray-800 px-3 py-2 sm:px-6 sm:py-3 flex items-center justify-between">
+
+
+                                                    <div className="text-sm sm:text-base font-medium">
+                                                        <button onClick={() => toggleTopics(questao.id)} className="cursor-pointer text-blue-800 hover:text-blue-600 flex items-center gap-1 sm:gap-2">
+                                                            {topicsVisible ? <>Ocultar tópicos <ChevronUp className="w-3 h-3 sm:w-4 sm:h-4" /></> : <>Ver tópicos <ChevronDown className="w-3 h-3 sm:w-4 sm:h-4" /></>}
+                                                        </button>
+
+                                                        <AnimatePresence>
+                                                            {topicsVisible && questao.topicos && (
+                                                                <motion.div
+                                                                    initial={{ x: 100, opacity: 0 }}
+                                                                    animate={{ x: 0, opacity: 1 }}
+                                                                    exit={{ x: 100, opacity: 0 }}
+                                                                    transition={{ duration: 0.3 }}
+                                                                    className="absolute top-0 right-0 h-full bg-blue-900 text-white text-xs sm:text-sm 
+                 px-2 py-2 sm:px-4 sm:py-3 
+                 flex items-center gap-1 sm:gap-2 
+                 rounded-l-xl shadow-lg"
+                                                                >
+                                                                    <div className="flex flex-wrap items-center gap-1 sm:gap-2">
+
+                                                                        {questao.topicos.map(t => (
+                                                                            <span
+                                                                                key={t.id}
+                                                                                className="bg-blue-700 text-white text-xs font-semibold 
+                       px-1.5 py-0.5 sm:px-2 sm:py-1 
+                       rounded-full whitespace-nowrap shadow-md"
+                                                                            >
+                                                                                {t.nome}
+                                                                            </span>
+                                                                        ))}
+
+                                                                        <div className="ml-1 sm:ml-3">
+                                                                            {getDifficultyBadge(questao.dificuldade)}
+                                                                        </div>
+
+                                                                    </div>
+                                                                </motion.div>
+                                                            )}
+                                                        </AnimatePresence>
+
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Metadados */}
+                                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-3 text-sm font-medium my-2 px-4 sm:px-6 border-b border-white pb-3 sm:pb-4">
+
+                                            {/* Badges da Prova */}
+                                            <div className="flex flex-wrap gap-2 sm:gap-3">
+                                                {questao.prova?.sigla && (
+                                                    <span className="px-2 sm:px-3 py-1 bg-gray-700 rounded-full text-gray-300 text-xs sm:text-sm">
+                                                        {questao.prova.sigla}
+                                                    </span>
+                                                )}
+                                                {questao.prova?.ano && (
+                                                    <span className="px-2 sm:px-3 py-1 bg-gray-700 rounded-full text-gray-300 text-xs sm:text-sm">
+                                                        {questao.prova.ano}
+                                                    </span>
+
+                                                )}
+                                                {questao.adaptado && (
+
+                                                    <span className="px-2 sm:px-3 py-1 bg-gray-700 rounded-full text-gray-300 text-xs sm:text-sm">
+                                                        (Questão Adapitada)
+                                                    </span>)
+                                                }
+                                            </div>
+
+
+                                            <div className="mt-1 sm:mt-0">
+                                                <OpcoesQuestao
+                                                    questao={questao}
+                                                    onReport={() => openReportModal(questao.id)}
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {/* Corpo da Questão */}
+                                        <section className="p-4 sm:p-6 relative">
+                                            <div
+                                                className="text-gray-200 mb-4 sm:mb-6 leading-relaxed text-sm sm:text-base markdown-body wmde-markdown wmde-markdown-color"
+                                                style={{
+                                                    lineHeight: '1.25rem',
+                                                    '--color-canvas-default': 'transparent',
+                                                    '--color-fg-default': 'currentColor'
+                                                } as React.CSSProperties}
+                                                dangerouslySetInnerHTML={{
+                                                    __html: processedContent[questao.id]?.enunciado || questao.enunciado
+                                                }}
+                                            />
+
+                                            {/* Alternativas */}
+                                            <div className="relative">
+                                                {questao.alternativas.map((alt) => {
+                                                    const altComProcessado = {
+                                                        ...alt,
+                                                        processedText: processedContent[questao.id]?.alternativas[alt.id]
+                                                    };
+
+                                                    return (
+                                                        <QuizOption
+                                                            key={alt.id}
+                                                            alternativa={altComProcessado}
+                                                            questaoId={questao.id}
+                                                            alternativaCorretaId={questao.alternativa_correta_id}
+                                                            selecaoAtual={selectedAnswers[questao.id] || null}
+                                                            statusResposta={isQuestionAnswered(questao.id) ?
+                                                                (isSimuladoOuProva ? 'unanswered' :
+                                                                    (selectedAnswers[questao.id] === questao.alternativa_correta_id ? 'correct' : 'incorrect'))
+                                                                : 'unanswered'
+                                                            }
+                                                            onSelect={(alternativaId) => handleSelectAnswer(questao.id, alternativaId)}
+                                                        />
+                                                    );
+                                                })}
+                                            </div>
+
+                                            {/* Botão Responder */}
+                                            <div className="flex justify-end mt-4">
+                                                <button
+                                                    onClick={() => handleConfirmAnswer(questao.id, questao.alternativa_correta_id)}
+                                                    disabled={isQuestionAnswered(questao.id) || selectedAnswers[questao.id] == null}
+                                                    className="cursor-pointer px-6 sm:px-8 py-2 sm:py-3 bg-[#0E00D0] text-white rounded-lg hover:bg-blue-600 transition duration-200 text-sm sm:text-base font-bold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
+                                                >
+                                                    {isSaving[questao.id] ? (
+                                                        <span className="flex items-center justify-center gap-2">
+                                                            <Loader2 className="animate-spin w-4 h-4 sm:w-5 sm:h-5" />
+                                                            Salvando...
+                                                        </span>
+                                                    ) : (
+                                                        'Responder'
+                                                    )}
+                                                </button>
+                                            </div>
+
+                                        </section>
+
+                                        {/* Rodapé e Ações - AGORA EM UMA LINHA SÓ */}
+                                        <div className="w-full bg-gray-800 rounded-b-lg">
+                                            <div className="w-full rounded-lg overflow-hidden flex flex-row flex-wrap justify-around items-center py-3 sm:py-4">
+                                                {/* Botão Gabarito Comentado */}
+                                                <button
+                                                    onClick={() => toggleTab(questao.id, 'gabarito')}
+                                                    disabled={!isQuestionAnswered(questao.id)}
+                                                    className={`font-bold flex flex-row items-center justify-center cursor-pointer p-2 sm:p-3 transition duration-200 ease-in-out flex-1 min-w-[120px] text-center space-x-1 sm:space-x-2 ${activeTabs[questao.id] === 'gabarito'
+                                                        ? 'text-white bg-blue-900'
+                                                        : 'text-gray-300 hover:text-white'
+                                                        }`}
+                                                >
+                                                    <MessageCircle className="w-4 h-4 sm:w-5 sm:h-5" />
+                                                    <span className="text-xs sm:text-sm md:text-base">Gabarito</span>
+                                                    {getTabIcon(questao.id, 'gabarito')}
+                                                </button>
+
+                                                {/* Botão Estatísticas */}
+                                                <button
+                                                    onClick={() => toggleTab(questao.id, 'estatisticas')}
+                                                    disabled={!isQuestionAnswered(questao.id)}
+                                                    className={`font-bold flex flex-row items-center justify-center cursor-pointer p-2 sm:p-3 transition duration-200 ease-in-out flex-1 min-w-[120px] text-center border-l border-gray-700 space-x-1 sm:space-x-2 ${activeTabs[questao.id] === 'estatisticas'
+                                                        ? 'text-white bg-blue-900'
+                                                        : 'text-gray-300 hover:text-white'
+                                                        }`}
+
+                                                >
+                                                    <ChartColumn className="w-4 h-4 sm:w-5 sm:h-5" />
+                                                    <span className="text-xs sm:text-sm md:text-base">Estatísticas</span>
+                                                    {getTabIcon(questao.id, 'estatisticas')}
+                                                </button>
+
+                                                {/* Botão Dúvida */}
+                                                <button
+                                                    onClick={() => toggleTab(questao.id, 'duvida')}
+                                                    disabled={!isQuestionAnswered(questao.id)}
+                                                    className={`font-bold flex flex-row items-center justify-center cursor-pointer p-2 sm:p-3 transition duration-200 ease-in-out flex-1 min-w-[120px] text-center border-l border-gray-700 space-x-1 sm:space-x-2 ${activeTabs[questao.id] === 'duvida'
+                                                        ? 'text-white bg-blue-900'
+                                                        : 'text-gray-300 hover:text-white'
+                                                        }`}
+                                                >
+                                                    <HelpCircle className="w-4 h-4 sm:w-5 sm:h-5" />
+                                                    <span className="text-xs sm:text-sm md:text-base">Dúvida</span>
+                                                    {getTabIcon(questao.id, 'duvida')}
+                                                </button>
+                                            </div>
+
+                                            {/* Conteúdo das Abas com Animação */}
+                                            <AnimatePresence>
+                                                {activeTabs[questao.id] && (
+                                                    <motion.div
+                                                        initial={{ opacity: 0, height: 0 }}
+                                                        animate={{ opacity: 1, height: "auto" }}
+                                                        exit={{ opacity: 0, height: 0 }}
+                                                        transition={{ duration: 0.3, ease: "easeInOut" }}
+                                                        className="overflow-hidden"
+                                                    >
+                                                        <div className="px-4 sm:px-6 pb-4 sm:pb-6">
+                                                            {renderActiveTabContent(questao)}
+                                                        </div>
+                                                    </motion.div>
+                                                )}
+
+                                            </AnimatePresence>
+                                            {openReportModalId && (
+                                                <ReportarModal
+                                                    questaoId={openReportModalId}
+                                                    onClose={closeReportModal}
+                                                    token={userToken || ""}
+                                                />
+                                            )}
+                                        </div>
+                                    </div>
+
+                                </QuestionWrapper>
+                            ))}
+                        </main>
+                    </div>
+                )}
             </div>
             {deveMostrarBotaoRefazer && (
                 <RefazerListaButton
                     onRefazerLista={handleRefazerLista}
                     isLoading={isRefazendoLista}
                     isTentativaFinalizada={tentativaFinalizada}
+                />
+            )}
+            {zoomedImageUrl && (
+                <ImageLightbox
+                    imageUrl={zoomedImageUrl}
+                    onClose={closeLightbox}
                 />
             )}
 

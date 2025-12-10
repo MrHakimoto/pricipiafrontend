@@ -412,7 +412,7 @@ useEffect(() => {
                             animate="open"
                             exit="closed"
                             className={`
-                              flex my-1 text-4xl items-center gap-3 p-3 rounded cursor-pointer 
+                              flex my-1 text-base items-center gap-3 p-3 rounded cursor-pointer 
                               hover:bg-gray-700 transition-colors duration-200
                               ${isActive ? 'bg-gray-700' : 'text-gray-400'}
                               ${isCompleted ? 'border-l-4 border-l-green-500' : ''}
@@ -439,7 +439,7 @@ useEffect(() => {
                               ) : (
                                 <List size={16} className="shrink-0" />
                               )}
-                              <span className="truncate text-lg whitespace-nowrap">
+                              <span className="truncate text-base whitespace-nowrap">
                                 {lesson.title}
                                 {hasProgress && !isCompleted && (
                                   <span className="text-xs text-blue-400 ml-1">• Em andamento</span>
@@ -448,7 +448,7 @@ useEffect(() => {
                             </div>
 
                             <div className="flex flex-row items-center gap-1.5">
-                              <div className="text-lg text-gray-400 font-mono font-bold">
+                              <div className="text-base text-gray-400 font-mono font-bold">
                                 <span>{formattedTime}</span>
                               </div>
                             </div>

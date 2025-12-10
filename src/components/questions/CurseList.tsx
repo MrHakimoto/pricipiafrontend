@@ -2,16 +2,15 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { useParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 
 import { NavigationProvider } from '@/contexts/NavigationContext';
 import { QuestionsPanel } from '@/components/questions/QuestionsPanel';
 import { NavigationSidebar } from '@/components/questions/NavigationSidebar';
 import { getListaById } from '@/lib/questions/list';
-import { iniciarTentativa, finalizarTentativa, getTentativaAtiva } from '@/lib/questions/tentativa'; // ✅ Adicione estas importações
+import { iniciarTentativa, finalizarTentativa, getTentativaAtiva } from '@/lib/questions/tentativa';
 import { Loader2 } from 'lucide-react';
-import { Alternativa, Prova, Questao, ListaCompleta, Topico } from '@/types/list';
+import { Alternativa, Prova, Questao, ListaCompleta, Topico, Assunto, Frente, TopicoCompleto } from '@/types/list';
 import type { QuestaoBase } from '@/types/questions';
 
 interface ListaCursePageProps {
@@ -21,99 +20,204 @@ interface ListaCursePageProps {
 export type NavigationQuestion = QuestaoBase;
 
 export default function ListaCursePage({ idList }: ListaCursePageProps) {
-  const params = useParams();
   const { data: session, status } = useSession();
 
   const [questoes, setQuestoes] = useState<Questao[]>([]);
   const [listaInfo, setListaInfo] = useState<ListaCompleta | null>(null);
+  const [assuntos, setAssuntos] = useState<Assunto[]>([]);
+  const [frentes, setFrentes] = useState<Frente[]>([]);
+  const [topicos, setTopicos] = useState<TopicoCompleto[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  // ✅ ADICIONE ESTES ESTADOS para o sistema de tentativas
   const [resolucaoId, setResolucaoId] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [respostasSalvas, setRespostasSalvas] = useState<Record<number, number>>({});
-  const [tentativaAtiva, setTentativaAtiva] = useState<any>(null);
+  const [navbarHeight, setNavbarHeight] = useState(64);
+  const navbarRef = useRef<HTMLElement | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
 
   const listaId = idList;
-  const fetchDataRef = useRef(false); // ✅ Para evitar loops
 
   useEffect(() => {
-    if (fetchDataRef.current) {
-      console.log('🛑 fetchListaData já foi executado, ignorando...');
-      return;
+    // Buscar o navbar no DOM
+    const navbar = document.querySelector('nav') as HTMLElement;
+    navbarRef.current = navbar;
+
+    const updateNavbarHeight = () => {
+      if (navbar) {
+        setNavbarHeight(navbar.offsetHeight);
+      }
+    };
+
+    // Verificar se é mobile
+    const checkIfMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+
+    // Medir inicialmente
+    updateNavbarHeight();
+    checkIfMobile();
+
+    // Observar mudanças (responsive, etc)
+    const resizeObserver = new ResizeObserver(updateNavbarHeight);
+    if (navbar) {
+      resizeObserver.observe(navbar);
     }
 
+    window.addEventListener('resize', checkIfMobile);
+
+    return () => {
+      if (navbar) {
+        resizeObserver.unobserve(navbar);
+      }
+      window.removeEventListener('resize', checkIfMobile);
+    };
+  }, []);
+
+  // ✅ FETCH DATA COM ABORT CONTROLLER PARA EVITAR RACE CONDITIONS
+  useEffect(() => {
+    // ✅ Criar AbortController para cancelar requisições pendentes
+    const abortController = new AbortController();
+    let isMounted = true;
+
     const fetchListaData = async () => {
-      if (status === 'authenticated' && session?.laravelToken && listaId) {
-        try {
-          fetchDataRef.current = true;
+      // ✅ Verificar autenticação primeiro
+      if (status === 'loading') {
+        return;
+      }
+
+      if (status === 'unauthenticated') {
+        if (isMounted) {
+          setError("Você precisa estar logado para acessar esta lista.");
+          setIsLoading(false);
+        }
+        return;
+      }
+
+      if (!session?.laravelToken) {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+        return;
+      }
+
+      if (!listaId) {
+        if (isMounted) {
+          setError("ID da lista não fornecido.");
+          setIsLoading(false);
+        }
+        return;
+      }
+
+      try {
+        if (isMounted) {
           setIsLoading(true);
           setError(null);
-          const token = session.laravelToken;
+        }
 
-          console.log('Buscando lista com ID:', listaId);
+        const token = session.laravelToken;
 
-          // ✅ BUSCAR EM PARALELO: lista + tentativa ativa
-          const [response, tentativaExistente] = await Promise.all([
-            getListaById(listaId, token),
-            getTentativaAtiva(listaId, token) // ✅ Busca tentativa ativa
-          ]);
+        console.log('🔄 Buscando lista com ID:', listaId);
 
-          console.log('Resposta completa da API:', response);
-          console.log('Tentativa existente:', tentativaExistente);
+        // ✅ Adicionar timeout para evitar requisições pendentes
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Timeout ao carregar lista')), 10000)
+        );
 
-          let questoesData: Questao[] = [];
-          let listaInfoData: ListaCompleta | null = null;
+        const fetchPromise = Promise.all([
+          getListaById(listaId, token),
+          getTentativaAtiva(listaId, token)
+        ]);
 
-          // Processar questões (seu código existente)
-          if (response && response.questoes && Array.isArray(response.questoes)) {
-            questoesData = response.questoes;
-          } else if (response && response.lista_info && Array.isArray(response.lista_info.questoes)) {
-            questoesData = response.lista_info.questoes;
-          } else if (response && Array.isArray(response)) {
-            questoesData = response;
-          } else {
-            console.warn('Estrutura de resposta inesperada:', response);
-            setQuestoes([]);
-            setIsLoading(false);
-            return;
-          }
+        const [dadosLista, tentativaExistente] = await Promise.race([fetchPromise, timeoutPromise]) as any;
 
-          // Processar info da lista (seu código existente)
-          if (response.lista_info) {
-            listaInfoData = {
-              id: response.lista_info.id || listaId,
-              nome: response.lista_info.name || response.lista_info.nome || `Lista ${listaId}`,
-              descricao: response.lista_info.descricao || 'Lista de exercícios',
-              total_time_in_seconds: response.lista_info.total_time_in_seconds || 0,
-              user_id: response.lista_info.user_id,
-              is_public: response.lista_info.is_public,
-              time: response.lista_info.time,
-              tipo: response.lista_info.tipo,
-              created_at: response.lista_info.created_at,
-              updated_at: response.lista_info.updated_at,
-              average_difficulty: response.lista_info.average_difficulty,
-              most_frequent_assunto: response.lista_info.most_frequent_assunto
-            };
-          } else if (response.name) {
-            listaInfoData = {
-              id: listaId,
-              nome: response.name || `Lista ${listaId}`,
-              descricao: response.descricao || 'Lista de exercícios',
-              total_time_in_seconds: response.total_time_in_seconds || 0
-            };
-          }
+        console.log('✅ Dados da lista:', dadosLista);
+        console.log('✅ Tentativa existente:', tentativaExistente);
 
-          console.log('Questões carregadas:', questoesData.length);
-          console.log('Informações da lista:', listaInfoData);
+        // ✅ Verificar se o componente ainda está montado
+        if (!isMounted) return;
 
+        // ✅ Processar estrutura da resposta
+        const assuntosDaLista: Assunto[] = dadosLista.lista_info?.assuntos || [];
+        const frentesDaLista: Frente[] = dadosLista.lista_info?.frentes || [];
+        const topicosDaLista: TopicoCompleto[] = dadosLista.lista_info?.topicos || [];
+        let questoesData: Questao[] = [];
+        let listaInfoData: ListaCompleta | null = null;
+
+        // Verificar diferentes estruturas possíveis da resposta
+        if (dadosLista && dadosLista.questoes && Array.isArray(dadosLista.questoes)) {
+          // Estrutura 1: questões no nível raiz
+          questoesData = dadosLista.questoes;
+          console.log('📚 Questões carregadas do nível raiz:', questoesData.length);
+        } else if (dadosLista && dadosLista.lista_info && Array.isArray(dadosLista.lista_info.questoes)) {
+          // Estrutura 2: questões dentro de lista_info
+          questoesData = dadosLista.lista_info.questoes;
+          console.log('📚 Questões carregadas de lista_info:', questoesData.length);
+        } else if (dadosLista && Array.isArray(dadosLista)) {
+          // Estrutura 3: resposta é diretamente um array de questões
+          questoesData = dadosLista;
+          console.log('📚 Questões carregadas como array direto:', questoesData.length);
+        } else if (dadosLista && dadosLista.data && Array.isArray(dadosLista.data)) {
+          // Estrutura 4: questões dentro de data
+          questoesData = dadosLista.data;
+          console.log('📚 Questões carregadas de data:', questoesData.length);
+        } else {
+          console.warn('⚠️ Estrutura de resposta inesperada:', dadosLista);
+          throw new Error('Estrutura de resposta da API inesperada');
+        }
+
+        // ✅ Verificação crítica: garantir que temos questões
+        if (!questoesData || questoesData.length === 0) {
+          throw new Error('Nenhuma questão encontrada na lista');
+        }
+
+        // ✅ Buscar informações da lista
+        if (dadosLista.lista_info) {
+          listaInfoData = {
+            id: dadosLista.lista_info.id || listaId,
+            nome: dadosLista.lista_info.name || dadosLista.lista_info.nome || `Lista ${listaId}`,
+            descricao: dadosLista.lista_info.descricao || 'Lista de exercícios',
+            total_time_in_seconds: dadosLista.lista_info.total_time_in_seconds || 0,
+            user_id: dadosLista.lista_info.user_id,
+            is_public: dadosLista.lista_info.is_public,
+            time: dadosLista.lista_info.time,
+            tipo: dadosLista.lista_info.tipo,
+            created_at: dadosLista.lista_info.created_at,
+            updated_at: dadosLista.lista_info.updated_at,
+            average_difficulty: dadosLista.lista_info.average_difficulty,
+            most_frequent_assunto: dadosLista.lista_info.most_frequent_assunto
+          };
+        } else if (dadosLista.name) {
+          // Fallback: se não houver lista_info, mas houver name no nível raiz
+          listaInfoData = {
+            id: listaId,
+            nome: dadosLista.name || `Lista ${listaId}`,
+            descricao: dadosLista.descricao || 'Lista de exercícios',
+            total_time_in_seconds: dadosLista.total_time_in_seconds || 0
+          };
+        } else {
+          // Fallback final
+          listaInfoData = {
+            id: listaId,
+            nome: `Lista ${listaId}`,
+            descricao: 'Lista de exercícios',
+            total_time_in_seconds: 0
+          };
+        }
+
+        console.log('✅ Questões carregadas:', questoesData.length);
+        console.log('✅ Informações da lista:', listaInfoData);
+
+        // ✅ Atualizar estados apenas se montado
+        if (isMounted) {
+          setAssuntos(assuntosDaLista);
+          setFrentes(frentesDaLista);
+          setTopicos(topicosDaLista);
           setQuestoes(questoesData);
           setListaInfo(listaInfoData);
 
-          // ✅ PROCESSAR TENTATIVA ATIVA (igual ao ListaQuestionsPage)
           if (tentativaExistente) {
             console.log('✅ Tentativa ativa encontrada:', tentativaExistente);
             setResolucaoId(tentativaExistente.id);
-            setTentativaAtiva(tentativaExistente);
 
             // Extrair respostas já salvas
             const respostas: Record<number, number> = {};
@@ -123,46 +227,200 @@ export default function ListaCursePage({ idList }: ListaCursePageProps) {
               });
             }
             setRespostasSalvas(respostas);
-            console.log('📝 Respostas carregadas:', respostas);
-
+            console.log('📝 Respostas carregadas:', Object.keys(respostas).length);
           } else {
             console.log('🆕 Nenhuma tentativa ativa - será criada na primeira resposta');
             setResolucaoId(null);
-            setTentativaAtiva(null);
             setRespostasSalvas({});
           }
+        }
 
-        } catch (err) {
-          console.error('Erro detalhado ao carregar lista:', err);
+      } catch (err: any) {
+        console.error('❌ Erro ao carregar lista:', err);
+        
+        if (!isMounted) return;
+        
+        // ✅ Mensagens de erro específicas
+        if (err.message === 'Timeout ao carregar lista') {
+          setError("Tempo limite excedido ao carregar a lista. Tente novamente.");
+        } else if (err.message.includes('Nenhuma questão encontrada')) {
+          setError("Nenhuma questão encontrada nesta lista.");
+        } else if (err.message.includes('Estrutura de resposta')) {
+          setError("Erro no formato da resposta da API. Tente novamente.");
+        } else {
           setError("Falha ao carregar a lista de exercícios. Tente novamente.");
-          fetchDataRef.current = false; // Permite nova tentativa
-        } finally {
+        }
+        
+        // ✅ Limpar estados em caso de erro
+        setQuestoes([]);
+        setListaInfo(null);
+        setResolucaoId(null);
+        setRespostasSalvas({});
+      } finally {
+        if (isMounted) {
           setIsLoading(false);
         }
-      } else if (status === 'unauthenticated') {
-        setError("Você precisa estar logado para acessar esta lista.");
-        setIsLoading(false);
-      } else if (!listaId) {
-        setError("ID da lista não fornecido.");
-        setIsLoading(false);
-      } else {
-        setIsLoading(false);
       }
     };
 
     fetchListaData();
 
     return () => {
-      fetchDataRef.current = false;
+      // ✅ Cleanup: cancelar requisições e marcar como não montado
+      isMounted = false;
+      abortController.abort();
+      console.log('🧹 Cleanup: abortando requisições pendentes');
     };
-  }, [listaId]);
+  }, [listaId, session?.laravelToken, status]);
 
-  // ✅ ADICIONE AS FUNÇÕES DE TENTATIVA (igual ao ListaQuestionsPage)
+  // ✅ LOADING STATE
+  if (isLoading || status === 'loading') {
+    return (
+      <div className="flex justify-center items-center h-screen bg-[#00091A]">
+        <div className="text-center">
+          <Loader2 className="animate-spin text-white mx-auto mb-4" size={48} />
+          <p className="text-white text-lg">Carregando lista...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // ✅ ERROR STATE - mostrar apenas se error !== null
+  if (error) {
+    return (
+      <div className="min-h-screen bg-[#00091A] flex items-center justify-center p-8">
+        <div className="text-center text-white max-w-md">
+          <div className="text-xl mb-4">{error}</div>
+          <div className="flex gap-4 justify-center">
+            <button
+              onClick={() => window.location.reload()}
+              className="px-6 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+            >
+              Tentar Novamente
+            </button>
+            <button
+              onClick={() => window.history.back()}
+              className="px-6 py-2 bg-gray-600 hover:bg-gray-700 rounded-lg transition-colors"
+            >
+              Voltar
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ✅ VERIFICAÇÃO DE ESTADO INCONSISTENTE (sem questões mas também sem erro)
+  // Esta verificação deve vir APÓS o loading e error states
+  if (!questoes || questoes.length === 0) {
+    console.warn('⚠️ Estado inconsistente: questoes vazio sem erro?', { 
+      questoes, 
+      listaInfo, 
+      resolucaoId,
+      respostasSalvas 
+    });
+    
+    // ✅ Tentar recuperação automática se chegarmos aqui
+    useEffect(() => {
+      console.log('🔄 Tentando recuperação automática do estado inconsistente...');
+      window.location.reload();
+    }, []);
+    
+    return (
+      <div className="min-h-screen bg-[#00091A] flex items-center justify-center p-8">
+        <div className="text-center text-white">
+          <div className="text-xl mb-4">Recarregando lista...</div>
+          <Loader2 className="animate-spin text-white mx-auto mb-4" size={32} />
+          <p className="text-gray-400 text-sm">Estado inconsistente detectado. Recarregando automaticamente...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // ✅ PREPARAR AS QUESTÕES PARA O FORMATO ESPERADO PELO NAVIGATIONPROVIDER
+  const questionsFormatted: QuestaoBase[] = questoes.map(questao => {
+    // Formatar informações da prova
+    const provaInfo = questao.prova ? {
+      banca: {
+        nome: questao.prova.nome || 'Banca não informada'
+      },
+      ano: questao.prova.ano || 0,
+      sigla: questao.prova.sigla || undefined
+    } : {
+      banca: { nome: 'Banca não informada' },
+      ano: 0,
+      sigla: undefined
+    };
+
+    // Formatar tópicos - garantir que seja um array de objetos com id e nome
+    const topicosFormatados = Array.isArray(questao.topicos)
+      ? questao.topicos.map((topico: Topico) => ({
+        id: topico.id,
+        nome: topico.nome
+      }))
+      : [];
+
+    // Formatar alternativas
+    const alternativasFormatadas = Array.isArray(questao.alternativas)
+      ? questao.alternativas.map((alt: Alternativa) => ({
+        id: alt.id,
+        letra: alt.letra,
+        texto: alt.texto
+      }))
+      : [];
+
+    // ✅ GARANTIR que todas as propriedades obrigatórias estejam presentes
+    const questaoFormatada: QuestaoBase = {
+      id: questao.id,
+      enunciado: questao.enunciado || 'Enunciado não disponível',
+      dificuldade: questao.dificuldade || 3, // Default para dificuldade média
+      alternativa_correta_id: questao.alternativa_correta_id,
+      alternativas: alternativasFormatadas,
+      topicos: topicosFormatados,
+      prova: provaInfo,
+      gabarito_video: questao.gabarito_video || null,
+      gabarito_comentado_texto: questao.gabarito_comentado_texto || 'Gabarito comentado não disponível.',
+      adaptado: !!questao.adaptado
+    };
+
+    // Verificar se todas as propriedades obrigatórias estão presentes
+    if (!questaoFormatada.dificuldade) {
+      console.warn(`⚠️ Questão ${questaoFormatada.id} sem dificuldade, usando valor padrão: 3`);
+      questaoFormatada.dificuldade = 3;
+    }
+
+    return questaoFormatada;
+  });
+
+  // ✅ VERIFICAÇÃO FINAL
+  const questaoIncompleta = questionsFormatted.find(q =>
+    q.dificuldade === undefined ||
+    q.dificuldade === null
+  );
+
+  if (questaoIncompleta) {
+    console.error('❌ Questão ainda sem dificuldade:', questaoIncompleta);
+    // Corrigir em tempo de execução
+    questionsFormatted.forEach(q => {
+      if (q.dificuldade === undefined || q.dificuldade === null) {
+        q.dificuldade = 3;
+      }
+    });
+  }
+
+  console.log('📊 CurseList Estado final:', {
+    questoesFormatadas: questionsFormatted.length,
+    resolucaoId,
+    respostasSalvas: Object.keys(respostasSalvas).length,
+    listaInfo: listaInfo?.nome
+  });
+
+  // ✅ HANDLE FUNCTIONS
   const handleIniciarTentativa = async (): Promise<number> => {
     if (!listaId) throw new Error("ID da lista não disponível");
     const token = session?.laravelToken!;
     try {
-      console.log('🎯 Iniciando nova tentativa...');
+      console.log('🚀 Iniciando nova tentativa...');
       const novaTentativa = await iniciarTentativa(listaId, token);
       console.log('✅ Nova tentativa criada:', novaTentativa);
 
@@ -178,142 +436,52 @@ export default function ListaCursePage({ idList }: ListaCursePageProps) {
     const token = session?.laravelToken!;
 
     if (!resolucaoId) {
-      console.warn('Nenhuma tentativa ativa para finalizar');
+      console.warn('⚠️ Nenhuma tentativa ativa para finalizar');
       return;
     }
 
     try {
-      console.log('Finalizando tentativa:', resolucaoId);
+      console.log('🏁 Finalizando tentativa:', resolucaoId);
       const resultado = await finalizarTentativa(resolucaoId, token);
-      console.log('Tentativa finalizada com sucesso:', resultado);
+      console.log('✅ Tentativa finalizada com sucesso:', resultado);
 
+      // Aqui você pode redirecionar para uma página de resultados ou mostrar um modal
       alert('Tentativa finalizada com sucesso! Pontuação: ' + resultado.resolucao.score_final);
 
     } catch (err) {
-      console.error('Erro ao finalizar tentativa:', err);
+      console.error('❌ Erro ao finalizar tentativa:', err);
       alert('Erro ao finalizar tentativa. Tente novamente.');
     }
   };
 
-  // Loading state
-  if (isLoading || status === 'loading') {
-    return (
-      <div className="flex justify-center items-center h-screen bg-[#00091A]">
-        <div className="text-center">
-          <Loader2 className="animate-spin text-white mx-auto mb-4" size={48} />
-          <p className="text-white text-lg">Carregando lista...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Error state
-  if (error) {
-    return (
-      <div className="min-h-screen bg-[#00091A] flex items-center justify-center p-8">
-        <div className="text-center text-white">
-          <div className="text-xl mb-4">{error}</div>
-          <button
-            onClick={() => window.location.reload()}
-            className="px-6 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
-          >
-            Tentar Novamente
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // Se não há questões
-  if (!questoes || questoes.length === 0) {
-    return (
-      <div className="min-h-screen bg-[#00091A] flex items-center justify-center p-8">
-        <div className="text-center text-white">
-          <div className="text-xl mb-4">Nenhuma questão encontrada nesta lista</div>
-          <p className="text-gray-400 mb-6">A lista pode estar vazia ou ocorreu um problema ao carregar as questões.</p>
-          <button
-            onClick={() => window.history.back()}
-            className="px-6 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
-          >
-            Voltar
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // Prepara as questões para o formato esperado pelo NavigationProvider
-  const questionsFormatted: QuestaoBase[] = questoes.map(questao => {
-    const provaInfo = questao.prova ? {
-      banca: {
-        nome: questao.prova.nome || 'Banca não informada' // ⚠ manter nome real
-      },
-      ano: questao.prova.ano || 0,
-      sigla: questao.prova.sigla || undefined // ✅ incluir sigla
-    } : {
-      banca: { nome: 'Banca não informada' },
-      ano: 0,
-      sigla: undefined
-    };
-
-    const topicosFormatados = Array.isArray(questao.topicos)
-      ? questao.topicos.map((topico: Topico) => ({
-        id: topico.id,
-        nome: topico.nome
-      }))
-      : [];
-
-    const alternativasFormatadas = Array.isArray(questao.alternativas)
-      ? questao.alternativas.map((alt: Alternativa) => ({
-        id: alt.id,
-        letra: alt.letra,
-        texto: alt.texto
-      }))
-      : [];
-
-    return {
-      id: questao.id,
-      enunciado: questao.enunciado || 'Enunciado não disponível',
-      dificuldade: questao.dificuldade || 3,
-      alternativa_correta_id: questao.alternativa_correta_id,
-      alternativas: alternativasFormatadas,
-      topicos: topicosFormatados,
-      prova: provaInfo,
-      adaptado: !!questao.adaptado,
-      gabarito_video: questao.gabarito_video || null,
-      gabarito_comentado_texto: questao.gabarito_comentado_texto || 'Gabarito comentado não disponível.'
-    };
-  });
-
-  console.log('📊 CurseList Estado final:', {
-    questoesFormatadas: questionsFormatted.length,
-    resolucaoId,
-    respostasSalvas: Object.keys(respostasSalvas).length,
-    listaInfo: listaInfo?.nome,
-    tipo: listaInfo?.tipo
-  });
-
-  // ✅ VERIFICA SE É SIMULADO/PROVA (igual ao ListaQuestionsPage)
-  const isSimuladoOuProva = Boolean(
-    listaInfo?.tipo && ['simulado', 'prova'].includes(listaInfo.tipo)
-  );
+  // ✅ RENDERIZAÇÃO PRINCIPAL
+  const isSimuladoOuProva = listaInfo?.tipo && ['simulado', 'prova'].includes(listaInfo.tipo);
 
   return (
-    // ✅ ATUALIZE O NavigationProvider com todas as props necessárias
     <NavigationProvider
       questions={questionsFormatted}
       respostasSalvas={respostasSalvas}
-      isSimuladoOuProva={isSimuladoOuProva}
+      isSimuladoOuProva={!!isSimuladoOuProva}
     >
-      <div className="flex h-[calc(100vh-245px)] bg-[#00091A] overflow-hidden">
-        {/* ✅ ATUALIZE O NavigationSidebar com todas as props */}
-        <NavigationSidebar
+      <div 
+        className="flex bg-[#00091A] overflow-hidden"
+        style={{ 
+          height: `calc(100vh - ${navbarHeight}px)`,
+          // paddingTop: isMobile ? '60px' : '0' // Adiciona padding no topo para mobile
+        }}
+      >
+        {/* Sidebar Esquerda */}
+        <NavigationSidebar 
+          assuntos={assuntos}
+          frentes={frentes}
+          topicos={topicos}
           listaInfo={listaInfo ?? undefined}
           resolucaoId={resolucaoId}
           onFinalizarTentativa={handleFinalizarTentativa}
+          navbarHeight={navbarHeight}
         />
 
-        {/* ✅ ATUALIZE O QuestionsPanel com todas as props */}
+        {/* Painel de Questões (Direita) */}
         <QuestionsPanel
           className="flex-1 overflow-y-auto"
           questions={questionsFormatted}
@@ -323,19 +491,28 @@ export default function ListaCursePage({ idList }: ListaCursePageProps) {
           listaId={listaInfo?.id}
           listaTipo={listaInfo?.tipo}
         />
-      </div>
 
-      {/* DEBUG - Apenas em desenvolvimento */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="fixed bottom-3 right-3 bg-black/80 text-white p-3 rounded-md border border-gray-700 text-xs z-[1000] font-mono">
-          <div className="font-bold mb-1">DEBUG CurseList:</div>
-          <div>Questões: {questoes.length}</div>
-          <div>Tentativa ID: {resolucaoId || 'Não iniciada'}</div>
-          <div>Tipo: {listaInfo?.tipo || 'normal'}</div>
-          <div>É simulado/prova: {isSimuladoOuProva ? 'Sim' : 'Não'}</div>
-          <div>Status: {status}</div>
-        </div>
-      )}
+        {/* DEBUG - Apenas em desenvolvimento */}
+        {process.env.NODE_ENV === 'development' && (
+          <div
+            className="fixed bottom-3 right-3 bg-black/80 text-white p-3 rounded-md border border-gray-700 text-xs z-[1000] font-mono"
+          >
+            <div className="font-bold mb-1">DEBUG CurseList:</div>
+            <div>Questões: {questionsFormatted.length}</div>
+            <div>
+              Com Dificuldade:{' '}
+              {questionsFormatted.filter(
+                (q) => q.dificuldade !== undefined && q.dificuldade !== null
+              ).length}
+            </div>
+            <div>Lista Info: {listaInfo ? 'Sim' : 'Não'}</div>
+            <div>Tentativa ID: {resolucaoId || 'Não iniciada'}</div>
+            <div>Status: {status}</div>
+            <div>Mobile: {isMobile ? 'Sim' : 'Não'}</div>
+            <div>Navbar Height: {navbarHeight}px</div>
+          </div>
+        )}
+      </div>
     </NavigationProvider>
   );
 }

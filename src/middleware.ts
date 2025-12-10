@@ -4,20 +4,40 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 export async function middleware(request: NextRequest) {
-  const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
+  const token = await getToken({
+    req: request,
+    secret: process.env.NEXTAUTH_SECRET,
+  });
 
   // ============================================================
   // BLOQUEIO TEMPORÁRIO DA ROTA /exercicios
   // Só você consegue acessar. Todos os outros veem "Em construção"
   // ============================================================
+  // ============================================================
+  // BLOQUEIO SELETIVO DAS ROTAS /exercicios
+  // ============================================================
   if (request.nextUrl.pathname.startsWith("/exercicios")) {
-    // ←←← TROQUE AQUI PELO SEU E-MAIL DE DESENVOLVEDOR ←←←
-    const EMAIL_DO_DEV = "maccabeus@gmail.com";   // <--- MUDE AQUI!!!
+    const EMAIL_DO_DEV = "maccabeus@gmail.com";
 
-    // Se não estiver logado OU não for o dev → bloqueia
-    if (!token || token.email !== EMAIL_DO_DEV) {
-      return new NextResponse(
-        `<!DOCTYPE html>
+    const rota = request.nextUrl.pathname;
+
+    // Rotas que DEVEM SER LIVRES
+    const rotasLiberadas = ["/exercicios", "/exercicios/listas-oficiais"];
+
+    // Rotas que devem ser BLOQUEADAS
+    const rotasBloqueadas = [
+      "/exercicios/provas-famosas",
+      "/exercicios/minhas-listas",
+    ];
+
+    // Se a rota for bloqueada → proteger
+    const deveBloquear = rotasBloqueadas.some((r) => rota.startsWith(r));
+
+    if (deveBloquear) {
+      // Se não estiver logado OU não for o dev → bloqueia
+      if (!token || token.email !== EMAIL_DO_DEV) {
+        return new NextResponse(
+          `<!DOCTYPE html>
         <html lang="pt-BR">
           <head>
             <meta charset="utf-8">
@@ -39,13 +59,13 @@ export async function middleware(request: NextRequest) {
             </div>
           </body>
         </html>`,
-        {
-          status: 200,
-          headers: { "Content-Type": "text/html" },
-        }
-      );
+          {
+            status: 200,
+            headers: { "Content-Type": "text/html" },
+          }
+        );
+      }
     }
-    // Se for você → continua normalmente (pula o bloqueio)
   }
 
   // ============================================================

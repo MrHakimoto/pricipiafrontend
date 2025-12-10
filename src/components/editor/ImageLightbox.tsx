@@ -1,3 +1,4 @@
+//components/editor/ImageLightbox.tsx
 "use client";
 
 import { useEffect, useRef } from "react";
