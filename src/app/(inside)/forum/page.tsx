@@ -58,6 +58,7 @@ const Forum = () => {
 
 
   // Carregar threads
+  // Atualize a função loadThreads para aceitar parâmetros de filtro
   const loadThreads = async (page: number = 1) => {
     if (!session?.laravelToken) {
       console.error('Token não encontrado');
@@ -66,7 +67,24 @@ const Forum = () => {
 
     setLoading(true);
     try {
-      const data: LaravelPaginationObject<ForumThread> = await getForumThreads(session.laravelToken, page);
+      const filterParams: { filter?: string; search?: string } = {};
+
+      // Apenas envia filtros diferentes de 'all'
+      if (filter !== 'all') {
+        filterParams.filter = filter;
+      }
+
+      // Se houver busca, envia também
+      if (search.trim()) {
+        filterParams.search = search;
+      }
+
+      const data: LaravelPaginationObject<ForumThread> = await getForumThreads(
+        session.laravelToken,
+        page,
+        filterParams // Passa os parâmetros de filtro
+      );
+
       setThreads(data.data);
       processThreadsPreview(data.data);
       setPagination({
@@ -81,11 +99,24 @@ const Forum = () => {
     }
   };
 
+
   useEffect(() => {
     if (status === 'authenticated') {
+      // Recarrega threads quando o filtro ou busca muda
       loadThreads();
     }
-  }, []);
+  }, [filter, status]); // Adicione filter como dependência
+
+  // Adicione também para a busca (com debounce para evitar muitas chamadas)
+  useEffect(() => {
+    if (status === 'authenticated') {
+      const timeoutId = setTimeout(() => {
+        loadThreads();
+      }, 500); // Debounce de 500ms
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [search, status]);
 
   const handleCreateThread = async (data: { title: string; body: string }) => {
     if (!session?.laravelToken) {
@@ -125,23 +156,7 @@ const Forum = () => {
     return <ForumSkeleton />;
   }
 
-  const filteredThreads = threads.filter(thread => {
-    // Filtro por tipo
-    if (filter === 'pending') return !thread.is_closed;
-    if (filter === 'closed') return thread.is_closed;
-    if (filter === 'mine') return thread.author.id.toString() === session?.user?.id;
-    return true;
-  }).filter(thread => {
-    // Filtro por pesquisa
-    if (!search.trim()) return true;
-    const searchLower = search.toLowerCase();
-    return (
-      thread.title.toLowerCase().includes(searchLower) ||
-      thread.body.toLowerCase().includes(searchLower) ||
-      thread.author.name.toLowerCase().includes(searchLower)
-    );
-  }).sort((a, b) => {
-    // Ordenação
+  const filteredThreads = [...threads].sort((a, b) => {
     if (sort === 'recent') {
       return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     } else {

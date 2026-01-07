@@ -1,3 +1,4 @@
+//components/metricas/WeekProgress.tsx
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -5,7 +6,7 @@ import { useSession } from 'next-auth/react'
 import useSWR from 'swr'
 import { Check, X, Flame, Calendar } from 'lucide-react'
 import { checkinStatus, checkinDaily } from '@/lib/dailyCheck/daily'
-import { getUTCDateString } from '@/utils/dateHelpers' 
+import { getUTCDateString } from '@/utils/dateHelpers'
 
 interface UserStreak {
   id: number
@@ -14,6 +15,7 @@ interface UserStreak {
   longest_streak: number
   last_checkin_date: string
   has_checked_in_today: boolean
+  week_checkins?: string[]
 }
 
 type DayStatus = 'done' | 'current' | 'missed' | 'pending'
@@ -65,7 +67,7 @@ export default function WeekProgress() {
           await checkinDaily(token)
           mutate() // Revalida os dados
         }
-        
+
         // Marca como feito
         localStorage.setItem('daily_checkin_date', today)
       } catch (err) {
@@ -109,25 +111,43 @@ export default function WeekProgress() {
 
   // Gerar dias da semana baseado no estado atual - CORRIGIDO
   const getWeekDays = (): WeekDay[] => {
-    const days = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
-    const today = new Date().getDay()
+    const days = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+    const today = new Date();
+    const todayIndex = today.getDay();
+
+    // Calcula datas da semana atual
+    const weekDates: string[] = [];
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(today);
+      date.setDate(today.getDate() - todayIndex + i);
+      weekDates.push(date.toISOString().split('T')[0]);
+    }
+
+    // Usa dados da API se disponível
+    const weekCheckins = streakData?.week_checkins || [];
 
     return days.map((day, index): WeekDay => {
-      let status: DayStatus = 'pending'
+      const dateStr = weekDates[index];
+      const isToday = index === todayIndex;
+      const hasCheckedIn = weekCheckins.includes(dateStr);
 
-      if (index === today) {
-        // Dia atual: mostra como "current" se não fez check-in, "done" se fez
-        status = streakData?.has_checked_in_today ? 'done' : 'current'
-      } else if (index < today) {
-        // Dias passados: verifica se fez check-in baseado no histórico
-        // Esta é uma simplificação - em produção você precisaria do histórico completo
-        status = 'missed' // Por padrão marca como missed, poderia ser refinado
+      if (isToday) {
+        return {
+          name: day,
+          status: streakData?.has_checked_in_today ? 'done' : 'current'
+        };
       }
-      // Dias futuros permanecem como 'pending'
 
-      return { name: day, status }
-    })
-  }
+      if (index < todayIndex) {
+        return {
+          name: day,
+          status: hasCheckedIn ? 'done' : 'missed'
+        };
+      }
+
+      return { name: day, status: 'pending' };
+    });
+  };
 
   const DAYS = getWeekDays()
 
@@ -197,22 +217,20 @@ export default function WeekProgress() {
       <div className="flex justify-between mb-6 px-1">
         {DAYS.map((day, index) => (
           <div key={index} className="flex flex-col items-center">
-            <div className={`w-7 h-7 flex items-center justify-center rounded-full mb-2 transition-all duration-300 ${
-              day.status === "done"
-                ? "bg-gradient-to-br from-orange-500 to-orange-600 shadow-lg shadow-orange-500/25"
-                : day.status === "current"
+            <div className={`w-7 h-7 flex items-center justify-center rounded-full mb-2 transition-all duration-300 ${day.status === "done"
+              ? "bg-gradient-to-br from-orange-500 to-orange-600 shadow-lg shadow-orange-500/25"
+              : day.status === "current"
                 ? "bg-gradient-to-br from-blue-500 to-blue-600 shadow-lg shadow-blue-500/25 ring-2 ring-blue-400/50"
                 : day.status === "missed"
-                ? "bg-gradient-to-br from-gray-600 to-gray-700"
-                : "bg-gradient-to-br from-gray-700 to-gray-800 border border-gray-600/50"
-            }`}>
+                  ? "bg-gradient-to-br from-gray-600 to-gray-700"
+                  : "bg-gradient-to-br from-gray-700 to-gray-800 border border-gray-600/50"
+              }`}>
               {day.status === "done" && <Check className="text-white w-3 h-3" />}
               {day.status === "current" && <div className="w-2 h-2 bg-white rounded-full"></div>}
               {day.status === "missed" && <X className="text-white w-3 h-3" />}
             </div>
-            <span className={`text-xs font-medium transition-colors ${
-              day.status === "pending" ? "text-gray-500" : "text-gray-300"
-            }`}>
+            <span className={`text-xs font-medium transition-colors ${day.status === "pending" ? "text-gray-500" : "text-gray-300"
+              }`}>
               {day.name}
             </span>
           </div>

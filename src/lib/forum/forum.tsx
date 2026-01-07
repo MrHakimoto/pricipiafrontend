@@ -105,13 +105,24 @@ export interface LaravelPaginationObject<T> {
  */
 export const getForumThreads = async (
   token: string,
-  page: number = 1
+  page: number = 1,
+  filterParams?: { filter?: string; search?: string }
 ): Promise<LaravelPaginationObject<ForumThread>> => {
   if (!token) throw new Error("Token não fornecido.");
 
   try {
+    const params: Record<string, string | number> = { page };
+    
+    // Adiciona parâmetros de filtro se fornecidos
+    if (filterParams?.filter && filterParams.filter !== 'all') {
+      params.filter = filterParams.filter;
+    }
+    if (filterParams?.search && filterParams.search.trim()) {
+      params.search = filterParams.search;
+    }
+
     const response = await api.get<LaravelPaginationObject<ForumThread>>("/forum", {
-      params: { page },
+      params,
       headers: { Authorization: `Bearer ${token}` },
     });
     return response.data;

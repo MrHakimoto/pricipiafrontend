@@ -562,7 +562,7 @@ export const QuestionsPanel: React.FC<QuestionsPanelProps> = ({
 
                     <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-6 pt-2 lg:pt-6">
                         <main>
-                            {todasQuestoesRespondidas && (
+                            {/* {todasQuestoesRespondidas && (
                                 <div className="fixed bottom-6 right-6 z-50">
                                     <motion.button
                                         initial={{ scale: 0, opacity: 0 }}
@@ -581,7 +581,7 @@ export const QuestionsPanel: React.FC<QuestionsPanelProps> = ({
                                         Refazer Lista
                                     </motion.button>
                                 </div>
-                            )}
+                            )} */}
                             {questions.map((questao, index) => (
                                 <QuestionWrapper key={questao.id}
                                     questionId={questao.id}>
@@ -656,23 +656,22 @@ export const QuestionsPanel: React.FC<QuestionsPanelProps> = ({
 
                                             {/* Badges da Prova */}
                                             <div className="flex flex-wrap gap-2 sm:gap-3">
-                                                {questao.prova?.sigla && (
+                                                {questao.prova?.sigla ? (
                                                     <span className="px-2 sm:px-3 py-1 bg-gray-700 rounded-full text-gray-300 text-xs sm:text-sm">
                                                         {questao.prova.sigla}
                                                     </span>
-                                                )}
-                                                {questao.prova?.ano && (
+                                                ) : ''}
+
+                                                {questao.prova?.ano ? (
                                                     <span className="px-2 sm:px-3 py-1 bg-gray-700 rounded-full text-gray-300 text-xs sm:text-sm">
                                                         {questao.prova.ano}
                                                     </span>
-
-                                                )}
-                                                {questao.adaptado && (
-
+                                                ) : ''}
+                                                {!!questao.adaptado && (
                                                     <span className="px-2 sm:px-3 py-1 bg-gray-700 rounded-full text-gray-300 text-xs sm:text-sm">
-                                                        (Questão Adapitada)
-                                                    </span>)
-                                                }
+                                                        (Questão Adaptada)
+                                                    </span>
+                                                )}
                                             </div>
 
 
