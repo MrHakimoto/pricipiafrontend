@@ -73,7 +73,7 @@ export default function CommentCard({
       >
         {/* Coluna do Avatar */}
         <div className="flex-shrink-0">
-          {comment.author.avatar ? (
+          {comment.author?.avatar ? (
             <img 
               src={comment.author.avatar} 
               alt={comment.author.name}
@@ -89,7 +89,7 @@ export default function CommentCard({
           {/* Header: Nome e Timestamp */}
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-x-2">
-              <span className="font-semibold text-white">{comment.author.name}</span>
+              <span className="font-semibold text-white">{comment.author?.name!}</span>
               {isOwnComment && (
                 <span className="text-xs bg-blue-600 text-white px-2 py-1 rounded-full">
                   Você

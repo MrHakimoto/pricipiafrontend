@@ -1,3 +1,4 @@
+// [conteudoId]/[conteudoSlug]/page.tsx
 "use client";
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -12,7 +13,6 @@ import CommentCard from "@/components/modules/CommentCard";
 import CommentSection from "@/components/modules/CommentSection";
 
 import { useVideoProgress } from '@/hooks/useVideoProgress';
-import { usePandaPlayer } from '@/hooks/usePandaPlayer';
 import { DuvidaCard } from "@/components/modules/DuvidaCard";
 import { toggleLike } from "@/lib/course/like";
 
@@ -62,37 +62,10 @@ export default function ConteudoPage() {
   const currentIndex = contents.findIndex((c) => c.id === Number(conteudoId));
 
   const { sendHeartbeat, saveFinalProgress, isSaving } = useVideoProgress(Number(conteudoId));
-  const { setupPlayerListeners, currentTimeRef } = usePandaPlayer(
-    Number(conteudoId),
-    thisDataD?.user_progress?.last_watched_timestamp
-  );
 
-  useEffect(() => {
-    console.log('🎬 Iniciando configuração do player...');
 
-    const cleanup = setupPlayerListeners();
+  
 
-    const handleBeforeUnload = () => {
-      const finalTime = currentTimeRef.current;
-      console.log('🚪 Usuário saindo - salvando tempo final:', finalTime);
-      saveFinalProgress(finalTime);
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-
-    return () => {
-      console.log('🔚 Desmontando componente...');
-      cleanup();
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-
-      // Save final na desmontagem
-      const finalTime = currentTimeRef.current;
-      if (finalTime > 5) { // Só salva se assistiu pelo menos 5 segundos
-        console.log('💾 Salvando progresso final na desmontagem:', finalTime);
-        saveFinalProgress(finalTime);
-      }
-    };
-  }, [setupPlayerListeners]);
 
   // Ref para guardar o último tempo conhecido (fallback)
   const lastKnownTimeRef = useRef<number>(0);
