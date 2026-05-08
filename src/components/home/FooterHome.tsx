@@ -119,7 +119,7 @@ export const FooterHome = () => {
         {/* Linha de Copyright (separador) */}
         <div className="border-t border-gray-700 mt-12 pt-8 text-center">
           <p className="text-sm text-gray-500">
-            © 2025 Principia Matemática. Todos os direitos reservados.
+            © 2026 Principia Matemática. Todos os direitos reservados.
           </p>
         </div>
 

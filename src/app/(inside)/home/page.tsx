@@ -6,36 +6,40 @@ import { useProgressBar } from "@/components/Context/ProgressBarContext";
 import LogoutButton from "@/components/LogoutButton";
 import { useSession } from "next-auth/react";
 import HomeSkeleton from "@/components/Skeletons/HomeSkeleton";
-import { motion } from 'framer-motion'
-import BannerCarousel from '@/components/home/BannerCarousel'
-import UserCard from '@/components/home/UserCard'
-import CoursesSection from '@/components/home/CoursesSection'
-import GoalsSection from '@/components/home/metricas/GoalsSection'
-import WeekProgress from '@/components/home/metricas/WeekProgress'
-import MyLists from '@/components/home/metricas/MyLists'
-import MetricsSection from '@/components/home/metricas/MetricsSection'
-import { FooterHome } from '@/components/home/FooterHome'
-import ContinueWatchingCard from '@/components/home/ContinueWatchingCard';
+import { motion } from "framer-motion";
+import BannerCarousel from "@/components/home/BannerCarousel";
+import UserCard from "@/components/home/UserCard";
+import CoursesSection from "@/components/home/CoursesSection";
+import GoalsSection from "@/components/home/metricas/GoalsSection";
+import WeekProgress from "@/components/home/metricas/WeekProgress";
+import MyLists from "@/components/home/metricas/MyLists";
+import MetricsSection from "@/components/home/metricas/MetricsSection";
+import { FooterHome } from "@/components/home/FooterHome";
+import ContinueWatchingCard from "@/components/home/ContinueWatchingCard";
 import { getHomeStats, type HomeStats } from "@/lib/dashboard/homeStats";
 
 export default function HomePage() {
   const { done } = useProgressBar();
   const { data: session, status } = useSession();
   const [continueWatching, setContinueWatching] = useState(null);
-  const [stats, setStats] = useState<HomeStats | null>(null)
-  const [loadingStats, setLoadingStats] = useState(true)
+  const [stats, setStats] = useState<HomeStats | null>(null);
+  const [loadingStats, setLoadingStats] = useState(true);
+
+  console.log("SESSION USER:", session);
+  console.log("SESSION USER ID:", session?.user?.id);
+
 
   useEffect(() => {
-    console.log(session)
+    console.log(session);
     const fetchContinueWatching = async () => {
       try {
-        const response = await fetch('/api/dashboard/continuar-assistindo');
+        const response = await fetch("/api/dashboard/continuar-assistindo");
         if (response.ok) {
           const data = await response.json();
           setContinueWatching(data);
         }
       } catch (error) {
-        console.error('Erro ao buscar continuar assistindo:', error);
+        console.error("Erro ao buscar continuar assistindo:", error);
       }
     };
 
@@ -46,21 +50,21 @@ export default function HomePage() {
     const loadStats = async () => {
       if (session?.laravelToken) {
         try {
-          setLoadingStats(true)
-          const data = await getHomeStats(session.laravelToken)
-          setStats(data)
+          setLoadingStats(true);
+          const data = await getHomeStats(session.laravelToken);
+          setStats(data);
         } catch (error) {
-          console.error('Erro ao carregar stats:', error)
+          console.error("Erro ao carregar stats:", error);
         } finally {
-          setLoadingStats(false)
+          setLoadingStats(false);
         }
       }
-    }
-    
+    };
+
     if (status === "authenticated") {
-      loadStats()
+      loadStats();
     }
-  }, [session?.laravelToken, status])
+  }, [session?.laravelToken, status]);
 
   const isLoading = status === "loading" || loadingStats;
 
@@ -107,12 +111,8 @@ export default function HomePage() {
             >
               {stats && (
                 <>
-                  <MyLists
-                    dados={stats.listas_stats}
-                  />
-                  <MetricsSection
-                    dados={stats.questoes_stats}
-                  />
+                  <MyLists dados={stats.listas_stats} />
+                  <MetricsSection dados={stats.questoes_stats} />
                 </>
               )}
             </motion.div>
@@ -121,5 +121,5 @@ export default function HomePage() {
       </main>
       <FooterHome />
     </>
-  )
+  );
 }

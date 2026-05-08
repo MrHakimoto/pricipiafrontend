@@ -1,3 +1,4 @@
+//lib/auth.ts
 import CredentialsProvider from "next-auth/providers/credentials";
 import GoogleProvider from "next-auth/providers/google";
 import { api } from "@/lib/axios";
@@ -131,30 +132,39 @@ export const authOptions: NextAuthOptions = {
       },
     }),
   ],
-  callbacks: {
-    async jwt({ token, user, trigger, session }) {
-      // 1. Login Inicial (Mantém o que você já tem)
-      if (user) {
-        token.laravelToken = user.laravelToken;
-        token.picture = user.image ?? null;
+callbacks: {
+  async jwt({ token, user, trigger, session }) {
+    // Login inicial
+    if (user) {
+      token.id = user.id;
+      token.laravelToken = user.laravelToken;
+      token.picture = user.image ?? null;
+    }
+
+    // Atualização manual via update()
+    if (trigger === "update" && session?.user) {
+      token.picture = session.user.image ?? null;
+
+      // Mantém/atualiza o ID caso venha no update()
+      if (session.user.id) {
+        token.id = session.user.id;
       }
+    }
 
-      // 🔥 2. ATUALIZAÇÃO MANUAL (Novo Código)
-      // Se o frontend chamar update(), o 'trigger' será "update"
-      // e os dados novos virão em 'session'.
-      if (trigger === "update" && session?.user) {
-        token.picture = session.user.image ?? null; // ← ACEITA NULL
-      }
-
-      return token;
-    },
-    async session({ session, token }) {
-      session.laravelToken = token.laravelToken;
-
-      session.user.image = token.picture ?? null;
-      return session;
-    },
+    return token;
   },
+
+  async session({ session, token }) {
+    session.laravelToken = token.laravelToken as string;
+
+    if (session.user) {
+      session.user.id = String(token.id ?? "");
+      session.user.image = token.picture ?? null;
+    }
+
+    return session;
+  },
+},
   session: {
     strategy: "jwt",
     maxAge: 24 * 60 * 60,

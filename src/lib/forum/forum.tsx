@@ -37,7 +37,6 @@ export type LinkableContent = {
   duration_in_seconds?: number;
 } | null;
 
-
 export interface CourseContent {
   id: number;
   module_id: number;
@@ -73,7 +72,7 @@ export interface ForumThread {
 export interface CreateThreadData {
   title: string;
   body: string;
-  linkable_type?: 'Questao' | 'CourseContent';
+  linkable_type?: "Questao" | "CourseContent";
   linkable_id?: number;
 }
 
@@ -106,29 +105,35 @@ export interface LaravelPaginationObject<T> {
 export const getForumThreads = async (
   token: string,
   page: number = 1,
-  filterParams?: { filter?: string; search?: string }
+  filterParams?: { filter?: string; search?: string },
 ): Promise<LaravelPaginationObject<ForumThread>> => {
   if (!token) throw new Error("Token não fornecido.");
 
   try {
     const params: Record<string, string | number> = { page };
-    
+
     // Adiciona parâmetros de filtro se fornecidos
-    if (filterParams?.filter && filterParams.filter !== 'all') {
+    if (filterParams?.filter && filterParams.filter !== "all") {
       params.filter = filterParams.filter;
     }
     if (filterParams?.search && filterParams.search.trim()) {
       params.search = filterParams.search;
     }
 
-    const response = await api.get<LaravelPaginationObject<ForumThread>>("/forum", {
-      params,
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const response = await api.get<LaravelPaginationObject<ForumThread>>(
+      "/forum",
+      {
+        params,
+        headers: { Authorization: `Bearer ${token}` },
+      },
+    );
     return response.data;
   } catch (error) {
     const err = error as AxiosError;
-    console.error("Erro ao buscar tópicos do fórum:", err.response?.data || err.message);
+    console.error(
+      "Erro ao buscar tópicos do fórum:",
+      err.response?.data || err.message,
+    );
     throw new Error("Falha ao buscar os tópicos do fórum.");
   }
 };
@@ -140,7 +145,7 @@ export const getForumThreads = async (
  */
 export const getForumThreadDetails = async (
   token: string,
-  threadId: number | string
+  threadId: number | string,
 ): Promise<ForumThread> => {
   if (!token) throw new Error("Token não fornecido.");
   if (!threadId) throw new Error("ID do Tópico é obrigatório.");
@@ -152,7 +157,10 @@ export const getForumThreadDetails = async (
     return response.data;
   } catch (error) {
     const err = error as AxiosError;
-    console.error(`Erro ao buscar tópico #${threadId}:`, err.response?.data || err.message);
+    console.error(
+      `Erro ao buscar tópico #${threadId}:`,
+      err.response?.data || err.message,
+    );
     throw new Error("Falha ao buscar os detalhes do tópico.");
   }
 };
@@ -164,10 +172,11 @@ export const getForumThreadDetails = async (
  */
 export const createForumThread = async (
   token: string,
-  data: CreateThreadData
+  data: CreateThreadData,
 ): Promise<ForumThread> => {
   if (!token) throw new Error("Token não fornecido.");
-  if (!data.title || !data.body) throw new Error("Título e Corpo são obrigatórios.");
+  if (!data.title || !data.body)
+    throw new Error("Título e Corpo são obrigatórios.");
 
   try {
     const response = await api.post<ForumThread>("/forum", data, {
@@ -189,20 +198,27 @@ export const createForumThread = async (
 export const postForumReply = async (
   token: string,
   threadId: number | string,
-  body: string
+  body: string,
 ): Promise<ForumReply> => {
   if (!token) throw new Error("Token não fornecido.");
   if (!threadId) throw new Error("ID do Tópico é obrigatório.");
   if (!body) throw new Error("O corpo da resposta não pode estar vazio.");
 
   try {
-    const response = await api.post<ForumReply>(`/forum/${threadId}/replies`, { body }, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const response = await api.post<ForumReply>(
+      `/forum/${threadId}/replies`,
+      { body },
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      },
+    );
     return response.data;
   } catch (error) {
     const err = error as AxiosError;
-    console.error("Erro ao postar resposta:", err.response?.data || err.message);
+    console.error(
+      "Erro ao postar resposta:",
+      err.response?.data || err.message,
+    );
     throw new Error("Falha ao postar a resposta.");
   }
 };
@@ -215,19 +231,27 @@ export const postForumReply = async (
 export const markBestReply = async (
   token: string,
   threadId: number | string,
-  replyId: number | string
+  replyId: number | string,
 ): Promise<ForumThread> => {
   if (!token) throw new Error("Token não fornecido.");
-  if (!threadId || !replyId) throw new Error("ID do Tópico e da Resposta são obrigatórios.");
+  if (!threadId || !replyId)
+    throw new Error("ID do Tópico e da Resposta são obrigatórios.");
 
   try {
-    const response = await api.post<ForumThread>(`/forum/${threadId}/mark-best-reply/${replyId}`, {}, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const response = await api.post<ForumThread>(
+      `/forum/${threadId}/mark-best-reply/${replyId}`,
+      {},
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      },
+    );
     return response.data;
   } catch (error) {
     const err = error as AxiosError;
-    console.error("Erro ao marcar melhor resposta:", err.response?.data || err.message);
+    console.error(
+      "Erro ao marcar melhor resposta:",
+      err.response?.data || err.message,
+    );
     throw new Error("Falha ao marcar a melhor resposta.");
   }
 };
@@ -239,19 +263,172 @@ export const markBestReply = async (
  */
 export const reopenThread = async (
   token: string,
-  threadId: number | string
+  threadId: number | string,
 ): Promise<ForumThread> => {
   if (!token) throw new Error("Token não fornecido.");
   if (!threadId) throw new Error("ID do Tópico é obrigatório.");
 
   try {
-    const response = await api.post<ForumThread>(`/forum/${threadId}/reopen`, {}, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const response = await api.post<ForumThread>(
+      `/forum/${threadId}/reopen`,
+      {},
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      },
+    );
     return response.data;
   } catch (error) {
     const err = error as AxiosError;
     console.error("Erro ao reabrir tópico:", err.response?.data || err.message);
     throw new Error("Falha ao reabrir o tópico.");
   }
+}
+  // UPDATE
+
+export const updateForumThread = async (
+  token: string,
+  threadId: number | string,
+  data: {
+    title: string;
+    body: string;
+  }
+): Promise<ForumThread> => {
+  if (!token) throw new Error("Token não fornecido.");
+  if (!threadId) throw new Error("ID do tópico é obrigatório.");
+
+  try {
+    const response = await api.put<ForumThread>(
+      `/forum/${threadId}`,
+      data,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    return response.data;
+  } catch (error) {
+    const err = error as AxiosError;
+    console.error("Erro ao editar tópico:", err.response?.data || err.message);
+    throw new Error("Falha ao editar o tópico.");
+  }
 };
+
+export const closeForumThread = async (
+  token: string,
+  threadId: number | string
+): Promise<ForumThread> => {
+  if (!token) throw new Error("Token não fornecido.");
+  if (!threadId) throw new Error("ID do tópico é obrigatório.");
+
+  try {
+    const response = await api.post<{ message: string; thread: ForumThread }>(
+      `/forum/${threadId}/close`,
+      {},
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    return response.data.thread;
+  } catch (error) {
+    const err = error as AxiosError;
+    console.error("Erro ao fechar tópico:", err.response?.data || err.message);
+    throw new Error("Falha ao fechar o tópico.");
+  }
+};
+
+export const updateForumReply = async (
+  token: string,
+  threadId: number | string,
+  replyId: number | string,
+  body: string
+): Promise<ForumReply> => {
+  if (!token) throw new Error("Token não fornecido.");
+  if (!threadId || !replyId) {
+    throw new Error("ID do tópico e da resposta são obrigatórios.");
+  }
+
+  if (!body.trim()) {
+    throw new Error("O corpo da resposta não pode estar vazio.");
+  }
+
+  try {
+    const response = await api.put<ForumReply>(
+      `/forum/${threadId}/replies/${replyId}`,
+      { body },
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    return response.data;
+  } catch (error) {
+    const err = error as AxiosError;
+    console.error("Erro ao editar resposta:", err.response?.data || err.message);
+    throw new Error("Falha ao editar a resposta.");
+  }
+};
+
+
+export const deleteForumThread = async (
+  token: string,
+  threadId: number | string
+): Promise<{ message: string }> => {
+  if (!token) throw new Error("Token não fornecido.");
+  if (!threadId) throw new Error("ID do tópico é obrigatório.");
+
+  try {
+    const response = await api.delete<{ message: string }>(
+      `/forum/${threadId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    return response.data;
+  } catch (error) {
+    const err = error as AxiosError;
+    console.error("Erro ao apagar tópico:", err.response?.data || err.message);
+    throw new Error("Falha ao apagar a dúvida.");
+  }
+};
+
+export const deleteForumReply = async (
+  token: string,
+  threadId: number | string,
+  replyId: number | string
+): Promise<{ message: string }> => {
+  if (!token) throw new Error("Token não fornecido.");
+  if (!threadId || !replyId) {
+    throw new Error("ID do tópico e da resposta são obrigatórios.");
+  }
+
+  try {
+    const response = await api.delete<{ message: string }>(
+      `/forum/${threadId}/replies/${replyId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    return response.data;
+  } catch (error) {
+    const err = error as AxiosError;
+    console.error("Erro ao apagar resposta:", err.response?.data || err.message);
+    throw new Error("Falha ao apagar a resposta.");
+  }
+};
+
+
+
+
