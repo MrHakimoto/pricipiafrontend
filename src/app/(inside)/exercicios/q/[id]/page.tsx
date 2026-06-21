@@ -1,18 +1,17 @@
 // app/exercicios/q/[id]/page.tsx
 
 import { QuestionStaticPanel } from "@/components/questions/QuestionStaticPanel";
-import { useSession } from "next-auth/react";
 
 type PageProps = {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 };
 
-export default function QuestaoUnitariaPage({ params }: PageProps) {
+export default async function QuestaoUnitariaPage({ params }: PageProps) {
+  const { id } = await params;
 
-
-  const questionId = Number(params.id);
+  const questionId = Number(id);
 
   return <QuestionStaticPanel questionId={questionId} />;
 }
