@@ -14,6 +14,7 @@ import { api } from "@/lib/axios";
 import { Skeleton } from "@/components/ui/skeleton";
 import PdfViewerModal from "@/components/modules/PdfViewerModal";
 import { DuvidaCard } from "@/components/modules/DuvidaCard";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 // import CommentSection from "@/components/modules/CommentSection"; // se for usar, descomente
 
 type LiveFull = {
@@ -79,6 +80,8 @@ export default function LiveViewPage() {
     fileName: string;
     files?: { file_url: string; file_name: string }[];
   } | null>(null);
+
+   useDocumentTitle("Live");
 
   const token = (session as any)?.laravelToken as string | undefined;
   const id = params?.id;

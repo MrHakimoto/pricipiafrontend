@@ -1,40 +1,87 @@
-//lib/dailyCheck/daily.ts
-import { api } from "../axios"; // Sua instância configurada do Axios
+import { api } from "../axios";
 import type { AxiosError } from "axios";
 
-/**
- * Busca o estado atual do streak e o status do check-in do utilizador logado.
- * Rota: GET /api/checkin-status
- *
- * @param {string} token - O token de autenticação (Bearer token).
- *
- * @sends (Envia)
- * - Requisição GET.
- * - Headers: { Authorization: "Bearer <token>" }
- *
- * @receives (Recebe em caso de sucesso)
- * - Promise<UserStreak>
- * (Exemplo:
- * {
- * "id": 1,
- * "user_id": 1,
- * "current_streak": 5,
- * "longest_streak": 10,
- * "last_checkin_date": "2025-11-08",
- * "has_checked_in_today": false // Campo virtual adicionado pelo controller
- * })
- */
-export const checkinStatus = async (token: string) => {
+export interface CheckinStatusResponse {
+  id: number;
+  user_id: number;
+  current_streak: number;
+  longest_streak: number;
+  last_checkin_date: string | null;
+  has_checked_in_today: boolean;
+  week_checkins: string[];
+  month_checkins: string[];
+  today: string;
+  month: string;
+  month_label: string;
+}
+
+export interface CheckinStatusParams {
+  month?: string;
+}
+
+export interface CheckinDailyResponse {
+  message: string;
+  checkin?: {
+    id: number;
+    user_id: number;
+    checkin_date: string;
+    created_at?: string | null;
+    updated_at?: string | null;
+  };
+  streak?: {
+    id: number;
+    user_id: number;
+    current_streak: number;
+    longest_streak: number;
+    last_checkin_date: string | null;
+    created_at?: string | null;
+    updated_at?: string | null;
+  } | null;
+  status?: CheckinStatusResponse;
+}
+
+export const checkinStatus = async (
+  token: string,
+  params?: CheckinStatusParams,
+): Promise<CheckinStatusResponse> => {
+  if (!token) throw new Error("Token não fornecido.");
+
+  const response = await api.get<CheckinStatusResponse>("/checkin-status", {
+    params,
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  return response.data;
+};
+
+export const checkinDaily = async (
+  token: string,
+): Promise<CheckinDailyResponse> => {
   if (!token) throw new Error("Token não fornecido.");
 
   try {
-    const response = await api.get("/checkin-status", {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const response = await api.post<CheckinDailyResponse>(
+      "/checkin",
+      {},
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    );
+
     return response.data;
   } catch (error) {
-    console.error("Erro ao buscar status do check-in:", error);
-    throw new Error("Falha ao buscar o status do check-in.");
+    const err = error as AxiosError<CheckinDailyResponse>;
+
+    if (err.response?.status === 409 && err.response.data) {
+      return err.response.data;
+    }
+
+    console.error("Erro ao realizar o check-in:", err);
+    throw new Error("Falha ao realizar o check-in.");
   }
 };
 
@@ -43,57 +90,14 @@ export const getUser = async (token: string) => {
 
   try {
     const response = await api.get("/user", {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    return response.data;
-  } catch (error) {
-    console.error("Erro ao buscar status do check-in:", error);
-    throw new Error("Falha ao buscar o status do check-in.");
-  }
-};
-
-/**
- * Tenta realizar o check-in diário para o utilizador logado.
- * Rota: POST /api/checkin
- *
- * @param {string} token - O token de autenticação (Bearer token).
- *
- * @sends (Envia)
- * - Requisição POST.
- * - Corpo (Body): {} (Um objeto vazio, pois o controller usa o user do token)
- * - Headers: { Authorization: "Bearer <token>" }
- *
- * @receives (Recebe em caso de sucesso - 201 Created)
- * - Promise<{
- * message: string, // "Check-in realizado com sucesso!"
- * streak: UserStreak // O objeto do streak atualizado
- * }>
- *
- * @receives (Recebe em caso de conflito - 409 Conflict)
- * - Promise<{
- * message: string, // "Check-in já realizado hoje."
- * streak: UserStreak // O objeto do streak atual
- * }>
- */
-export const checkinDaily = async (token: string) => {
-  if (!token) throw new Error("Token não fornecido.");
-
-  try {
-    const response = await api.post("/checkin", {}, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
     });
 
     return response.data;
-
   } catch (error) {
-    const err = error as AxiosError;
-
-    if (err.response && err.response.status === 409) {
-      console.warn("Check-in diário: Já realizado hoje.");
-      return err.response.data; // ✅ agora o TS entende
-    }
-
-    console.error("Erro ao realizar o check-in:", err);
-    throw new Error("Falha ao realizar o check-in.");
+    console.error("Erro ao buscar usuário:", error);
+    throw new Error("Falha ao buscar o usuário.");
   }
 };

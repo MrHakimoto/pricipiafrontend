@@ -5,34 +5,105 @@ import { CircleUserRound, User, Mail, LogOut, Moon, Sun } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { useEffect, useState, useRef } from "react";
 import { useTheme } from "next-themes";
-import { usePathname } from 'next/navigation';
+import { usePathname } from "next/navigation";
+import { AnimatedRoleName } from "@/components/user/AnimatedRoleName";
+import {
+  getGamificationStatus,
+  type UserStatus,
+} from "@/lib/gamification/gamification";
+import { getMyRoles, type UserRole } from "@/lib/users/roles";
+
+// interface UserRole {
+//   id?: number;
+//   name?: string | null;
+//   slug?: string | null;
+//   display_name?: string | null;
+//   description?: string | null;
+//   priority?: number | null;
+//   is_staff?: boolean | number | null;
+// }
 
 interface UserMenuProps {
   mobile?: boolean;
   session?: {
+    laravelToken?: string;
     user: {
       name: string;
       email: string;
       image?: string;
     };
   };
-  hoverColor?: string; // ✅ <-- adiciona isso
+  hoverColor?: string;
 }
 
-export function UserMenu({ mobile = false, session, hoverColor = "#0E00D0" }: UserMenuProps) {
+export function UserMenu({
+  mobile = false,
+  session,
+  hoverColor = "#0E00D0",
+}: UserMenuProps) {
   const pathname = usePathname();
   const [mounted, setMounted] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
+  const [gamificationStatus, setGamificationStatus] =
+    useState<UserStatus | null>(null);
+
+  const [userRoles, setUserRoles] = useState<UserRole[]>([]);
+  const [primaryRole, setPrimaryRole] = useState<UserRole | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const { theme, setTheme } = useTheme();
   const user = session?.user;
   const image = user?.image;
+
+  const userLevel = gamificationStatus?.level ?? null;
+  const userLevelTitle = gamificationStatus?.rank_title ?? null;
+  const levelBadge = userLevel ? `N${userLevel}` : "N1";
+
   useEffect(() => setMounted(true), []);
+
+  useEffect(() => {
+    async function loadGamificationStatus() {
+      if (!session?.laravelToken) return;
+
+      try {
+        const status = await getGamificationStatus(session.laravelToken);
+        setGamificationStatus(status);
+      } catch (error) {
+        console.error("Erro ao carregar gamificação:", error);
+        setGamificationStatus(null);
+      }
+    }
+
+    loadGamificationStatus();
+  }, [session?.laravelToken]);
+
+  useEffect(() => {
+    async function loadUserRoles() {
+      if (!session?.laravelToken) return;
+
+      try {
+        const response = await getMyRoles(session.laravelToken);
+
+        const roles = Array.isArray(response.roles) ? response.roles : [];
+
+        setUserRoles(roles);
+        setPrimaryRole(response.role ?? roles[0] ?? null);
+      } catch (error) {
+        console.error("Erro ao carregar cargos do usuário:", error);
+        setUserRoles([]);
+        setPrimaryRole(null);
+      }
+    }
+
+    loadUserRoles();
+  }, [session?.laravelToken]);
 
   // Fechar dropdown ao clicar fora
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
         setIsOpen(false);
       }
     }
@@ -41,17 +112,29 @@ export function UserMenu({ mobile = false, session, hoverColor = "#0E00D0" }: Us
   }, []);
 
   const handleThemeToggle = () => {
-    setTheme(theme === 'dark' ? 'light' : 'dark');
+    setTheme(theme === "dark" ? "light" : "dark");
   };
 
-  const isDark = theme === 'dark';
-  const themeIcon = isDark ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />;
-  const themeLabel = isDark ? 'Tema Escuro' : 'Tema Claro';
+  const isDark = theme === "dark";
+  const themeIcon = isDark ? (
+    <Moon className="w-4 h-4" />
+  ) : (
+    <Sun className="w-4 h-4" />
+  );
+  const themeLabel = isDark ? "Tema Escuro" : "Tema Claro";
 
-  const getInitials = (name: string) => name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
+  const getInitials = (name: string) =>
+    name
+      .split(" ")
+      .map((w) => w[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2);
 
   if (!mounted) {
-    return mobile ? null : <div className="w-12 h-12 lg:w-14 lg:h-14 rounded-full bg-gray-100 dark:bg-[#1F293C]"></div>;
+    return mobile ? null : (
+      <div className="w-12 h-12 lg:w-14 lg:h-14 rounded-full bg-gray-100 dark:bg-[#1F293C]"></div>
+    );
   }
 
   // === JSX MOBILE ===
@@ -63,13 +146,28 @@ export function UserMenu({ mobile = false, session, hoverColor = "#0E00D0" }: Us
           <div className="relative flex flex-col">
             <span className="inline-flex items-center justify-center rounded-full border-2 border-blue-600 dark:border-[#0E00D0] w-12 h-12">
               <span className="w-full h-full rounded-full bg-blue-600 dark:bg-[#0E00D0] flex items-center justify-center font-semibold text-white text-sm">
-                {session?.user?.name ? getInitials(session.user.name) : <User className="w-5 h-5" />}
+                {session?.user?.name ? (
+                  getInitials(session.user.name)
+                ) : (
+                  <User className="w-5 h-5" />
+                )}
               </span>
             </span>
-            <div className="absolute -bottom-1 self-center text-[10px] py-0.5 px-1 rounded-sm bg-blue-600 dark:bg-[#0E00D0] text-white">16</div>
+            <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 rounded-md bg-[#0E00D0] px-1.5 py-0.5 text-[10px] font-black leading-none text-white shadow-[0_0_10px_rgba(14,0,208,0.45)] ring-1 ring-white/25">
+              {levelBadge}
+            </div>
           </div>
           <div className="flex-1 min-w-0">
-            <span className="block truncate text-sm font-bold text-gray-900 dark:text-white">{session?.user?.name || "Usuário"}</span>
+            <span className="block truncate text-sm">
+              <AnimatedRoleName
+                name={session?.user?.name}
+                roles={userRoles}
+                role={primaryRole}
+                level={userLevel}
+                levelTitle={userLevelTitle}
+                nameClassName="text-sm"
+              />
+            </span>
             <span className="text-xs text-gray-500 dark:text-gray-400 flex items-center mt-1">
               <Mail className="w-3 h-3 mr-1 shrink-0" />
               <span className="truncate">{session?.user?.email || ""}</span>
@@ -83,9 +181,18 @@ export function UserMenu({ mobile = false, session, hoverColor = "#0E00D0" }: Us
             onClick={handleThemeToggle}
             className="flex cursor-pointer items-center justify-between w-full p-3 rounded-lg text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-[#1F293C] transition-all duration-200"
           >
-            <div className="cursor-pointer flex items-center space-x-3">{themeIcon}<span>{themeLabel}</span></div>
-            <div role="switch" aria-checked={isDark} className={`relative inline-flex h-[18px] w-[34px] shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${isDark ? 'bg-blue-600' : 'bg-gray-400'}`}>
-              <span className={`pointer-events-none block h-[14px] w-[14px] rounded-full bg-white shadow-lg transition duration-200 ease-in-out ${isDark ? 'translate-x-[16px]' : 'translate-x-0'}`} />
+            <div className="cursor-pointer flex items-center space-x-3">
+              {themeIcon}
+              <span>{themeLabel}</span>
+            </div>
+            <div
+              role="switch"
+              aria-checked={isDark}
+              className={`relative inline-flex h-[18px] w-[34px] shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${isDark ? "bg-blue-600" : "bg-gray-400"}`}
+            >
+              <span
+                className={`pointer-events-none block h-[14px] w-[14px] rounded-full bg-white shadow-lg transition duration-200 ease-in-out ${isDark ? "translate-x-[16px]" : "translate-x-0"}`}
+              />
             </div>
           </button>
 
@@ -102,7 +209,10 @@ export function UserMenu({ mobile = false, session, hoverColor = "#0E00D0" }: Us
               onClick={() => signOut()}
               className="flex items-center justify-between w-full p-3 rounded-lg text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-300 hover:bg-red-100 dark:hover:bg-[#2A1A2A] transition-all duration-200"
             >
-              <div className="flex items-center space-x-3"><LogOut className="w-5 h-5" /><span>Sair</span></div>
+              <div className="flex items-center space-x-3">
+                <LogOut className="w-5 h-5" />
+                <span>Sair</span>
+              </div>
               <LogOut className="w-4 h-4" />
             </button>
           </div>
@@ -111,7 +221,7 @@ export function UserMenu({ mobile = false, session, hoverColor = "#0E00D0" }: Us
     );
   }
 
-  const active = pathname.startsWith('/perfil');
+  const active = pathname.startsWith("/perfil");
 
   // === JSX DESKTOP ===
   return (
@@ -126,23 +236,22 @@ export function UserMenu({ mobile = false, session, hoverColor = "#0E00D0" }: Us
               src={image}
               alt={session?.user.name}
               className={`w-full h-full transition-all duration-300 rounded-full object-cover
-          ${active ? "ring-2 ring-blue-600 dark:ring-[#0E00D0]" : "ring-0"}`
-              }
+          ${active ? "ring-2 ring-blue-600 dark:ring-[#0E00D0]" : "ring-0"}`}
               referrerPolicy="no-referrer"
             />
           ) : (
             <CircleUserRound
               className={`w-full h-full transition-colors duration-300
-          ${active
-                  ? "text-blue-600 dark:text-[#0E00D0]"
-                  : "text-gray-700 dark:text-white group-hover:text-blue-600 dark:group-hover:text-[#0E00D0]"
-                }`}
+          ${
+            active
+              ? "text-blue-600 dark:text-[#0E00D0]"
+              : "text-gray-700 dark:text-white group-hover:text-blue-600 dark:group-hover:text-[#0E00D0]"
+          }`}
             />
           )}
           <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-blue-600 dark:bg-[#0E00D0] rounded-full border-2 border-gray-100 dark:border-[#1F293C]"></div>
         </div>
       </button>
-
 
       {isOpen && (
         <div className="absolute right-0 top-full mt-2 w-80 bg-white dark:bg-[#00091A] text-gray-900 dark:text-white border border-gray-300 dark:border-[#555555] shadow-2xl rounded-lg overflow-hidden z-50">
@@ -158,14 +267,29 @@ export function UserMenu({ mobile = false, session, hoverColor = "#0E00D0" }: Us
                   />
                 ) : (
                   <span className="w-full h-full rounded-full bg-blue-600 dark:bg-[#0E00D0] flex items-center justify-center font-semibold text-white text-sm">
-                    {session?.user?.name ? getInitials(session.user.name) : <User className="w-5 h-5" />}
+                    {session?.user?.name ? (
+                      getInitials(session.user.name)
+                    ) : (
+                      <User className="w-5 h-5" />
+                    )}
                   </span>
                 )}
               </span>
-              <div className="absolute -bottom-1 self-center text-[10px] py-0.5 px-1 rounded-sm bg-blue-600 dark:bg-[#0E00D0] text-white">16</div>
+              <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 rounded-md bg-[#0E00D0] px-1.5 py-0.5 text-[10px] font-black leading-none text-white shadow-[0_0_10px_rgba(14,0,208,0.45)] ring-1 ring-white/25">
+                {levelBadge}
+              </div>
             </div>
             <div className="flex-1 min-w-0">
-              <span className="block truncate text-sm font-bold text-gray-900 dark:text-white">{session?.user?.name || "Usuário"}</span>
+              <span className="block truncate text-sm">
+                <AnimatedRoleName
+                  name={session?.user?.name}
+                  roles={userRoles}
+                  role={primaryRole}
+                  level={userLevel}
+                  levelTitle={userLevelTitle}
+                  nameClassName="text-sm"
+                />
+              </span>
               <span className="text-xs text-gray-500 dark:text-gray-400 flex items-center mt-1">
                 <Mail className="w-3 h-3 mr-1 shrink-0" />
                 <span className="truncate">{session?.user?.email || ""}</span>
@@ -178,9 +302,18 @@ export function UserMenu({ mobile = false, session, hoverColor = "#0E00D0" }: Us
               onClick={handleThemeToggle}
               className="flex cursor-pointer items-center justify-between w-full px-3 py-2.5 text-sm rounded-md text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-[#1F293C] transition-all duration-200 mb-1"
             >
-              <div className="flex cursor-pointer items-center space-x-3">{themeIcon}<span>{themeLabel}</span></div>
-              <div role="switch" aria-checked={isDark} className={`relative inline-flex h-[18px] w-[34px] shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${isDark ? 'bg-blue-600' : 'bg-gray-400'}`}>
-                <span className={`pointer-events-none block h-[14px] w-[14px] rounded-full bg-white shadow-lg transition duration-200 ease-in-out ${isDark ? 'translate-x-[16px]' : 'translate-x-0'}`} />
+              <div className="flex cursor-pointer items-center space-x-3">
+                {themeIcon}
+                <span>{themeLabel}</span>
+              </div>
+              <div
+                role="switch"
+                aria-checked={isDark}
+                className={`relative inline-flex h-[18px] w-[34px] shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${isDark ? "bg-blue-600" : "bg-gray-400"}`}
+              >
+                <span
+                  className={`pointer-events-none block h-[14px] w-[14px] rounded-full bg-white shadow-lg transition duration-200 ease-in-out ${isDark ? "translate-x-[16px]" : "translate-x-0"}`}
+                />
               </div>
             </button>
 
@@ -198,7 +331,10 @@ export function UserMenu({ mobile = false, session, hoverColor = "#0E00D0" }: Us
               onClick={() => signOut()}
               className="flex items-center cursor-pointer justify-between w-full px-3 py-2.5 text-sm rounded-md text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-300 hover:bg-red-100 dark:hover:bg-[#2A1A2A] transition-all duration-200"
             >
-              <div className="flex items-center space-x-3"><LogOut className="w-4 h-4" /><span>Sair da conta</span></div>
+              <div className="flex items-center space-x-3">
+                <LogOut className="w-4 h-4" />
+                <span>Sair da conta</span>
+              </div>
               <LogOut className="w-4 h-4" />
             </button>
           </div>

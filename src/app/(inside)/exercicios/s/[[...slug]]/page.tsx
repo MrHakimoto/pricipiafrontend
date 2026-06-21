@@ -1,234 +1,575 @@
+// exercicios/s/[[...slug]]/page.tsx
 "use client";
 
-import { useEffect, useState } from "react";
-import { useParams, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { LoadingSpinner } from "@/components/ui/spinnerLoading";
+
 import { FilterPanel } from "@/components/Panel/PanelFilter";
-import { ModelQuestions } from "@/components/questions/ModelQuestions";
-import { getFilterOptionsByIds, getFilteredQuestions, getAssuntosByFrentes, getTopicosByAssuntos } from "@/lib/filtra";
 import { ExercisesHeader } from "@/components/questions/ExercisesHeader";
+import { ModelQuestions } from "@/components/questions/ModelQuestions";
 
- // faz a requisição pra essa   Route::post('/questoes/{questao}/responder-avulsa', [ResolucaoController::class, 'responderAvulsa']);
+import {
+  getAnosByProvas,
+  getAssuntosByFrentes,
+  getFilteredQuestions,
+  getFilterOptionsByIds,
+  getTopicosByAssuntos,
+} from "@/lib/filtra";
 
-
-export type FilterPanelProps = {
-  initialSelectedFronts?: any[];
-  initialSelectedExams?: any[];
-  initialSelectedSubjects?: any[];
-  initialSelectedTopics?: any[];
-  initialSelectedYears?: { id: number; nome: string }[];
-  initialWantsComments?: boolean;
-  initialQuestionStatus?: string;
-  initialCorrectStatus?: string;
-  subjectOptions?: any[];
-  topicOptions?: any[];
+type FilterOption = {
+  id: number | string;
+  nome: string;
 };
 
-type FilterOption = { id: number; nome: string };
-
-// Interface para os filtros do caminho (path)
-interface PathFilters {
+type PathFilters = {
   frente?: string[];
   prova?: string[];
   assunto?: string[];
   topico?: string[];
   ano?: string[];
-}
-
-// Interface para os filtros de consulta (query) - COM ASSINATURA DE ÍNDICE
-interface QueryFilters {
-  [key: string]: string | undefined;
-  com_comentarios?: string;
-  status?: string;
-  acerto?: string;
-}
-
-// Hook personalizado para gerenciar o estado da busca
-const useSearchResults = () => {
-  const params = useParams();
-  const searchParams = useSearchParams();
-  const { data: session, status } = useSession();
-
-  const [initialFilters, setInitialFilters] = useState<Partial<FilterPanelProps>>({});
-  const [questions, setQuestions] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  // Extrai filtros do caminho da URL
-  const extractPathFilters = (): PathFilters => {
-    const pathFilters: PathFilters = {};
-    const slug = Array.isArray(params.slug) ? params.slug : [];
-    
-    for (let i = 0; i < slug.length; i += 2) {
-      const key = slug[i];
-      const values = slug[i + 1]?.split(',') || [];
-      
-      if (key && ['frente', 'prova', 'assunto', 'topico', 'ano'].includes(key)) {
-        pathFilters[key as keyof PathFilters] = values;
-      }
-    }
-    
-    return pathFilters;
-  };
-
-  // Extrai filtros dos parâmetros de consulta
-  const extractQueryFilters = (): QueryFilters => {
-    return Object.fromEntries(searchParams.entries()) as QueryFilters;
-  };
-
-  // Processa anos a partir dos filtros do caminho
-  const processYears = (pathFilters: PathFilters) => {
-    const yearIds = pathFilters.ano || [];
-    return yearIds.map(id => ({
-      id: Number(id),
-      nome: String(id)
-    }));
-  };
-
-  // Busca dados iniciais
-  const fetchInitialData = async (token: string, pathFilters: PathFilters, queryFilters: QueryFilters) => {
-    try {
-      // Busca dados básicos em paralelo
-      const [fronts, exams, subjects, topics, fetchedQuestions] = await Promise.all([
-        getFilterOptionsByIds('frentes', pathFilters.frente, token),
-        getFilterOptionsByIds('provas', pathFilters.prova, token),
-        getFilterOptionsByIds('assuntos', pathFilters.assunto, token),
-        getFilterOptionsByIds('topicos', pathFilters.topico, token),
-        getFilteredQuestions({ ...pathFilters }, queryFilters as { [key: string]: string }, token),
-      ]);
-
-      // Busca opções dependentes em paralelo
-      const [subjectOptions, topicOptions] = await Promise.all([
-        getAssuntosByFrentes(pathFilters.frente?.join(','), token),
-        getTopicosByAssuntos(pathFilters.assunto?.join(','), token),
-      ]);
-
-      const initialSelectedYears = processYears(pathFilters);
-
-      return {
-        fronts,
-        exams,
-        subjects,
-        topics,
-        fetchedQuestions,
-        subjectOptions,
-        topicOptions,
-        initialSelectedYears,
-      };
-    } catch (err) {
-      throw new Error(`Falha ao carregar dados da busca: ${err instanceof Error ? err.message : 'Erro desconhecido'}`);
-    }
-  };
-
-  useEffect(() => {
-    const loadSearchResults = async () => {
-      // Aguarda autenticação e parâmetros estarem disponíveis
-      if (status === 'loading' || !params) return;
-      
-      // Verifica se está autenticado
-      if (status !== 'authenticated' || !session?.laravelToken) {
-        setError("Usuário não autenticado");
-        setIsLoading(false);
-        return;
-      }
-
-      try {
-        setIsLoading(true);
-        setError(null);
-
-        const token = session.laravelToken;
-        const pathFilters = extractPathFilters();
-        const queryFilters = extractQueryFilters();
-
-        const {
-          fronts,
-          exams,
-          subjects,
-          topics,
-          fetchedQuestions,
-          subjectOptions,
-          topicOptions,
-          initialSelectedYears,
-        } = await fetchInitialData(token, pathFilters, queryFilters);
-
-        // Atualiza estado com os dados obtidos
-        setInitialFilters({
-          initialSelectedFronts: fronts,
-          initialSelectedExams: exams,
-          initialSelectedSubjects: subjects,
-          initialSelectedTopics: topics,
-          initialSelectedYears,
-          initialWantsComments: queryFilters.com_comentarios === 'true',
-          initialQuestionStatus: queryFilters.status || 'all',
-          initialCorrectStatus: queryFilters.acerto || 'all',
-          subjectOptions,
-          topicOptions,
-        });
-
-        setQuestions(fetchedQuestions?.data || []);
-
-      } catch (err) {
-        console.error("Erro ao carregar resultados da busca:", err);
-        setError(err instanceof Error ? err.message : "Erro desconhecido ao carregar dados");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    loadSearchResults();
-  }, [session, status, params, searchParams]);
-
-  return {
-    initialFilters,
-    questions,
-    isLoading: isLoading || status === 'loading',
-    error,
-  };
 };
 
-// Componente de Loading
-const SearchResultsLoading = () => (
-  <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
-    <LoadingSpinner className="p-2 h-70 w-70" />
-  </div>
-);
+type QueryFilters = {
+  status?: string;
+  acerto?: string;
+  com_comentarios?: string;
+  page?: string;
+  per_page?: string;
+};
 
-// Componente de Erro
-const SearchResultsError = ({ error }: { error: string }) => (
-  <div className="min-h-screen bg-[#00091A] flex items-center justify-center">
-    <div className="text-center">
-      <h2 className="text-2xl font-bold text-red-500 mb-4">Erro</h2>
-      <p className="text-white">{error}</p>
-    </div>
-  </div>
-);
+type LaravelPaginatedResponse<T = any> = {
+  current_page: number;
+  data: T[];
+  first_page_url: string | null;
+  from: number | null;
+  last_page: number;
+  last_page_url: string | null;
+  links: Array<{
+    url: string | null;
+    label: string;
+    active: boolean;
+  }>;
+  next_page_url: string | null;
+  path: string;
+  per_page: number;
+  prev_page_url: string | null;
+  to: number | null;
+  total: number;
+};
 
-// Componente Principal
-export default function SearchResultsPage() {
-  const { initialFilters, questions, isLoading, error } = useSearchResults();
+const VALID_PATH_KEYS = new Set([
+  "frente",
+  "prova",
+  "assunto",
+  "topico",
+  "ano",
+]);
 
-  // Estados de loading e erro
-  if (isLoading) {
-    return <SearchResultsLoading />;
+function safeArray<T>(value: T[] | undefined | null): T[] {
+  return Array.isArray(value) ? value : [];
+}
+
+function normalizeSlugParam(slug: unknown): string[] {
+  if (!slug) return [];
+
+  if (Array.isArray(slug)) {
+    return slug
+      .filter((item): item is string => typeof item === "string")
+      .map((item) => item.trim())
+      .filter(Boolean);
   }
 
-  if (error) {
-    return <SearchResultsError error={error} />;
+  if (typeof slug === "string") {
+    return [slug.trim()].filter(Boolean);
   }
+
+  return [];
+}
+
+function safeDecode(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
+function parseExerciseSlug(slug: string[]): PathFilters {
+  const filters: PathFilters = {};
+
+  for (let i = 0; i < slug.length; i += 2) {
+    const key = slug[i];
+    const rawValue = slug[i + 1];
+
+    if (!key || !rawValue) continue;
+    if (!VALID_PATH_KEYS.has(key)) continue;
+
+    const values = rawValue
+      .split(",")
+      .map((value) => safeDecode(value.trim()))
+      .filter(Boolean);
+
+    if (values.length === 0) continue;
+
+    filters[key as keyof PathFilters] = values;
+  }
+
+  return filters;
+}
+
+function pathFiltersKey(filters: PathFilters): string {
+  return JSON.stringify({
+    frente: filters.frente ?? [],
+    prova: filters.prova ?? [],
+    assunto: filters.assunto ?? [],
+    topico: filters.topico ?? [],
+    ano: filters.ano ?? [],
+  });
+}
+
+function getClientToken(): string {
+  if (typeof window === "undefined") return "";
+
+  const possibleKeys = [
+    "laravelToken",
+    "laravel_token",
+    "token",
+    "auth_token",
+    "access_token",
+    "sanctum_token",
+    "bearer_token",
+  ];
+
+  for (const key of possibleKeys) {
+    const value = window.localStorage.getItem(key);
+
+    if (value) {
+      return value.replace(/^Bearer\s+/i, "").trim();
+    }
+  }
+
+  const cookieToken = document.cookie
+    .split("; ")
+    .find((row) => row.startsWith("token="))
+    ?.split("=")[1];
+
+  return cookieToken ? decodeURIComponent(cookieToken) : "";
+}
+
+function sanitizeStatus(value: string | null): string | undefined {
+  if (!value || value === "all") return undefined;
+
+  if (value === "solved" || value === "not-solved") {
+    return value;
+  }
+
+  return undefined;
+}
+
+function sanitizeAcerto(
+  value: string | null,
+  status?: string,
+): string | undefined {
+  if (!value || value === "all") return undefined;
+
+  if (status === "not-solved") return undefined;
+
+  if (value === "correct" || value === "incorrect") {
+    return value;
+  }
+
+  return undefined;
+}
+
+function yearOptionsFromIds(ids?: string[]): FilterOption[] {
+  return safeArray(ids)
+    .map((id) => Number(id))
+    .filter((id) => Number.isFinite(id) && id > 0)
+    .map((year) => ({
+      id: year,
+      nome: String(year),
+    }));
+}
+
+export default function FilteredExercisesPage() {
+  const params = useParams();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { data: session, status: sessionStatus } = useSession();
+
+  const sessionToken = useMemo(() => {
+    return (
+      (session as any)?.laravelToken ||
+      (session as any)?.accessToken ||
+      (session as any)?.user?.laravelToken ||
+      ""
+    );
+  }, [session]);
+
+  const token = useMemo(() => {
+    return String(sessionToken || getClientToken() || "")
+      .replace(/^Bearer\s+/i, "")
+      .trim();
+  }, [sessionToken]);
+
+  const [questionsResponse, setQuestionsResponse] =
+    useState<LaravelPaginatedResponse | null>(null);
+
+  const [isLoadingQuestions, setIsLoadingQuestions] = useState(true);
+  const [isHydratingFilters, setIsHydratingFilters] = useState(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const [initialSelectedFronts, setInitialSelectedFronts] = useState<
+    FilterOption[]
+  >([]);
+
+  const [initialSelectedExams, setInitialSelectedExams] = useState<
+    FilterOption[]
+  >([]);
+
+  const [initialSelectedSubjects, setInitialSelectedSubjects] = useState<
+    FilterOption[]
+  >([]);
+
+  const [initialSelectedTopics, setInitialSelectedTopics] = useState<
+    FilterOption[]
+  >([]);
+
+  const [initialSelectedYears, setInitialSelectedYears] = useState<
+    FilterOption[]
+  >([]);
+
+  const [subjectOptions, setSubjectOptions] = useState<FilterOption[]>([]);
+  const [topicOptions, setTopicOptions] = useState<FilterOption[]>([]);
+  const [yearOptions, setYearOptions] = useState<FilterOption[]>([]);
+
+  const slug = useMemo(() => {
+    return normalizeSlugParam(params?.slug);
+  }, [params?.slug]);
+
+  const pathFilters = useMemo(() => {
+    return parseExerciseSlug(slug);
+  }, [slug]);
+
+  const pathKey = useMemo(() => {
+    return pathFiltersKey(pathFilters);
+  }, [pathFilters]);
+
+  const queryFilters: QueryFilters = useMemo(() => {
+    const status = sanitizeStatus(searchParams.get("status"));
+    const acerto = sanitizeAcerto(searchParams.get("acerto"), status);
+
+    return {
+      status,
+      acerto,
+      com_comentarios: searchParams.get("com_comentarios") ?? undefined,
+      page: searchParams.get("page") ?? "1",
+      per_page: searchParams.get("per_page") ?? "20",
+    };
+  }, [searchParams]);
+
+  const queryKey = useMemo(() => {
+    return JSON.stringify(queryFilters);
+  }, [queryFilters]);
+
+  const wantsComments = queryFilters.com_comentarios === "true";
+
+  /**
+   * Hidrata as seleções vindas da URL.
+   *
+   * Exemplo:
+   * /exercicios/s/prova/ENEM/ano/2020
+   *
+   * Agora:
+   * - prova usa /filtros/provas-grupos
+   * - ano usa /filtros/anos-provas
+   */
+  const hydrateFilters = useCallback(async () => {
+    if (!token) {
+      setIsHydratingFilters(false);
+      return;
+    }
+
+    setIsHydratingFilters(true);
+
+    try {
+      const provaSiglas = pathFilters.prova?.join(",");
+
+      const [
+        hydratedFronts,
+        hydratedExams,
+        hydratedSubjects,
+        hydratedTopics,
+        availableYears,
+      ] = await Promise.all([
+        getFilterOptionsByIds("frentes", pathFilters.frente, token),
+        getFilterOptionsByIds("provas-grupos", pathFilters.prova, token),
+        getFilterOptionsByIds("assuntos", pathFilters.assunto, token),
+        getFilterOptionsByIds("topicos", pathFilters.topico, token),
+        getAnosByProvas(provaSiglas, token),
+      ]);
+
+      const requestedYearIds = new Set(
+        safeArray(pathFilters.ano).map((year) => String(Number(year))),
+      );
+
+      const availableYearOptions = safeArray(availableYears);
+
+      const hydratedYears =
+        requestedYearIds.size > 0
+          ? availableYearOptions.filter((year) =>
+              requestedYearIds.has(String(year.id)),
+            )
+          : [];
+
+      const finalHydratedYears =
+        availableYearOptions.length > 0
+          ? hydratedYears
+          : yearOptionsFromIds(pathFilters.ano);
+
+      setInitialSelectedFronts(safeArray(hydratedFronts));
+      setInitialSelectedExams(safeArray(hydratedExams));
+      setInitialSelectedSubjects(safeArray(hydratedSubjects));
+      setInitialSelectedTopics(safeArray(hydratedTopics));
+      setInitialSelectedYears(finalHydratedYears);
+
+      setYearOptions(
+        availableYearOptions.length > 0
+          ? availableYearOptions
+          : finalHydratedYears,
+      );
+
+      /**
+       * Carrega opções de assuntos/tópicos para não deixar o seletor vazio
+       * quando a página já abre a partir de uma URL filtrada.
+       */
+      if (pathFilters.frente?.length) {
+        const options = await getAssuntosByFrentes(
+          pathFilters.frente.join(","),
+          token,
+        );
+
+        setSubjectOptions(safeArray(options));
+      } else {
+        setSubjectOptions(safeArray(hydratedSubjects));
+      }
+
+      if (pathFilters.assunto?.length) {
+        const options = await getTopicosByAssuntos(
+          pathFilters.assunto.join(","),
+          token,
+        );
+
+        setTopicOptions(safeArray(options));
+      } else {
+        setTopicOptions(safeArray(hydratedTopics));
+      }
+    } catch (error) {
+      console.error("Erro ao hidratar filtros da URL:", error);
+
+      setInitialSelectedFronts([]);
+      setInitialSelectedExams([]);
+      setInitialSelectedSubjects([]);
+      setInitialSelectedTopics([]);
+      setInitialSelectedYears([]);
+      setSubjectOptions([]);
+      setTopicOptions([]);
+      setYearOptions([]);
+    } finally {
+      setIsHydratingFilters(false);
+    }
+  }, [pathKey, token]);
+
+  const fetchQuestions = useCallback(async () => {
+    if (sessionStatus === "loading") return;
+
+    if (!token) {
+      setQuestionsResponse(null);
+      setIsLoadingQuestions(false);
+      setErrorMessage(
+        "Não foi possível carregar as questões porque o token de autenticação não foi encontrado.",
+      );
+      return;
+    }
+
+    setIsLoadingQuestions(true);
+    setErrorMessage(null);
+
+    try {
+      const response = await getFilteredQuestions(
+        pathFilters,
+        queryFilters,
+        token,
+      );
+
+      setQuestionsResponse(response);
+    } catch (error) {
+      console.error("Erro ao carregar questões filtradas:", error);
+
+      setErrorMessage("Não foi possível carregar as questões filtradas.");
+      setQuestionsResponse(null);
+    } finally {
+      setIsLoadingQuestions(false);
+    }
+  }, [sessionStatus, token, pathKey, queryKey]);
+
+  useEffect(() => {
+    hydrateFilters();
+  }, [hydrateFilters]);
+
+  useEffect(() => {
+    fetchQuestions();
+  }, [fetchQuestions]);
+
+  function goToPage(page: number) {
+    const lastPage = questionsResponse?.last_page ?? 1;
+    const safePage = Math.min(Math.max(page, 1), lastPage);
+
+    const nextParams = new URLSearchParams(searchParams.toString());
+    nextParams.set("page", String(safePage));
+
+    router.push(`?${nextParams.toString()}`);
+  }
+
+  const questions = questionsResponse?.data ?? [];
+  const isLoading = isLoadingQuestions || isHydratingFilters;
 
   return (
-    <div className="min-h-screen bg-[#00091A]">
+    <div className="min-h-screen bg-white dark:bg-[#00091A]">
       <ExercisesHeader />
-      <div className="max-w-6xl mx-auto mt-5 px-4">
-        <FilterPanel {...initialFilters} />
-        <div className="mt-8">
-          <h2 className="text-2xl font-bold text-white mb-4">
-            Resultados da Busca ({questions.length} questão{questions.length !== 1 ? 'es' : ''} encontrada{questions.length !== 1 ? 's' : ''})
-          </h2>
-          <ModelQuestions questions={questions} />
-        </div>
-      </div>
+
+      <main className="mx-auto mt-5 max-w-6xl px-4 pb-12">
+        <FilterPanel
+          key={`${pathKey}-${queryKey}`}
+          initialSelectedFronts={initialSelectedFronts}
+          initialSelectedExams={initialSelectedExams}
+          initialSelectedSubjects={initialSelectedSubjects}
+          initialSelectedTopics={initialSelectedTopics}
+          initialSelectedYears={initialSelectedYears}
+          initialWantsComments={wantsComments}
+          initialQuestionStatus={queryFilters.status ?? "all"}
+          initialCorrectStatus={queryFilters.acerto ?? "all"}
+          subjectOptions={subjectOptions}
+          topicOptions={topicOptions}
+          yearOptions={yearOptions}
+        />
+
+        <section className="mt-6">
+          {isLoading ? (
+            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-white/[0.03]">
+              <div className="space-y-4">
+                <div className="h-5 w-56 animate-pulse rounded bg-slate-200 dark:bg-white/10" />
+                <div className="h-24 animate-pulse rounded-xl bg-slate-100 dark:bg-white/10" />
+                <div className="h-24 animate-pulse rounded-xl bg-slate-100 dark:bg-white/10" />
+                <div className="h-24 animate-pulse rounded-xl bg-slate-100 dark:bg-white/10" />
+              </div>
+            </div>
+          ) : errorMessage ? (
+            <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200">
+              {errorMessage}
+            </div>
+          ) : questions.length === 0 ? (
+            <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm dark:border-white/10 dark:bg-white/[0.03]">
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+                Nenhuma questão encontrada
+              </h2>
+
+              <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+                Altere os filtros selecionados para ampliar a busca.
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="mb-4 flex flex-col gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600 shadow-sm dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-300 sm:flex-row sm:items-center sm:justify-between">
+                <span>
+                  Exibindo{" "}
+                  <strong className="font-semibold text-slate-900 dark:text-white">
+                    {questionsResponse?.from ?? 0}
+                  </strong>{" "}
+                  até{" "}
+                  <strong className="font-semibold text-slate-900 dark:text-white">
+                    {questionsResponse?.to ?? 0}
+                  </strong>{" "}
+                  de{" "}
+                  <strong className="font-semibold text-slate-900 dark:text-white">
+                    {questionsResponse?.total ?? 0}
+                  </strong>{" "}
+                  questões.
+                </span>
+
+                <span>
+                  Página{" "}
+                  <strong className="font-semibold text-slate-900 dark:text-white">
+                    {questionsResponse?.current_page ?? 1}
+                  </strong>{" "}
+                  de{" "}
+                  <strong className="font-semibold text-slate-900 dark:text-white">
+                    {questionsResponse?.last_page ?? 1}
+                  </strong>
+                </span>
+              </div>
+
+              <ModelQuestions questions={questions} meta={questionsResponse} />
+
+              {questionsResponse && questionsResponse.last_page > 1 && (
+                <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
+                  <button
+                    type="button"
+                    disabled={questionsResponse.current_page <= 1}
+                    onClick={() => goToPage(questionsResponse.current_page - 1)}
+                    className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-200 dark:hover:bg-white/[0.06]"
+                  >
+                    Anterior
+                  </button>
+
+                  {questionsResponse.links
+                    .filter((link) => {
+                      const label = link.label.toLowerCase();
+
+                      return (
+                        !label.includes("previous") &&
+                        !label.includes("next") &&
+                        Number.isFinite(Number(link.label))
+                      );
+                    })
+                    .map((link, index) => {
+                      const page = Number(link.label);
+
+                      return (
+                        <button
+                          key={`${link.label}-${index}`}
+                          type="button"
+                          onClick={() => goToPage(page)}
+                          className={[
+                            "rounded-xl border px-4 py-2 text-sm font-medium shadow-sm transition",
+                            link.active
+                              ? "border-[#0e00d0] bg-[#0e00d0] text-white"
+                              : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-200 dark:hover:bg-white/[0.06]",
+                          ].join(" ")}
+                        >
+                          {link.label}
+                        </button>
+                      );
+                    })}
+
+                  <button
+                    type="button"
+                    disabled={
+                      questionsResponse.current_page >=
+                      questionsResponse.last_page
+                    }
+                    onClick={() => goToPage(questionsResponse.current_page + 1)}
+                    className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-200 dark:hover:bg-white/[0.06]"
+                  >
+                    Próxima
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </section>
+      </main>
     </div>
   );
 }

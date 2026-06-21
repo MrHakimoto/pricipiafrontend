@@ -20,7 +20,16 @@ export interface ForumReply {
   forum_thread_id: number;
   body: string;
   created_at: string;
-  author: Author; // O autor da resposta
+  updated_at?: string | null;
+
+  /**
+   * Campos usados pelo front para melhor resposta e curtidas.
+   */
+  is_solution?: boolean;
+  liked_by_me?: boolean;
+  likes_count?: number;
+
+  author: Author | null;
 }
 
 export type LinkableContent = {

@@ -12,157 +12,280 @@ import {
   type ForumThread,
   type ForumReply,
   type CreateThreadData,
-  createForumThread
+  createForumThread,
 } from "@/lib/forum/forum";
-import { X, MessageCircle, Send, Loader2, CheckCircle } from "lucide-react";
+import {
+  X,
+  MessageCircle,
+  Send,
+  Loader2,
+  CheckCircle,
+  AlertCircle,
+} from "lucide-react";
+import { AnimatedRoleName } from "@/components/user/AnimatedRoleName";
+import { processMarkdown } from "@/utils/markdownProcessor";
+import MarkdownEditor from "@/components/editor/MarkDownEditor";
 
 interface ModalDuvidaProps {
   isOpen: boolean;
   onClose: () => void;
   questaoId?: number;
   enunciado?: string;
-  threadId?: string; // Para quando for abrir uma thread existente
-  modo?: "nova" | "discussao"; // 'nova' para nova dúvida, 'discussao' para thread existente
+  threadId?: string;
+  modo?: "nova" | "discussao";
+}
+import { getLevelTitle } from "@/lib/gamification/levels";
+type NotificationType = "success" | "error" | "warning";
+
+type NotificationState = {
+  type: NotificationType;
+  message: string;
+} | null;
+
+function getAuthorRoles(author: any) {
+  if (!Array.isArray(author?.roles)) return [];
+
+  return [...author.roles].sort(
+    (a, b) => Number(b?.priority ?? 0) - Number(a?.priority ?? 0),
+  );
+}
+
+function getAuthorPrimaryRole(author: any) {
+  const roles = getAuthorRoles(author);
+  return author?.role ?? roles[0] ?? null;
+}
+
+function getAuthorLevel(author: any) {
+  return Number(author?.gamification?.current_level ?? 1);
+}
+
+function getAuthorLevelTitle(author: any) {
+  return (
+    author?.gamification?.level_title ??
+    getLevelTitle(author?.gamification?.current_level ?? 1)
+  );
+}
+
+function MarkdownPreview({
+  content,
+  className = "",
+  clamp = false,
+}: {
+  content: string;
+  className?: string;
+  clamp?: boolean;
+}) {
+  const [html, setHtml] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function run() {
+      try {
+        const processed = await processMarkdown(content ?? "");
+
+        if (!cancelled) {
+          setHtml(processed);
+        }
+      } catch (error) {
+        console.error("Erro ao processar markdown:", error);
+
+        if (!cancelled) {
+          setHtml(content ?? "");
+        }
+      }
+    }
+
+    run();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [content]);
+
+  return (
+    <div
+      className={[
+        "markdown-body wmde-markdown wmde-markdown-color break-words text-gray-700 dark:text-gray-300",
+        clamp ? "line-clamp-4" : "",
+        className,
+      ].join(" ")}
+      style={
+        {
+          "--color-canvas-default": "transparent",
+          "--color-fg-default": "currentColor",
+        } as React.CSSProperties
+      }
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
+  );
 }
 
 export const ModalDuvida: React.FC<ModalDuvidaProps> = ({
   isOpen,
   onClose,
   questaoId,
-  enunciado = "Este é o enunciado da questão...",
+  enunciado = "",
   threadId,
-  modo = "nova"
+  modo = "nova",
 }) => {
-  const { data: session, status } = useSession();
-  const [thread, setThread] = useState<ForumThread | null>(null);
-  const [loading, setLoading] = useState(true);
   const [mensagem, setMensagem] = useState("");
+  const [thread, setThread] = useState<ForumThread | null>(null);
+  const [loading, setLoading] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-  
-  const token = session?.laravelToken;
-  const user = session?.user;
+  const [notification, setNotification] = useState<NotificationState>(null);
+
+  const { data: session } = useSession();
+
+  const sessionAny = session as any;
+  const token = sessionAny?.laravelToken;
+  const user = sessionAny?.user;
 
   useEffect(() => {
-    if (isOpen) {
-      if (modo === "discussao" && threadId && token) {
-        carregarThread();
-      } else {
-        setLoading(false);
-      }
+    if (isOpen && modo === "discussao" && threadId && token) {
+      carregarThread();
     }
-  }, [isOpen, threadId, modo, token]);
+
+    if (isOpen && modo === "nova") {
+      setThread(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, modo, threadId, token]);
+
+  useEffect(() => {
+    if (!notification) return;
+
+    const timeout = window.setTimeout(() => {
+      setNotification(null);
+    }, 4200);
+
+    return () => window.clearTimeout(timeout);
+  }, [notification]);
+
+  const showNotification = (type: NotificationType, message: string) => {
+    setNotification({ type, message });
+  };
 
   const carregarThread = async () => {
     if (!token || !threadId) return;
-    
+
     setLoading(true);
+
     try {
-      const data = await getForumThreadDetails(token, threadId);
-      setThread(data);
+      const threadData = await getForumThreadDetails(token, threadId);
+      setThread(threadData);
     } catch (error) {
-      console.error('Erro ao carregar thread:', error);
+      console.error("Erro ao carregar discussão:", error);
+      showNotification("error", "Erro ao carregar discussão.");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleEnviarDuvida = async () => {
+  const handleCreateThread = async () => {
     if (!mensagem.trim() || !token || !questaoId || !user) {
-      alert("Preencha sua dúvida antes de enviar.");
+      showNotification("warning", "Preencha sua dúvida antes de enviar.");
       return;
     }
 
     setEnviando(true);
+
     try {
       const threadData: CreateThreadData = {
         title: `Dúvida na Questão #${questaoId}`,
-        body: mensagem,
-        linkable_type: 'Questao',
-        linkable_id: questaoId
+        body: mensagem.trim(),
+        linkable_type: "Questao",
+        linkable_id: questaoId,
       };
 
       const novaThread = await createForumThread(token, threadData);
-      
-      console.log("Dúvida enviada com sucesso!", { questaoId, mensagem });
+
       setMensagem("");
-      
-      // Mudar para modo de discussão com a nova thread
       setThread(novaThread);
-      
-      alert("Dúvida enviada com sucesso! Nossa equipe responderá em breve.");
+      showNotification("success", "Dúvida enviada com sucesso.");
     } catch (error) {
       console.error("Erro ao enviar dúvida:", error);
-      alert("Erro ao enviar dúvida. Tente novamente.");
+      showNotification("error", "Erro ao enviar dúvida. Tente novamente.");
     } finally {
       setEnviando(false);
     }
   };
 
-  const handlePostReply = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!mensagem.trim() || !token || !thread) return;
+  const handlePostReply = async (event: React.FormEvent) => {
+    event.preventDefault();
+
+    if (!mensagem.trim() || !token || !thread?.id) {
+      showNotification("warning", "Escreva uma resposta antes de publicar.");
+      return;
+    }
 
     setEnviando(true);
+
     try {
-      await postForumReply(token, thread.id, mensagem);
-      setMensagem('');
+      await postForumReply(token, String(thread.id), mensagem.trim());
+      setMensagem("");
       await carregarThread();
+      showNotification("success", "Resposta publicada com sucesso.");
     } catch (error) {
-      console.error('Erro ao postar resposta:', error);
+      console.error("Erro ao publicar resposta:", error);
+      showNotification("error", "Erro ao publicar resposta. Tente novamente.");
     } finally {
       setEnviando(false);
     }
   };
 
   const handleMarkBestReply = async (replyId: number) => {
-    if (!token || !thread) return;
-    
+    if (!token || !thread?.id) return;
+
     setActionLoading(`mark-${replyId}`);
+
     try {
-      await markBestReply(token, thread.id, replyId);
+      await markBestReply(token, String(thread.id), replyId);
       await carregarThread();
+      showNotification("success", "Melhor resposta marcada com sucesso.");
     } catch (error) {
-      console.error('Erro ao marcar melhor resposta:', error);
+      console.error("Erro ao marcar melhor resposta:", error);
+      showNotification("error", "Erro ao marcar melhor resposta.");
     } finally {
       setActionLoading(null);
     }
   };
 
   const handleReopenThread = async () => {
-    if (!token || !thread) return;
-    
-    setActionLoading('reopen');
+    if (!token || !thread?.id) return;
+
+    setActionLoading("reopen");
+
     try {
-      await reopenThread(token, thread.id);
+      await reopenThread(token, String(thread.id));
       await carregarThread();
+      showNotification("success", "Discussão reaberta com sucesso.");
     } catch (error) {
-      console.error('Erro ao reabrir thread:', error);
+      console.error("Erro ao reabrir discussão:", error);
+      showNotification("error", "Erro ao reabrir discussão.");
     } finally {
       setActionLoading(null);
     }
   };
 
-  const isAuthor = user?.id === thread?.author.id.toString();
+  const formatarData = (dataString?: string) => {
+    if (!dataString) return "";
 
-  const formatarData = (dataString: string) => {
-    return new Date(dataString).toLocaleDateString('pt-BR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+    return new Date(dataString).toLocaleDateString("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
     });
   };
 
-  // Resetar estado quando modal fechar
-  useEffect(() => {
-    if (!isOpen) {
-      setThread(null);
-      setMensagem("");
-      setLoading(true);
-    }
-  }, [isOpen]);
+  const isAuthor = Boolean(
+    user?.id && thread?.author?.id && Number(user.id) === Number(thread.author.id),
+  );
+
+  if (!isOpen) return null;
 
   return (
     <AnimatePresence>
@@ -171,90 +294,137 @@ export const ModalDuvida: React.FC<ModalDuvidaProps> = ({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 dark:bg-black/70"
+          onClick={onClose}
         >
+          <AnimatePresence>
+            {notification && (
+              <motion.div
+                initial={{ opacity: 0, y: -12, scale: 0.96 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -12, scale: 0.96 }}
+                transition={{ duration: 0.22 }}
+                className={[
+                  "fixed right-4 top-4 z-[60] flex max-w-sm items-start gap-3 rounded-xl border px-4 py-3 shadow-2xl backdrop-blur",
+                  notification.type === "success"
+                    ? "border-green-300 bg-green-50 text-green-700 dark:border-green-500/40 dark:bg-green-950/80 dark:text-green-100"
+                    : notification.type === "error"
+                      ? "border-red-300 bg-red-50 text-red-700 dark:border-red-500/40 dark:bg-red-950/80 dark:text-red-100"
+                      : "border-yellow-300 bg-yellow-50 text-yellow-700 dark:border-yellow-500/40 dark:bg-yellow-950/80 dark:text-yellow-100",
+                ].join(" ")}
+              >
+                <div className="mt-0.5 flex-shrink-0">
+                  {notification.type === "success" ? (
+                    <CheckCircle size={18} />
+                  ) : (
+                    <AlertCircle size={18} />
+                  )}
+                </div>
+
+                <p className="text-sm font-medium leading-relaxed">
+                  {notification.message}
+                </p>
+
+                <button
+                  type="button"
+                  onClick={() => setNotification(null)}
+                  className="ml-1 rounded-md p-1 opacity-70 transition hover:bg-slate-100 hover:opacity-100 dark:hover:bg-white/10"
+                  aria-label="Fechar notificação"
+                >
+                  <X size={14} />
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           <motion.div
             initial={{ opacity: 0, scale: 0.9, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: 20 }}
-            className="bg-[#00091A] rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden border border-gray-800"
+            className="max-h-[90vh] w-full max-w-4xl overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-gray-800 dark:bg-[#00091A]"
+            onClick={(event) => event.stopPropagation()}
           >
-            {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-800 bg-[#1B1F27]">
+            <div className="flex items-center justify-between border-b border-gray-200 bg-[#F8F8F8] px-6 py-4 dark:border-gray-800 dark:bg-[#1B1F27]">
               <div className="flex items-center gap-3">
                 <MessageCircle className="text-blue-500" size={24} />
+
                 <div>
-                  <h2 className="text-lg font-bold text-white">
-                    {modo === "nova" ? "Tire sua Dúvida" : "Discussão da Dúvida"}
+                  <h2 className="text-lg font-bold text-gray-950 dark:text-white">
+                    {modo === "nova"
+                      ? "Tire sua Dúvida"
+                      : "Discussão da Dúvida"}
                   </h2>
-                  <p className="text-gray-400 text-sm">
-                    {modo === "nova" 
-                      ? "Nossa equipe de especialistas vai te ajudar" 
-                      : `Questão #${questaoId}`
-                    }
+
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    {modo === "nova"
+                      ? "Nossa equipe de especialistas vai te ajudar"
+                      : `Questão #${questaoId}`}
                   </p>
                 </div>
               </div>
-              
+
               <button
+                type="button"
                 onClick={onClose}
-                className="text-gray-400 hover:text-white transition-colors p-2 hover:bg-gray-800 rounded-lg"
+                className="rounded-lg p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-950 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white"
               >
                 <X size={20} />
               </button>
             </div>
 
-            {/* Conteúdo */}
-            <div className="overflow-y-auto max-h-[calc(90vh-80px)]">
+            <div className="max-h-[calc(90vh-80px)] overflow-y-auto">
               {loading ? (
-                <div className="flex justify-center items-center py-12">
+                <div className="flex items-center justify-center py-12">
                   <Loader2 className="animate-spin text-blue-500" size={32} />
                 </div>
               ) : modo === "nova" || !thread ? (
-                // Modo Nova Dúvida
                 <div className="p-6">
-                  {/* Preview da Questão */}
-                  <div className="bg-[#131b2d] rounded-lg p-4 mb-6 border border-gray-700">
-                    <h4 className="text-white font-medium mb-2">Questão #{questaoId}</h4>
-                    <p className="text-gray-300 text-sm line-clamp-3">
-                      {enunciado.replace(/<[^>]*>/g, '').substring(0, 150)}...
-                    </p>
+                  <div className="mb-6 rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-[#131b2d]">
+                    <h4 className="mb-2 font-medium text-gray-950 dark:text-white">
+                      Questão #{questaoId}
+                    </h4>
+
+                    <MarkdownPreview
+                      content={enunciado}
+                      clamp
+                      className="text-sm"
+                    />
                   </div>
 
-                  {/* Formulário de Dúvida */}
                   <div className="space-y-4">
                     <div>
-                      <label className="block text-white text-sm font-medium mb-2">
+                      <label className="mb-2 block text-sm font-medium text-gray-950 dark:text-white">
                         Sua Dúvida *
                       </label>
-                      <textarea
-                        value={mensagem}
-                        onChange={(e) => setMensagem(e.target.value)}
-                        placeholder="Descreva sua dúvida em detalhes... O que você não entendeu? Em qual parte da resolução está com dificuldade?"
-                        rows={6}
-                        className="w-full px-4 py-3 rounded-lg border border-[#4A5260] bg-[#0F172A] text-white focus:outline-none focus:border-[#0E00D0] transition-colors resize-none"
-                        required
-                      />
+
+                      <div className="overflow-hidden rounded-lg border border-gray-300 bg-white dark:border-[#4A5260] dark:bg-[#0F172A]">
+                        <MarkdownEditor
+                          initialContent={mensagem}
+                          onChange={(content: string) =>
+                            setMensagem(content ?? "")
+                          }
+                        />
+                      </div>
                     </div>
 
-                    {/* Dicas */}
-                    <div className="bg-yellow-900/20 rounded-lg p-3 border border-yellow-700">
-                      <div className="flex items-center gap-2 text-yellow-300 text-sm font-medium mb-1">
+                    <div className="rounded-lg border border-yellow-300 bg-yellow-50 p-3 dark:border-yellow-700 dark:bg-yellow-900/20">
+                      <div className="mb-1 flex items-center gap-2 text-sm font-medium text-yellow-700 dark:text-yellow-300">
                         <span>💡</span>
                         Dicas para uma boa pergunta:
                       </div>
-                      <ul className="text-yellow-200 text-xs space-y-1">
+
+                      <ul className="space-y-1 text-xs text-yellow-800 dark:text-yellow-200">
                         <li>• Seja específico sobre o que não entendeu</li>
                         <li>• Mencione o passo onde tem dificuldade</li>
                         <li>• Compartilhe seu raciocínio atual</li>
                       </ul>
                     </div>
 
-                    {/* Botão Enviar */}
                     <button
-                      onClick={handleEnviarDuvida}
+                      type="button"
+                      onClick={handleCreateThread}
                       disabled={!mensagem.trim() || enviando}
-                      className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium py-3 px-4 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2"
+                      className="flex w-full items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-3 font-medium text-white transition-colors duration-200 hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-gray-400 dark:disabled:bg-gray-600"
                     >
                       {enviando ? (
                         <>
@@ -270,65 +440,85 @@ export const ModalDuvida: React.FC<ModalDuvidaProps> = ({
                     </button>
                   </div>
 
-                  {/* Informações Adicionais */}
-                  <div className="mt-6 text-center text-gray-400 text-xs">
+                  <div className="mt-6 text-center text-xs text-gray-500 dark:text-gray-400">
                     <p>⌛ Resposta em até 24 horas</p>
                     <p>Resposta por especialistas da matéria</p>
                   </div>
                 </div>
               ) : (
-                // Modo Discussão (Thread Existente)
-                <div className="p-6 space-y-6">
-                  {/* Tópico Principal */}
-                  <div className="border border-[#2F3541] rounded-xl p-6 bg-[#0F172A]">
-                    <div className="flex items-start gap-4 mb-4">
+                <div className="space-y-6 p-6">
+                  <div className="rounded-xl border border-gray-200 bg-gray-50 p-6 dark:border-[#2F3541] dark:bg-[#0F172A]">
+                    <div className="flex items-start gap-4">
                       <div className="flex-shrink-0">
-                        <div className="w-12 h-12 bg-[#1B1F27] rounded-full flex items-center justify-center border border-[#2F3541]">
-                          {thread.author.avatar ? (
+                        <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border border-gray-200 bg-white dark:border-[#2F3541] dark:bg-[#1B1F27]">
+                          {(thread as any).author?.avatar ? (
                             <img
-                              src={thread.author.avatar}
-                              alt={thread.author.name}
-                              className="w-10 h-10 rounded-full"
+                              src={(thread as any).author.avatar}
+                              alt={(thread as any).author.name}
+                              className="h-full w-full object-cover"
                             />
                           ) : (
-                            <span className="text-lg font-semibold text-gray-300">
-                              {thread.author.name.charAt(0).toUpperCase()}
+                            <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                              {((thread as any).author?.name ?? "U")
+                                .charAt(0)
+                                .toUpperCase()}
                             </span>
                           )}
                         </div>
                       </div>
-                      
-                      <div className="flex-1">
-                        <div className="flex flex-wrap items-center gap-3 mb-3">
-                          <h2 className="text-xl font-bold text-white">{thread.title}</h2>
-                          
+
+                      <div className="min-w-0 flex-1">
+                        <div className="mb-3 flex flex-wrap items-center gap-3">
+                          <h2 className="break-words text-xl font-bold text-gray-950 dark:text-white">
+                            {thread.title}
+                          </h2>
+
                           <div className="flex gap-2">
                             {thread.is_closed && (
-                              <span className="bg-green-500/20 text-green-300 px-3 py-1 rounded-full text-sm border border-green-500/30">
+                              <span className="rounded-full border border-green-300 bg-green-50 px-3 py-1 text-sm text-green-700 dark:border-green-500/30 dark:bg-green-500/20 dark:text-green-300">
                                 Resolvida
                               </span>
                             )}
+
                             {thread.best_reply_id && (
-                              <span className="bg-yellow-500/20 text-yellow-300 px-3 py-1 rounded-full text-sm border border-yellow-500/30">
+                              <span className="rounded-full border border-yellow-300 bg-yellow-50 px-3 py-1 text-sm text-yellow-700 dark:border-yellow-500/30 dark:bg-yellow-500/20 dark:text-yellow-300">
                                 Melhor resposta selecionada
                               </span>
                             )}
                           </div>
                         </div>
-                        
-                        <p className="text-gray-300 leading-relaxed whitespace-pre-wrap">
-                          {thread.body}
-                        </p>
-                        
-                        <div className="flex flex-wrap items-center gap-4 mt-4 text-sm text-gray-400">
-                          <span>Por {thread.author.name}</span>
+
+                        <MarkdownPreview
+                          content={thread.body}
+                          className="text-sm leading-relaxed"
+                        />
+
+                        <div className="mt-4 flex flex-wrap items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
+                          <span className="inline-flex items-center gap-1">
+                            Por{" "}
+                            <AnimatedRoleName
+                              name={(thread as any).author?.name ?? "Usuário"}
+                              roles={getAuthorRoles((thread as any).author)}
+                              role={getAuthorPrimaryRole(
+                                (thread as any).author,
+                              )}
+                              level={getAuthorLevel((thread as any).author)}
+                              levelTitle={getAuthorLevelTitle(
+                                (thread as any).author,
+                              )}
+                              nameClassName="text-sm"
+                            />
+                          </span>
+
                           <span>•</span>
+
                           <span>{formatarData(thread.created_at)}</span>
-                          
-                          {thread.linkable_type && (
+
+                          {thread.linkable_id && (
                             <>
                               <span>•</span>
-                              <span className="bg-[#1B1F27] px-3 py-1 rounded-lg border border-[#2F3541]">
+
+                              <span className="rounded-lg border border-gray-200 bg-white px-3 py-1 dark:border-[#2F3541] dark:bg-[#1B1F27]">
                                 Questão #{thread.linkable_id}
                               </span>
                             </>
@@ -337,128 +527,164 @@ export const ModalDuvida: React.FC<ModalDuvidaProps> = ({
                       </div>
                     </div>
 
-                    {/* Ações do Autor */}
                     {isAuthor && thread.is_closed && (
-                      <div className="flex justify-end pt-4 border-t border-[#2F3541]">
+                      <div className="mt-4 flex justify-end border-t border-gray-200 pt-4 dark:border-[#2F3541]">
                         <button
+                          type="button"
                           onClick={handleReopenThread}
-                          disabled={actionLoading === 'reopen'}
-                          className="px-4 py-2 rounded-lg bg-yellow-500/20 text-yellow-300 border border-yellow-500/30 hover:bg-yellow-500/30 disabled:opacity-50 transition-colors text-sm"
+                          disabled={actionLoading === "reopen"}
+                          className="rounded-lg border border-yellow-300 bg-yellow-50 px-4 py-2 text-sm text-yellow-700 transition-colors hover:bg-yellow-100 disabled:opacity-50 dark:border-yellow-500/30 dark:bg-yellow-500/20 dark:text-yellow-300 dark:hover:bg-yellow-500/30"
                         >
-                          {actionLoading === 'reopen' ? 'Reabrindo...' : 'Reabrir Discussão'}
+                          {actionLoading === "reopen"
+                            ? "Reabrindo..."
+                            : "Reabrir Discussão"}
                         </button>
                       </div>
                     )}
                   </div>
 
-                  {/* Respostas */}
                   <div className="space-y-4">
-                    <h3 className="text-lg font-semibold border-b border-[#2F3541] pb-3">
+                    <h3 className="border-b border-gray-200 pb-3 text-lg font-semibold text-gray-950 dark:border-[#2F3541] dark:text-white">
                       Respostas ({thread.replies?.length || 0})
                     </h3>
 
                     <AnimatePresence>
-                      {thread.replies?.map((reply: ForumReply, index: number) => (
-                        <motion.div
-                          key={reply.id}
-                          initial={{ opacity: 0, x: -20 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ duration: 0.4, delay: index * 0.1 }}
-                          className={`border rounded-xl p-6 ${
-                            reply.id === thread.best_reply_id
-                              ? 'border-yellow-500/50 bg-yellow-500/5'
-                              : 'border-[#2F3541] bg-[#0F172A]'
-                          }`}
-                        >
-                          <div className="flex items-start gap-4">
-                            <div className="flex-shrink-0">
-                              <div className={`w-10 h-10 rounded-full flex items-center justify-center border ${
+                      {thread.replies?.map(
+                        (reply: ForumReply, index: number) => {
+                          const replyAny = reply as any;
+
+                          return (
+                            <motion.div
+                              key={reply.id}
+                              initial={{ opacity: 0, x: -20 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              transition={{ duration: 0.4, delay: index * 0.1 }}
+                              className={`rounded-xl border p-6 ${
                                 reply.id === thread.best_reply_id
-                                  ? 'border-yellow-500 bg-yellow-500/20'
-                                  : 'border-[#2F3541] bg-[#1B1F27]'
-                              }`}>
-                                {reply.author.avatar ? (
-                                  <img
-                                    src={reply.author.avatar}
-                                    alt={reply.author.name}
-                                    className="w-8 h-8 rounded-full"
-                                  />
-                                ) : (
-                                  <span className={`text-sm font-semibold ${
-                                    reply.id === thread.best_reply_id ? 'text-yellow-300' : 'text-gray-300'
-                                  }`}>
-                                    {reply.author.name.charAt(0).toUpperCase()}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                            
-                            <div className="flex-1">
-                              <div className="flex flex-wrap items-center gap-2 mb-3">
-                                <h4 className="font-semibold text-white">{reply.author.name}</h4>
-                                
-                                {reply.id === thread.best_reply_id && (
-                                  <span className="bg-yellow-500/20 text-yellow-300 px-2 py-1 rounded text-xs border border-yellow-500/30 flex items-center gap-1">
-                                    <CheckCircle size={12} />
-                                    Melhor Resposta
-                                  </span>
-                                )}
-                                
-                                <span className="text-sm text-gray-400">
-                                  {formatarData(reply.created_at)}
-                                </span>
-                              </div>
-                              
-                              <p className="text-gray-300 leading-relaxed whitespace-pre-wrap">
-                                {reply.body}
-                              </p>
-                              
-                              {/* Botão Marcar como Melhor Resposta */}
-                              {isAuthor && !thread.is_closed && reply.id !== thread.best_reply_id && (
-                                <div className="flex justify-end mt-4">
-                                  <button
-                                    onClick={() => handleMarkBestReply(reply.id)}
-                                    disabled={actionLoading === `mark-${reply.id}`}
-                                    className="px-4 py-2 rounded-lg bg-green-500/20 text-green-300 border border-green-500/30 hover:bg-green-500/30 disabled:opacity-50 transition-colors text-sm"
+                                  ? "border-yellow-500/50 bg-yellow-50 dark:bg-yellow-500/5"
+                                  : "border-gray-200 bg-white dark:border-[#2F3541] dark:bg-[#0F172A]"
+                              }`}
+                            >
+                              <div className="flex items-start gap-4">
+                                <div className="flex-shrink-0">
+                                  <div
+                                    className={`flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border ${
+                                      reply.id === thread.best_reply_id
+                                        ? "border-yellow-500 bg-yellow-50 dark:bg-yellow-500/20"
+                                        : "border-gray-200 bg-gray-50 dark:border-[#2F3541] dark:bg-[#1B1F27]"
+                                    }`}
                                   >
-                                    {actionLoading === `mark-${reply.id}` ? 'Marcando...' : 'Marcar como Melhor Resposta'}
-                                  </button>
+                                    {replyAny.author?.avatar ? (
+                                      <img
+                                        src={replyAny.author.avatar}
+                                        alt={replyAny.author.name}
+                                        className="h-full w-full object-cover"
+                                      />
+                                    ) : (
+                                      <span
+                                        className={`text-sm font-semibold ${
+                                          reply.id === thread.best_reply_id
+                                            ? "text-yellow-700 dark:text-yellow-300"
+                                            : "text-gray-700 dark:text-gray-300"
+                                        }`}
+                                      >
+                                        {(replyAny.author?.name ?? "U")
+                                          .charAt(0)
+                                          .toUpperCase()}
+                                      </span>
+                                    )}
+                                  </div>
                                 </div>
-                              )}
-                            </div>
-                          </div>
-                        </motion.div>
-                      ))}
+
+                                <div className="min-w-0 flex-1">
+                                  <div className="mb-3 flex flex-wrap items-center gap-2">
+                                    <AnimatedRoleName
+                                      name={replyAny.author?.name ?? "Usuário"}
+                                      roles={getAuthorRoles(replyAny.author)}
+                                      role={getAuthorPrimaryRole(
+                                        replyAny.author,
+                                      )}
+                                      level={getAuthorLevel(replyAny.author)}
+                                      levelTitle={getAuthorLevelTitle(
+                                        replyAny.author,
+                                      )}
+                                      nameClassName="text-sm"
+                                    />
+
+                                    <span className="text-sm text-gray-600 dark:text-gray-400">
+                                      • {formatarData(reply.created_at)}
+                                    </span>
+
+                                    {reply.id === thread.best_reply_id && (
+                                      <span className="flex items-center gap-1 rounded border border-yellow-300 bg-yellow-50 px-2 py-1 text-xs text-yellow-700 dark:border-yellow-500/30 dark:bg-yellow-500/20 dark:text-yellow-300">
+                                        <CheckCircle size={12} />
+                                        Melhor resposta
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  <MarkdownPreview
+                                    content={reply.body}
+                                    className="text-sm leading-relaxed"
+                                  />
+
+                                  {isAuthor &&
+                                    !thread.is_closed &&
+                                    reply.id !== thread.best_reply_id && (
+                                      <div className="mt-4 flex justify-end">
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            handleMarkBestReply(reply.id)
+                                          }
+                                          disabled={
+                                            actionLoading === `mark-${reply.id}`
+                                          }
+                                          className="rounded-lg border border-green-300 bg-green-50 px-4 py-2 text-sm text-green-700 transition-colors hover:bg-green-100 disabled:opacity-50 dark:border-green-500/30 dark:bg-green-500/20 dark:text-green-300 dark:hover:bg-green-500/30"
+                                        >
+                                          {actionLoading === `mark-${reply.id}`
+                                            ? "Marcando..."
+                                            : "Marcar como Melhor Resposta"}
+                                        </button>
+                                      </div>
+                                    )}
+                                </div>
+                              </div>
+                            </motion.div>
+                          );
+                        },
+                      )}
                     </AnimatePresence>
                   </div>
 
-                  {/* Formulário de Resposta */}
                   {!thread.is_closed && (
                     <motion.div
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.4, delay: 0.3 }}
-                      className="border border-[#2F3541] rounded-xl p-6 bg-[#0F172A]"
+                      className="rounded-xl border border-gray-200 bg-gray-50 p-6 dark:border-[#2F3541] dark:bg-[#0F172A]"
                     >
-                      <h3 className="text-lg font-semibold mb-4">Sua Resposta</h3>
-                      
+                      <h3 className="mb-4 text-lg font-semibold text-gray-950 dark:text-white">
+                        Sua Resposta
+                      </h3>
+
                       <form onSubmit={handlePostReply} className="space-y-4">
-                        <textarea
-                          value={mensagem}
-                          onChange={(e) => setMensagem(e.target.value)}
-                          placeholder="Compartilhe sua solução ou insight sobre esta dúvida..."
-                          rows={4}
-                          className="w-full px-4 py-3 rounded-lg border border-[#4A5260] bg-[#00091A] text-white focus:outline-none focus:border-[#0E00D0] transition-colors resize-none"
-                          required
-                        />
-                        
+                        <div className="overflow-hidden rounded-lg border border-gray-300 bg-white dark:border-[#4A5260] dark:bg-[#00091A]">
+                          <MarkdownEditor
+                            initialContent={mensagem}
+                            onChange={(content: string) =>
+                              setMensagem(content ?? "")
+                            }
+                          />
+                        </div>
+
                         <div className="flex justify-end">
                           <button
                             type="submit"
                             disabled={enviando || !mensagem.trim()}
-                            className="px-6 py-3 rounded-lg bg-[#0E00D0] hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 text-white"
+                            className="rounded-lg bg-[#0E00D0] px-6 py-3 text-white transition-all duration-200 hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
                           >
-                            {enviando ? 'Publicando...' : 'Publicar Resposta'}
+                            {enviando ? "Publicando..." : "Publicar Resposta"}
                           </button>
                         </div>
                       </form>
@@ -466,10 +692,14 @@ export const ModalDuvida: React.FC<ModalDuvidaProps> = ({
                   )}
 
                   {thread.is_closed && (
-                    <div className="text-center py-8 text-gray-400">
-                      <CheckCircle className="w-16 h-16 mx-auto mb-4 text-green-500" />
-                      <h3 className="text-lg font-semibold text-green-400 mb-2">Dúvida Resolvida</h3>
-                      <p>Esta discussão foi marcada como resolvida pelo autor.</p>
+                    <div className="py-8 text-center text-gray-500 dark:text-gray-400">
+                      <CheckCircle className="mx-auto mb-4 h-16 w-16 text-green-600 dark:text-green-500" />
+                      <h3 className="mb-2 text-lg font-semibold text-green-700 dark:text-green-400">
+                        Dúvida Resolvida
+                      </h3>
+                      <p>
+                        Esta discussão foi marcada como resolvida pelo autor.
+                      </p>
                     </div>
                   )}
                 </div>

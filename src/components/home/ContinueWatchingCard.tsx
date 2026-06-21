@@ -1,81 +1,134 @@
-// src/components/home/ContinueWatchingCard.tsx
-'use client';
+// components/home/ContinueWatchingCard.tsx
+"use client";
 
-import { useContinueWatching, type ContinueWatchingData } from './ContinueWatching';
-import { motion } from 'framer-motion';
-import { Play, Clock } from 'lucide-react';
+import { useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import { Play, Clock, PlayCircle } from "lucide-react";
+import { getContinueWatching } from "@/lib/course/videoProgress";
 
-interface ContinueWatchingCardProps {
-  data?: ContinueWatchingData | null;
+type ContinueWatchingData = {
+  content_id: number;
+  content_title: string;
+  module_id: number;
+  module_name: string;
+  course_name?: string | null;
+  last_watched_seconds: number;
+  duration_seconds: number;
+  progress_percent: number;
+};
+
+function slugify(str: string) {
+  return str
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9\s-]/g, "")
+    .trim()
+    .replace(/\s+/g, "-");
 }
 
-export default function ContinueWatchingCard({ data }: ContinueWatchingCardProps) {
-  const { data: hookData, loading, error } = useContinueWatching();
-  
-  // Usa os dados passados por prop ou do hook
-  const continueData = data || hookData;
+function formatTime(totalSeconds: number) {
+  const seconds = Math.max(0, Math.floor(totalSeconds || 0));
+  const minutes = Math.floor(seconds / 60);
+  const rest = seconds % 60;
 
-  if (loading) {
-    return (
-      <div className="bg-gray-800 rounded-lg p-6 animate-pulse">
-        <div className="h-6 bg-gray-700 rounded w-1/3 mb-4"></div>
-        <div className="h-4 bg-gray-700 rounded w-full mb-2"></div>
-        <div className="h-4 bg-gray-700 rounded w-2/3"></div>
-      </div>
-    );
+  return `${minutes.toString().padStart(2, "0")}:${rest
+    .toString()
+    .padStart(2, "0")}`;
+}
+
+export default function ContinueWatchingCard() {
+  const router = useRouter();
+  const { data: session, status } = useSession();
+
+  const [item, setItem] = useState<ContinueWatchingData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadContinueWatching() {
+      if (status !== "authenticated" || !session?.laravelToken) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const response = await getContinueWatching(session.laravelToken);
+        setItem(response?.data ?? null);
+      } catch (error) {
+        console.error("Erro ao buscar continuar assistindo:", error);
+        setItem(null);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    if (status !== "loading") {
+      loadContinueWatching();
+    }
+  }, [status, session?.laravelToken]);
+
+  if (loading || !item) {
+    return null;
   }
 
-  if (error || !continueData) {
-    return null; // Não mostra nada se não houver dados
-  }
+  const moduleSlug = slugify(item.module_name);
+  const contentSlug = slugify(item.content_title);
+  const progress = Math.min(100, Math.max(0, item.progress_percent || 0));
 
-  const { aula, progress_percentage, last_watched_timestamp } = continueData;
+  const url = `/modulos/${item.module_id}/${moduleSlug}/${item.content_id}/${contentSlug}`;
 
-  const formatTime = (seconds: number) => {
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
-  };
+return (
+  <button
+    type="button"
+    onClick={() => router.push(url)}
+    className="group w-full rounded-2xl border border-black/10 bg-white px-5 py-4 text-left shadow-sm transition hover:border-[#0E00D0]/40 hover:shadow-md dark:border-white/10 dark:bg-[#020817]"
+  >
+    <div className="flex items-center gap-4">
+      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#0E00D0] text-white transition group-hover:scale-105">
+        <PlayCircle size={25} />
+      </div>
 
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="flex-1 bg-gray-800 rounded-lg p-6 border border-gray-700 hover:border-gray-600 transition-colors cursor-pointer"
-      onClick={() => {
-        // Navegar para a aula ou reproduzir vídeo
-        console.log('Continuar aula:', aula.id);
-      }}
-    >
-      <h2 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
-        <Play size={20} className="text-blue-400" />
-        Continuar Assistindo
-      </h2>
-      
-      <div className="space-y-3">
-        <div>
-          <h3 className="text-white font-medium text-lg">{aula.title}</h3>
-          <p className="text-gray-400 text-sm">{aula.module.name}</p>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-[11px] font-bold uppercase tracking-wide text-[#0E00D0]">
+            Continuar assistindo
+          </p>
+
+          <span className="shrink-0 text-xs text-gray-500 dark:text-gray-400">
+            {formatTime(item.last_watched_seconds)}
+          </span>
         </div>
-        
-        <div className="flex items-center gap-2 text-sm text-gray-400">
-          <Clock size={16} />
-          <span>Continuar de {formatTime(last_watched_timestamp)}</span>
-        </div>
-        
-        {/* Barra de progresso */}
-        <div className="w-full bg-gray-700 rounded-full h-2">
-          <div 
-            className="bg-blue-500 h-2 rounded-full transition-all duration-300"
-            style={{ width: `${progress_percentage}%` }}
-          />
-        </div>
-        
-        <div className="flex justify-between text-xs text-gray-400">
-          <span>{progress_percentage}% concluído</span>
-          <span>{formatTime(last_watched_timestamp)} / {formatTime(aula.duration)}</span>
+
+        <h3 className="mt-1 line-clamp-1 text-base font-bold text-gray-950 dark:text-white">
+          {item.content_title}
+        </h3>
+
+        <p className="mt-1 line-clamp-1 text-sm text-gray-500 dark:text-gray-400">
+          {item.course_name ? `${item.course_name} • ` : ""}
+          {item.module_name}
+        </p>
+
+        <div className="mt-3">
+          <div className="mb-1 flex items-center justify-between text-[11px] text-gray-500 dark:text-gray-400">
+            <span>Progresso</span>
+            <span>{Math.round(item.progress_percent || 0)}%</span>
+          </div>
+
+          <div className="h-1.5 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-800">
+            <div
+              className="h-full rounded-full bg-[#0E00D0] transition-all"
+              style={{
+                width: `${Math.min(
+                  100,
+                  Math.max(0, item.progress_percent || 0)
+                )}%`,
+              }}
+            />
+          </div>
         </div>
       </div>
-    </motion.div>
-  );
+    </div>
+  </button>
+);
 }

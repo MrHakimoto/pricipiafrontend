@@ -1,390 +1,694 @@
 // components/home/metricas/MetricsSection.tsx
-'use client'
+"use client";
 
-import { useState, useEffect } from 'react'
-import { motion } from 'framer-motion'
-import { Target, LayoutList, Folders, Calendar, CircleQuestionMark, SquareCheckBig, SquareX, ArrowRight } from 'lucide-react'
-import type { QuestoesStats, EvolucaoSemanal, AssuntoStats } from '@/lib/dashboard/homeStats'
+import { useMemo, useState } from "react";
+import { motion } from "framer-motion";
+import {
+  ArrowRight,
+  Calendar,
+  Folders,
+  LayoutList,
+  SquareCheckBig,
+  SquareX,
+  Target,
+  type LucideIcon,
+} from "lucide-react";
+import type {
+  AssuntoStats,
+  EvolucaoSemanal,
+  QuestoesStats,
+} from "@/lib/dashboard/homeStats";
 
 interface MetricsSectionProps {
-  dados: QuestoesStats
+  dados: QuestoesStats;
 }
 
-type TabType = 'assuntos' | 'topicos' | 'semana'
+type TabType = "assuntos" | "topicos" | "semana";
+
+type SemanaRender = EvolucaoSemanal & {
+  inicio: Date;
+  fim: Date;
+  isReal: boolean;
+};
+
+const RADIUS = 28.5;
+const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
+const MAX_SEMANAS_RENDERIZADAS = 80;
+
+function formatarData(data: Date): string {
+  return `${String(data.getDate()).padStart(2, "0")}/${String(
+    data.getMonth() + 1,
+  ).padStart(2, "0")}`;
+}
+
+function normalizarPeriodo(periodo: string): string {
+  return periodo
+    .trim()
+    .replace(/\s+/g, " ")
+    .replace(/\s*-\s*/g, " - ");
+}
+
+function getInicioSemanaDomingo(data: Date): Date {
+  const novaData = new Date(data);
+  const diaSemana = novaData.getDay();
+
+  novaData.setDate(novaData.getDate() - diaSemana);
+  novaData.setHours(0, 0, 0, 0);
+
+  return novaData;
+}
+
+function parseDiaMes(dataStr: string, ano: number): Date {
+  const [dia, mes] = dataStr.split("/").map(Number);
+  return new Date(ano, mes - 1, dia, 0, 0, 0, 0);
+}
+
+function inferirAnoInicialPeloMes(mes: number, referencia: Date): number {
+  const mesReferencia = referencia.getMonth() + 1;
+
+  // Se estamos, por exemplo, em junho/2026 e aparece dezembro,
+  // muito provavelmente é dezembro/2025.
+  if (mes > mesReferencia + 1) {
+    return referencia.getFullYear() - 1;
+  }
+
+  return referencia.getFullYear();
+}
+
+function parsePeriodo(periodo: string, referencia = new Date()) {
+  const periodoNormalizado = normalizarPeriodo(periodo);
+  const [inicioStr, fimStr] = periodoNormalizado.split(" - ");
+
+  if (!inicioStr || !fimStr) {
+    return null;
+  }
+
+  const [, mesInicio] = inicioStr.split("/").map(Number);
+  const [, mesFim] = fimStr.split("/").map(Number);
+
+  let anoInicio = inferirAnoInicialPeloMes(mesInicio, referencia);
+  let anoFim = anoInicio;
+
+  if (mesFim < mesInicio) {
+    anoFim += 1;
+  }
+
+  const inicio = parseDiaMes(inicioStr, anoInicio);
+  const fim = parseDiaMes(fimStr, anoFim);
+
+  if (Number.isNaN(inicio.getTime()) || Number.isNaN(fim.getTime())) {
+    return null;
+  }
+
+  return {
+    periodo: `${formatarData(inicio)} - ${formatarData(fim)}`,
+    inicio,
+    fim,
+  };
+}
+
+function getDiaSemana(data: Date): string {
+  const dias = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
+  return dias[data.getDay()];
+}
+
+function plural(value: number, singular: string, pluralText: string) {
+  return value === 1 ? singular : pluralText;
+}
+
+function getPercent(part: number, total: number) {
+  if (!total) return 0;
+  return Math.round((part / total) * 100);
+}
+
+function getDashoffset(part: number, total: number) {
+  if (!total) return CIRCUMFERENCE;
+  return CIRCUMFERENCE - (part / total) * CIRCUMFERENCE;
+}
+
+function clampColor(value: number) {
+  return Math.max(0, Math.min(255, value));
+}
+
+function gerarCorAssunto(index: number) {
+  const g1 = clampColor(100 + index * 20);
+  const b1 = clampColor(50 + index * 10);
+
+  const g2 = clampColor(150 + index * 10);
+  const b2 = clampColor(100 + index * 5);
+
+  const g3 = clampColor(50 + index * 10);
+  const b3 = clampColor(20 + index * 5);
+
+  return {
+    borderColor: `rgb(255, ${g1}, ${b1})`,
+    background: `radial-gradient(circle, rgba(255, ${g2}, ${b2}, 0.3) 0%, rgba(255, ${g1}, ${b1}, 1) 50%, rgba(255, ${g3}, ${b3}, 0.8) 100%)`,
+  };
+}
+
+function MiniSplitBar({
+  acertos,
+  erros,
+  total,
+  empty = false,
+}: {
+  acertos: number;
+  erros: number;
+  total: number;
+  empty?: boolean;
+}) {
+  const percentAcertos = total > 0 ? (acertos / total) * 100 : 0;
+  const percentErros = total > 0 ? (erros / total) * 100 : 0;
+
+  return (
+    <div className="relative mt-1 flex h-[5px] w-[90px] flex-row justify-between overflow-hidden rounded-[1.5px] bg-gray-200 dark:bg-gray-700">
+      {empty ? (
+        <div
+          className="ml-auto h-full rounded-[1.5px] bg-gray-300 transition-[width] dark:bg-gray-600"
+          style={{ width: "100%" }}
+        />
+      ) : (
+        <>
+          <div
+            className="ml-auto h-full rounded-[1.5px] bg-green-500 transition-[width]"
+            style={{ width: `${percentAcertos}%` }}
+          />
+          <div className="min-w-[3px] flex-1" />
+          <div
+            className="ml-auto h-full rounded-[1.5px] bg-red-500 transition-[width]"
+            style={{ width: `${percentErros}%` }}
+          />
+        </>
+      )}
+    </div>
+  );
+}
+
+function EmptyContent({
+  icon: Icon,
+  title,
+  subtitle,
+}: {
+  icon: LucideIcon;
+  title: string;
+  subtitle: string;
+}) {
+  return (
+    <div className="flex h-full flex-col items-center justify-center py-12 text-center">
+      <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800">
+        <Icon className="h-8 w-8 text-gray-400 dark:text-gray-500" />
+      </div>
+
+      <p className="text-sm text-gray-500 dark:text-gray-400">{title}</p>
+      <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
+        {subtitle}
+      </p>
+    </div>
+  );
+}
+
+function gerarSemanasFallback(): SemanaRender[] {
+  const hoje = new Date();
+  const inicioSemanaAtual = getInicioSemanaDomingo(hoje);
+  const semanas: SemanaRender[] = [];
+
+  for (let i = 15; i >= 1; i--) {
+    const inicio = new Date(inicioSemanaAtual);
+    inicio.setDate(inicioSemanaAtual.getDate() - i * 7);
+
+    const fim = new Date(inicio);
+    fim.setDate(inicio.getDate() + 6);
+
+    semanas.push({
+      periodo: `${formatarData(inicio)} - ${formatarData(fim)}`,
+      inicio,
+      fim,
+      total: 0,
+      acertos: 0,
+      erros: 0,
+      isReal: false,
+    });
+  }
+
+  const fimAtual = new Date(inicioSemanaAtual);
+  fimAtual.setDate(inicioSemanaAtual.getDate() + 6);
+
+  semanas.push({
+    periodo: `${formatarData(inicioSemanaAtual)} - ${formatarData(fimAtual)}`,
+    inicio: inicioSemanaAtual,
+    fim: fimAtual,
+    total: 0,
+    acertos: 0,
+    erros: 0,
+    isReal: false,
+  });
+
+  for (let i = 1; i <= 2; i++) {
+    const inicio = new Date(inicioSemanaAtual);
+    inicio.setDate(inicioSemanaAtual.getDate() + i * 7);
+
+    const fim = new Date(inicio);
+    fim.setDate(inicio.getDate() + 6);
+
+    semanas.push({
+      periodo: `${formatarData(inicio)} - ${formatarData(fim)}`,
+      inicio,
+      fim,
+      total: 0,
+      acertos: 0,
+      erros: 0,
+      isReal: false,
+    });
+  }
+
+  return semanas;
+}
 
 export default function MetricsSection({ dados }: MetricsSectionProps) {
-  const [activeTab, setActiveTab] = useState<TabType>('semana')
-  const [semanas, setSemanas] = useState<EvolucaoSemanal[]>([])
+  const [activeTab, setActiveTab] = useState<TabType>("semana");
 
-  // Gerar semanas (passadas, atual e futuras)
-  useEffect(() => {
-    // Após gerar todas as semanas, inverta a ordem
-    const gerarSemanas = () => {
-      const semanasGeradas: EvolucaoSemanal[] = []
-      const hoje = new Date()
+  const semanas = useMemo(() => {
+    const referencia = new Date();
+    const dadosValidos = (dados.evolucao_semanal ?? [])
+      .map((item) => {
+        const periodoParseado = parsePeriodo(item.periodo, referencia);
 
-      // Gerar semanas passadas em ordem crescente (1 a 15)
-      for (let i = 1; i <= 15; i++) {
-        const dataInicio = new Date(hoje)
-        dataInicio.setDate(hoje.getDate() - (i * 7) - hoje.getDay() + 1)
+        if (!periodoParseado) {
+          return null;
+        }
 
-        const dataFim = new Date(dataInicio)
-        dataFim.setDate(dataInicio.getDate() + 6)
-
-        semanasGeradas.push({
-          periodo: `${formatarData(dataInicio)} - ${formatarData(dataFim)}`,
-          total: 0,
-          acertos: 0,
-          erros: 0
-        })
-      }
-
-      // Adicionar semana atual
-      const inicioAtual = new Date(hoje)
-      inicioAtual.setDate(hoje.getDate() - hoje.getDay() + 1)
-      const fimAtual = new Date(inicioAtual)
-      fimAtual.setDate(inicioAtual.getDate() + 6)
-
-      semanasGeradas.push({
-        periodo: `${formatarData(inicioAtual)} - ${formatarData(fimAtual)}`,
-        total: 0,
-        acertos: 0,
-        erros: 0
+        return {
+          ...item,
+          periodo: periodoParseado.periodo,
+          inicio: periodoParseado.inicio,
+          fim: periodoParseado.fim,
+          total: Number(item.total ?? 0),
+          acertos: Number(item.acertos ?? 0),
+          erros: Number(item.erros ?? 0),
+          isReal: true,
+        } satisfies SemanaRender;
       })
+      .filter(Boolean) as SemanaRender[];
 
-      // Adicionar semanas futuras
-      for (let i = 1; i <= 2; i++) {
-        const dataInicio = new Date(inicioAtual)
-        dataInicio.setDate(inicioAtual.getDate() + (i * 7))
-
-        const dataFim = new Date(dataInicio)
-        dataFim.setDate(dataInicio.getDate() + 6)
-
-        semanasGeradas.push({
-          periodo: `${formatarData(dataInicio)} - ${formatarData(dataFim)}`,
-          total: 0,
-          acertos: 0,
-          erros: 0
-        })
-      }
-
-      // Aqui está o segredo: REVERTA a ordem do array
-      // Para: [mais recente ... mais antigo]
-      const semanasEmOrdem = semanasGeradas.reverse()
-
-      // Mesclar com dados reais
-      return semanasEmOrdem.map(semana => {
-        const dadoReal = dados.evolucao_semanal.find(s => s.periodo === semana.periodo)
-        return dadoReal ? { ...semana, ...dadoReal } : semana
-      })
+    if (dadosValidos.length === 0) {
+      return gerarSemanasFallback();
     }
-    setSemanas(gerarSemanas())
-  }, [dados.evolucao_semanal])
 
-  const formatarData = (data: Date): string => {
-    return `${data.getDate().toString().padStart(2, '0')}/${(data.getMonth() + 1).toString().padStart(2, '0')}`
-  }
+    const dadosPorPeriodo = new Map(
+      dadosValidos.map((item) => [normalizarPeriodo(item.periodo), item]),
+    );
 
-  const getDiaSemana = (dataStr: string): string => {
-    const [dia, mes] = dataStr.split('/').map(Number)
-    const hoje = new Date()
-    const data = new Date(hoje.getFullYear(), mes - 1, dia)
-    const dias = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb']
-    return dias[data.getDay()]
-  }
+    const semanasOrdenadas = [...dadosValidos].sort(
+      (a, b) => a.inicio.getTime() - b.inicio.getTime(),
+    );
+
+    const primeiraSemanaReal = semanasOrdenadas[0];
+    const inicioSemanaAtual = getInicioSemanaDomingo(referencia);
+
+    let inicioRange = getInicioSemanaDomingo(primeiraSemanaReal.inicio);
+
+    const fimRange = new Date(inicioSemanaAtual);
+    fimRange.setDate(inicioSemanaAtual.getDate() + 14);
+
+    const semanasGeradas: SemanaRender[] = [];
+    const cursor = new Date(inicioRange);
+
+    while (
+      cursor <= fimRange &&
+      semanasGeradas.length < MAX_SEMANAS_RENDERIZADAS
+    ) {
+      const inicio = new Date(cursor);
+      const fim = new Date(inicio);
+      fim.setDate(inicio.getDate() + 6);
+
+      const periodo = `${formatarData(inicio)} - ${formatarData(fim)}`;
+      const dadoReal = dadosPorPeriodo.get(normalizarPeriodo(periodo));
+
+      semanasGeradas.push(
+        dadoReal
+          ? {
+              ...dadoReal,
+              inicio,
+              fim,
+              periodo,
+              isReal: true,
+            }
+          : {
+              periodo,
+              inicio,
+              fim,
+              total: 0,
+              acertos: 0,
+              erros: 0,
+              isReal: false,
+            },
+      );
+
+      cursor.setDate(cursor.getDate() + 7);
+    }
+
+    return semanasGeradas;
+  }, [dados.evolucao_semanal]);
 
   const tabs = [
-    { id: 'assuntos' as TabType, label: 'Por Assunto', icon: LayoutList },
-    { id: 'topicos' as TabType, label: 'Por Tópicos', icon: Folders },
-    { id: 'semana' as TabType, label: 'Por Semana', icon: Calendar },
-  ]
+    { id: "assuntos" as TabType, label: "Por Assunto", icon: LayoutList },
+    { id: "topicos" as TabType, label: "Por Tópicos", icon: Folders },
+    { id: "semana" as TabType, label: "Por Semana", icon: Calendar },
+  ];
 
-  // Estatísticas gerais
-  const { total, acertos, erros } = dados.geral
-  const taxaAcerto = total > 0 ? ((acertos / total) * 100).toFixed(0) : 0
-  const taxaErro = total > 0 ? ((erros / total) * 100).toFixed(0) : 0
+  const { total, acertos, erros } = dados.geral;
 
-  // Calcular o gráfico circular
-  const radius = 28.5
-  const circumference = 2 * Math.PI * radius
-  const acertosDashoffset = total > 0 ? circumference - (acertos / total) * circumference : circumference
-  const errosDashoffset = total > 0 ? circumference - (erros / total) * circumference : circumference
-  const rotationErros = total > 0 ? (acertos / total) * 360 : 0
+  const taxaAcerto = getPercent(acertos, total);
+  const taxaErro = getPercent(erros, total);
 
-  // Encontrar índice da semana atual
-  const encontrarIndiceSemanaAtual = () => {
-    const hoje = new Date()
-    const inicioAtual = new Date(hoje)
-    inicioAtual.setDate(hoje.getDate() - hoje.getDay() + 1)
-    const periodoAtual = `${formatarData(inicioAtual)} - ${formatarData(new Date(inicioAtual.getTime() + 6 * 24 * 60 * 60 * 1000))}`
+  const acertosDashoffset = getDashoffset(acertos, total);
+  const errosDashoffset = getDashoffset(erros, total);
+  const rotationErros = total > 0 ? (acertos / total) * 360 : 0;
 
-    return semanas.findIndex(s => s.periodo === periodoAtual)
-  }
+  const indiceSemanaAtual = useMemo(() => {
+    const inicioAtual = getInicioSemanaDomingo(new Date());
 
-  const indiceSemanaAtual = encontrarIndiceSemanaAtual()
+    const fimAtual = new Date(inicioAtual);
+    fimAtual.setDate(inicioAtual.getDate() + 6);
+
+    const periodoAtual = normalizarPeriodo(
+      `${formatarData(inicioAtual)} - ${formatarData(fimAtual)}`,
+    );
+
+    return semanas.findIndex(
+      (semana) => normalizarPeriodo(semana.periodo) === periodoAtual,
+    );
+  }, [semanas]);
 
   const renderConteudoAssuntos = () => {
     if (!dados.por_assunto || dados.por_assunto.length === 0) {
       return (
-        <div className="flex flex-col items-center justify-center h-full py-12 text-center">
-          <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4">
-            <LayoutList className="w-8 h-8 text-gray-400 dark:text-gray-500" />
-          </div>
-          <p className="text-gray-500 dark:text-gray-400 text-sm">Nenhum dado por assunto disponível</p>
-          <p className="text-gray-400 dark:text-gray-500 text-xs mt-1">Complete listas para ver estatísticas</p>
-        </div>
-      )
+        <EmptyContent
+          icon={LayoutList}
+          title="Nenhum dado por assunto disponível"
+          subtitle="Complete listas para ver estatísticas"
+        />
+      );
     }
 
     return (
       <div className="space-y-0">
         {dados.por_assunto.map((assunto: AssuntoStats, index: number) => {
-          const totalAssunto = assunto.total || (assunto.acertos + assunto.erros)
-          const percentAcertos = totalAssunto > 0 ? (assunto.acertos / totalAssunto) * 100 : 0
-          const percentErros = totalAssunto > 0 ? (assunto.erros / totalAssunto) * 100 : 0
+          const totalAssunto = assunto.total || assunto.acertos + assunto.erros;
+          const percentAcertos =
+            totalAssunto > 0 ? (assunto.acertos / totalAssunto) * 100 : 0;
+          const percentErros =
+            totalAssunto > 0 ? (assunto.erros / totalAssunto) * 100 : 0;
 
           return (
-            <div key={index} className="flex flex-row justify-between py-2.5 gap-4 min-h-[48px] border-t border-gray-200 dark:border-gray-700 first:border-t-0">
-              <div className="flex flex-row gap-2.5 items-center min-w-0">
-                <div className="w-5 h-5 rounded-[30%] shrink-0 border dark:border-gray-600" style={{
-                  borderColor: `rgb(255, ${100 + index * 20}, ${50 + index * 10})`,
-                  background: `radial-gradient(circle, rgba(255, ${150 + index * 10}, ${100 + index * 5}, 0.3) 0%, rgba(255, ${100 + index * 20}, ${50 + index * 10}, 1) 50%, rgba(255, ${50 + index * 10}, ${20 + index * 5}, 0.8) 100%)`
-                }} />
-                <div className="text-gray-900 dark:text-gray-200 align-middle truncate text-sm">
+            <div
+              key={`${assunto.assunto}-${index}`}
+              className="flex min-h-[48px] flex-row justify-between gap-4 border-t border-gray-200 py-2.5 first:border-t-0 dark:border-gray-700"
+            >
+              <div className="flex min-w-0 flex-row items-center gap-2.5">
+                <div
+                  className="h-5 w-5 shrink-0 rounded-[30%] border dark:border-gray-600"
+                  style={gerarCorAssunto(index)}
+                />
+
+                <div className="truncate text-sm align-middle text-gray-900 dark:text-gray-200">
                   {assunto.assunto}
                 </div>
               </div>
 
-              <div className="flex flex-col items-end">
-                <span className="text-gray-600 dark:text-gray-400 font-semibold text-sm">
-                  {totalAssunto} Respostas
+              <div className="flex shrink-0 flex-col items-end">
+                <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">
+                  {totalAssunto} {plural(totalAssunto, "Resposta", "Respostas")}
                 </span>
-                <div className="relative h-[5px] rounded-[1.5px] justify-between flex flex-row overflow-hidden bg-gray-200 dark:bg-gray-700 w-[90px] mt-1">
+
+                <div className="relative mt-1 flex h-[5px] w-[90px] flex-row justify-between overflow-hidden rounded-[1.5px] bg-gray-200 dark:bg-gray-700">
                   <div
-                    className="h-full rounded-[1.5px] transition-[width] ml-auto bg-green-500"
+                    className="ml-auto h-full rounded-[1.5px] bg-green-500 transition-[width]"
                     style={{ width: `${percentAcertos}%` }}
                   />
                   <div className="min-w-[3px] flex-1" />
                   <div
-                    className="h-full rounded-[1.5px] transition-[width] ml-auto bg-red-500"
+                    className="ml-auto h-full rounded-[1.5px] bg-red-500 transition-[width]"
                     style={{ width: `${percentErros}%` }}
                   />
                 </div>
               </div>
             </div>
-          )
+          );
         })}
       </div>
-    )
-  }
+    );
+  };
 
   const renderConteudoTopicos = () => {
-    if (!dados.topicos_mais_errados || dados.topicos_mais_errados.length === 0) {
+    if (
+      !dados.topicos_mais_errados ||
+      dados.topicos_mais_errados.length === 0
+    ) {
       return (
-        <div className="flex flex-col items-center justify-center h-full py-12 text-center">
-          <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4">
-            <Folders className="w-8 h-8 text-gray-400 dark:text-gray-500" />
-          </div>
-          <p className="text-gray-500 dark:text-gray-400 text-sm">Nenhum tópico com dados disponível</p>
-          <p className="text-gray-400 dark:text-gray-500 text-xs mt-1">Continue praticando para ver estatísticas</p>
-        </div>
-      )
+        <EmptyContent
+          icon={Folders}
+          title="Nenhum tópico com dados disponível"
+          subtitle="Continue praticando para ver estatísticas"
+        />
+      );
     }
 
     return (
       <div className="space-y-0">
         {dados.topicos_mais_errados.map((topico, index) => (
-          <div key={index} className="flex flex-row justify-between py-2.5 gap-4 min-h-[48px] border-t border-gray-200 dark:border-gray-700 first:border-t-0">
-            <div className="flex flex-row gap-2.5 items-center min-w-0">
-              <div className="w-5 h-5 rounded-[30%] shrink-0 border dark:border-gray-600" style={{
-                borderColor: '#C6005C',
-                background: 'radial-gradient(circle, rgba(198, 0, 92, 0.3) 0%, rgba(198, 0, 92, 1) 50%, rgba(198, 0, 92, 0.8) 100%)'
-              }} />
-              <div className="text-gray-900 dark:text-gray-200 align-middle truncate text-sm">
+          <div
+            key={`${topico.topico}-${index}`}
+            className="flex min-h-[48px] flex-row justify-between gap-4 border-t border-gray-200 py-2.5 first:border-t-0 dark:border-gray-700"
+          >
+            <div className="flex min-w-0 flex-row items-center gap-2.5">
+              <div
+                className="h-5 w-5 shrink-0 rounded-[30%] border dark:border-gray-600"
+                style={{
+                  borderColor: "#C6005C",
+                  background:
+                    "radial-gradient(circle, rgba(198, 0, 92, 0.3) 0%, rgba(198, 0, 92, 1) 50%, rgba(198, 0, 92, 0.8) 100%)",
+                }}
+              />
+
+              <div className="truncate text-sm align-middle text-gray-900 dark:text-gray-200">
                 {topico.topico}
               </div>
             </div>
 
-            <div className="flex flex-col items-end">
-              <span className="text-gray-600 dark:text-gray-400 font-semibold text-sm">
-                {topico.erros} Erro{topico.erros !== 1 ? 's' : ''}
+            <div className="flex shrink-0 flex-col items-end">
+              <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">
+                {topico.erros} {plural(topico.erros, "Erro", "Erros")}
               </span>
             </div>
           </div>
         ))}
       </div>
-    )
-  }
+    );
+  };
 
   const renderConteudoSemana = () => {
     return (
       <div className="space-y-0">
         {semanas.map((semana, index) => {
-          const [dataInicioStr, dataFimStr] = semana.periodo.split(' - ')
-          const temDados = semana.total > 0
-          const percentAcertos = semana.total > 0 ? (semana.acertos / semana.total) * 100 : 0
-          const percentErros = semana.total > 0 ? (semana.erros / semana.total) * 100 : 0
-          const isCurrentWeek = index === indiceSemanaAtual
+          const [dataInicioStr, dataFimStr] = semana.periodo.split(" - ");
+          const temDados = semana.total > 0;
+          const isCurrentWeek = index === indiceSemanaAtual;
+          const taxaSemana = getPercent(semana.acertos, semana.total);
 
           return (
             <div
-              key={index}
+              key={`${semana.periodo}-${index}`}
               className={`
-                flex flex-row justify-between py-1.5 gap-4 min-h-[48px] 
-                border-t border-gray-200 dark:border-gray-700 first:border-t-0
-                ${!temDados ? 'opacity-50' : ''}
-                ${isCurrentWeek ? 'bg-blue-50 dark:bg-blue-900/10' : ''}
+                flex min-h-[48px] flex-row justify-between gap-4 border-t border-gray-200 px-1 py-1.5 first:border-t-0 dark:border-gray-700
+                ${!temDados ? "opacity-50" : ""}
+                ${isCurrentWeek ? "bg-blue-50 dark:bg-blue-900/10" : ""}
               `}
             >
-              <div className="flex flex-row gap-2.5 items-center min-w-0 text-gray-900 dark:text-gray-200 text-[13px]">
+              <div className="flex min-w-0 flex-row items-center gap-2.5 text-[13px] text-gray-900 dark:text-gray-200">
                 <div className="flex flex-col leading-none">
                   <span className="font-mono">{dataInicioStr}</span>
-                  <span className="text-xs text-gray-500 dark:text-gray-400">{getDiaSemana(dataInicioStr)}</span>
+                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                    {getDiaSemana(semana.inicio)}
+                  </span>
                 </div>
-                <ArrowRight className="size-4 text-gray-500 dark:text-gray-400" />
+
+                <ArrowRight className="size-4 shrink-0 text-gray-500 dark:text-gray-400" />
+
                 <div className="flex flex-col leading-none">
                   <span className="font-mono">{dataFimStr}</span>
-                  <span className="text-xs text-gray-500 dark:text-gray-400">{getDiaSemana(dataFimStr)}</span>
+                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                    {getDiaSemana(semana.fim)}
+                  </span>
                 </div>
+
+                {isCurrentWeek && (
+                  <span className="ml-1 hidden rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-blue-600 dark:bg-blue-900/40 dark:text-blue-300 sm:inline-flex">
+                    atual
+                  </span>
+                )}
               </div>
 
-              <div className="flex flex-col items-end">
-                <span className={`text-gray-600 dark:text-gray-400 font-semibold text-sm ${!temDados ? 'opacity-50' : ''}`}>
-                  {temDados ? `${semana.total} Resposta${semana.total !== 1 ? 's' : ''}` : '0 Respostas'}
+              <div className="flex shrink-0 flex-col items-end">
+                <span
+                  className={`text-sm font-semibold text-gray-600 dark:text-gray-400 ${
+                    !temDados ? "opacity-50" : ""
+                  }`}
+                >
+                  {temDados
+                    ? `${semana.total} ${plural(
+                        semana.total,
+                        "Resposta",
+                        "Respostas",
+                      )}`
+                    : "0 Respostas"}
                 </span>
-                <div className="relative h-[5px] rounded-[1.5px] justify-between flex flex-row overflow-hidden bg-gray-200 dark:bg-gray-700 w-[90px] mt-1">
-                  {temDados ? (
-                    <>
-                      <div
-                        className="h-full rounded-[1.5px] transition-[width] ml-auto bg-green-500"
-                        style={{ width: `${percentAcertos}%` }}
-                      />
-                      <div className="min-w-[3px] flex-1" />
-                      <div
-                        className="h-full rounded-[1.5px] transition-[width] ml-auto bg-red-500"
-                        style={{ width: `${percentErros}%` }}
-                      />
-                    </>
-                  ) : (
-                    <div className="h-full rounded-[1.5px] transition-[width] ml-auto bg-gray-300 dark:bg-gray-600" style={{ width: '100%' }} />
+
+                <div className="flex items-center gap-2">
+                  {temDados && (
+                    <span className="text-[11px] font-mono text-gray-500 dark:text-gray-400">
+                      {taxaSemana}%
+                    </span>
                   )}
+
+                  <MiniSplitBar
+                    acertos={semana.acertos}
+                    erros={semana.erros}
+                    total={semana.total}
+                    empty={!temDados}
+                  />
                 </div>
               </div>
             </div>
-          )
+          );
         })}
       </div>
-    )
-  }
+    );
+  };
 
   return (
-    <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl p-6 shadow-sm flex flex-col h-[500px]">
-      {/* Cabeçalho com estatísticas gerais */}
-      <div className="flex items-start justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-green-500 rounded-xl">
-            <Target className="w-4 h-4 text-white" />
+    <div className="flex h-auto flex-col rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900 sm:p-6 lg:h-[500px]">
+      <div className="mb-6 flex items-start justify-between">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="rounded-xl bg-green-500 p-2">
+            <Target className="h-4 w-4 text-white" />
           </div>
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Métricas de Performance</h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Seu desempenho geral</p>
+
+          <div className="min-w-0">
+            <h2 className="truncate text-lg font-semibold text-gray-900 dark:text-white">
+              Métricas de Performance
+            </h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Seu desempenho geral
+            </p>
           </div>
         </div>
-
       </div>
 
-      {/* Estatísticas Gerais */}
       <div className="mb-6">
-        <div className="flex flex-row gap-4 items-center flex-1">
-          <div className="relative flex items-center justify-center">
-            <svg style={{ width: '65px', height: '65px' }}>
+        <div className="flex flex-row items-center gap-4">
+          <div className="relative flex shrink-0 items-center justify-center">
+            <svg className="h-[65px] w-[65px]">
               <circle
                 cy="32.5"
                 cx="32.5"
                 strokeWidth="8"
                 fill="transparent"
-                r="28.5"
-                className="stroke-transparent"
+                r={RADIUS}
+                className="stroke-gray-100 dark:stroke-gray-800"
               />
-              <circle
-                cy="32.5"
-                cx="32.5"
-                strokeWidth="8"
-                fill="transparent"
-                r="28.5"
-                strokeDasharray={circumference}
-                strokeDashoffset={acertosDashoffset}
-                className="stroke-green-500"
-                strokeLinecap="round"
-                transform="rotate(0, 32.5, 32.5)"
-              />
-              <circle
-                cy="32.5"
-                cx="32.5"
-                strokeWidth="8"
-                fill="transparent"
-                r="28.5"
-                strokeDasharray={circumference}
-                strokeDashoffset={errosDashoffset}
-                className="stroke-red-500"
-                strokeLinecap="round"
-                transform={`rotate(${rotationErros}, 32.5, 32.5)`}
-              />
+
+              {total > 0 && (
+                <>
+                  <circle
+                    cy="32.5"
+                    cx="32.5"
+                    strokeWidth="8"
+                    fill="transparent"
+                    r={RADIUS}
+                    strokeDasharray={CIRCUMFERENCE}
+                    strokeDashoffset={acertosDashoffset}
+                    className="stroke-green-500"
+                    strokeLinecap="round"
+                    transform="rotate(0, 32.5, 32.5)"
+                  />
+
+                  <circle
+                    cy="32.5"
+                    cx="32.5"
+                    strokeWidth="8"
+                    fill="transparent"
+                    r={RADIUS}
+                    strokeDasharray={CIRCUMFERENCE}
+                    strokeDashoffset={errosDashoffset}
+                    className="stroke-red-500"
+                    strokeLinecap="round"
+                    transform={`rotate(${rotationErros}, 32.5, 32.5)`}
+                  />
+                </>
+              )}
             </svg>
           </div>
 
-          <div className="flex flex-col gap-1">
-            <span className="font-bold text-gray-900 dark:text-white text-lg mb-1 leading-none">
-              {total} resposta{total !== 1 ? 's' : ''}
+          <div className="flex min-w-0 flex-col gap-1">
+            <span className="mb-1 text-lg font-bold leading-none text-gray-900 dark:text-white">
+              {total} {plural(total, "resposta", "respostas")}
             </span>
-            <span className="flex gap-1 items-center text-green-500 text-xs leading-none font-medium font-mono">
+
+            <span className="flex items-center gap-1 text-xs font-medium leading-none text-green-500 font-mono">
               <SquareCheckBig className="size-3.5" />
-              <div>{taxaAcerto}%</div>
+              <span>{taxaAcerto}%</span>
             </span>
-            <span className="flex gap-1 items-center text-red-500 text-xs leading-none font-medium font-mono">
+
+            <span className="flex items-center gap-1 text-xs font-medium leading-none text-red-500 font-mono">
               <SquareX className="size-3.5" />
-              <div>{taxaErro}%</div>
+              <span>{taxaErro}%</span>
             </span>
           </div>
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-1 mb-4 border-b border-gray-200 dark:border-gray-700">
+      <div className="mb-4 flex gap-1 overflow-x-auto border-b border-gray-200 dark:border-gray-700">
         {tabs.map((tab) => {
-          const Icon = tab.icon
-          const isActive = activeTab === tab.id
+          const Icon = tab.icon;
+          const isActive = activeTab === tab.id;
 
           return (
             <button
               key={tab.id}
+              type="button"
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors relative ${isActive
-                  ? 'text-[#C6005C] dark:text-[#C6005C]'
-                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
-                }`}
+              className={`relative flex shrink-0 items-center gap-2 px-3 py-2.5 text-sm font-medium transition-colors sm:px-4 ${
+                isActive
+                  ? "text-[#C6005C] dark:text-[#C6005C]"
+                  : "text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200"
+              }`}
             >
-              <Icon className="w-3.5 h-3.5" />
+              <Icon className="h-3.5 w-3.5" />
               {tab.label}
+
               {isActive && (
                 <motion.div
                   layoutId="activeTab"
                   className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#C6005C] dark:bg-[#C6005C]"
                   initial={false}
-                  transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                  transition={{
+                    type: "spring",
+                    stiffness: 300,
+                    damping: 30,
+                  }}
                 />
               )}
             </button>
-          )
+          );
         })}
       </div>
 
-      {/* Conteúdo da Tab Ativa */}
-      <div className="flex-1 overflow-y-auto">
-        {activeTab === 'assuntos' && renderConteudoAssuntos()}
-        {activeTab === 'topicos' && renderConteudoTopicos()}
-        {activeTab === 'semana' && renderConteudoSemana()}
+      <div className="min-h-[250px] flex-1 overflow-y-auto pr-1">
+        {activeTab === "assuntos" && renderConteudoAssuntos()}
+        {activeTab === "topicos" && renderConteudoTopicos()}
+        {activeTab === "semana" && renderConteudoSemana()}
       </div>
     </div>
-  )
+  );
 }

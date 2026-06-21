@@ -75,7 +75,7 @@ export function useListaData(listaId: string | string[]): UseListaDataReturn {
       questoesData = dadosLista;
       console.log(
         "📋 Questões carregadas como array direto:",
-        questoesData.length
+        questoesData.length,
       );
     } else if (
       dadosLista &&
@@ -174,7 +174,7 @@ export function useListaData(listaId: string | string[]): UseListaDataReturn {
     console.log(
       "📝 Respostas carregadas:",
       Object.keys(respostas).length,
-      "respostas"
+      "respostas",
     );
 
     return {
@@ -224,23 +224,22 @@ export function useListaData(listaId: string | string[]): UseListaDataReturn {
       // ✅ GARANTIR que todas as propriedades obrigatórias estejam presentes
       const questaoFormatada: QuestaoBase = {
         id: questao.id,
-        enunciado: questao.enunciado || "Enunciado não disponível",
-        dificuldade: questao.dificuldade || 3, // Default para dificuldade média
+        tipo: "objetiva",
+        enunciado: questao.enunciado,
+        dificuldade: questao.dificuldade,
         alternativa_correta_id: questao.alternativa_correta_id,
-        alternativas: alternativasFormatadas,
-        topicos: topicosFormatados,
-        prova: provaInfo,
-        adaptado: !!questao.adaptado,
-        gabarito_video: questao.gabarito_video || null,
-        gabarito_comentado_texto:
-          questao.gabarito_comentado_texto ||
-          "Gabarito comentado não disponível.",
+        alternativas: questao.alternativas,
+        topicos: questao.topicos,
+        prova: questao.prova,
+        adaptado: Boolean(questao.adaptado),
+        gabarito_video: questao.gabarito_video,
+        gabarito_comentado_texto: questao.gabarito_comentado_texto,
       };
 
       // Verificar se todas as propriedades obrigatórias estão presentes
       if (!questaoFormatada.dificuldade) {
         console.warn(
-          `⚠️ Questão ${questaoFormatada.id} sem dificuldade, usando valor padrão: 3`
+          `⚠️ Questão ${questaoFormatada.id} sem dificuldade, usando valor padrão: 3`,
         );
         questaoFormatada.dificuldade = 3;
       }
@@ -264,7 +263,7 @@ export function useListaData(listaId: string | string[]): UseListaDataReturn {
         const token = session.laravelToken;
         const idNumber = parseInt(
           Array.isArray(listaId) ? listaId[0] : listaId,
-          10
+          10,
         );
 
         if (isNaN(idNumber)) {
@@ -283,7 +282,7 @@ export function useListaData(listaId: string | string[]): UseListaDataReturn {
         // Processar dados da lista
         const { questoesData, listaInfoData } = processarDadosLista(
           dadosLista,
-          idNumber
+          idNumber,
         );
 
         // Processar tentativa existente
@@ -295,7 +294,7 @@ export function useListaData(listaId: string | string[]): UseListaDataReturn {
         console.log("   - Tentativa ID:", tentativaData.resolucaoId);
         console.log(
           "   - Respostas salvas:",
-          Object.keys(tentativaData.respostasSalvas).length
+          Object.keys(tentativaData.respostasSalvas).length,
         );
 
         setQuestoes(questoesData);
@@ -308,7 +307,7 @@ export function useListaData(listaId: string | string[]): UseListaDataReturn {
         setError(
           err instanceof Error
             ? err.message
-            : "Falha ao carregar a lista de exercícios. Tente novamente."
+            : "Falha ao carregar a lista de exercícios. Tente novamente.",
         );
       } finally {
         setIsLoading(false);
@@ -342,7 +341,7 @@ export function useListaData(listaId: string | string[]): UseListaDataReturn {
       console.log("🎯 Iniciando nova tentativa...");
       const idNumber = parseInt(
         Array.isArray(listaId) ? listaId[0] : listaId,
-        10
+        10,
       );
 
       if (isNaN(idNumber)) {
@@ -399,13 +398,13 @@ export function useListaData(listaId: string | string[]): UseListaDataReturn {
 
   // Verificação final de consistência
   const questaoIncompleta = questionsFormatted.find(
-    (q) => q.dificuldade === undefined || q.dificuldade === null
+    (q) => q.dificuldade === undefined || q.dificuldade === null,
   );
 
   if (questaoIncompleta) {
     console.error(
       "⚠️ Questão ainda sem dificuldade após formatação:",
-      questaoIncompleta
+      questaoIncompleta,
     );
     // Corrigir em tempo de execução
     questionsFormatted.forEach((q) => {

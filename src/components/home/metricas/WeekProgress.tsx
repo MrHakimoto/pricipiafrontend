@@ -1,249 +1,291 @@
-//components/metricas/WeekProgress.tsx
-'use client'
+// components/home/metricas/WeekProgress.tsx
+"use client";
 
-import { useEffect, useState } from 'react'
-import { useSession } from 'next-auth/react'
-import useSWR from 'swr'
-import { Check, X, Flame, Calendar } from 'lucide-react'
-import { checkinStatus, checkinDaily } from '@/lib/dailyCheck/daily'
-import { getUTCDateString } from '@/utils/dateHelpers'
+import { useEffect, useMemo, useState } from "react";
+import { useSession } from "next-auth/react";
+import useSWR from "swr";
+import { Check, X, Flame, Calendar, RefreshCw } from "lucide-react";
+import { checkinStatus, checkinDaily } from "@/lib/dailyCheck/daily";
+import { getUTCDateString } from "@/utils/dateHelpers";
 
 interface UserStreak {
-  id: number
-  user_id: number
-  current_streak: number
-  longest_streak: number
-  last_checkin_date: string
-  has_checked_in_today: boolean
-  week_checkins?: string[]
+  id?: number;
+  user_id?: number;
+  current_streak: number;
+  longest_streak: number;
+  last_checkin_date: string | null;
+  has_checked_in_today: boolean;
+  week_checkins?: string[];
 }
 
-type DayStatus = 'done' | 'current' | 'missed' | 'pending'
+type DayStatus = "done" | "current" | "missed" | "pending";
 
 interface WeekDay {
-  name: string
-  status: DayStatus
+  name: string;
+  status: DayStatus;
 }
 
-const STREAK_KEY = '/api/checkin-status'
+const STREAK_KEY = "/api/checkin-status";
+
+function WeekProgressSkeleton() {
+  return (
+    <section className="rounded-3xl border border-black/5 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#020B1F] sm:p-6">
+      <div className="animate-pulse">
+        <div className="mb-6 flex items-center justify-between">
+          <div className="h-5 w-28 rounded-xl bg-gray-200 dark:bg-white/10" />
+          <div className="h-4 w-16 rounded-xl bg-gray-200 dark:bg-white/10" />
+        </div>
+
+        <div className="mx-auto mb-6 h-16 w-28 rounded-2xl bg-gray-200 dark:bg-white/10" />
+
+        <div className="grid grid-cols-7 gap-2">
+          {Array.from({ length: 7 }).map((_, index) => (
+            <div key={index} className="flex flex-col items-center gap-2">
+              <div className="h-8 w-8 rounded-full bg-gray-200 dark:bg-white/10" />
+              <div className="h-3 w-6 rounded bg-gray-200 dark:bg-white/10" />
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function getStreakText(streak: number): string {
+  return streak === 1 ? "dia" : "dias";
+}
 
 export default function WeekProgress() {
-  const { data: session } = useSession()
-  const token = session?.laravelToken
+  const { data: session } = useSession();
+  const token = session?.laravelToken;
 
-  const [animatedStreak, setAnimatedStreak] = useState<number>(0)
-  const [loaded, setLoaded] = useState<boolean>(false)
+  const [animatedStreak, setAnimatedStreak] = useState(0);
 
   const {
     data: streakData,
     error,
     isLoading,
     mutate,
-  } = useSWR<UserStreak>(
-    token ? [STREAK_KEY, token] : null,
-    ([key, token]: [string, string]) => checkinStatus(token),
+  } = useSWR<UserStreak, Error, readonly [string, string] | null>(
+    token ? ([STREAK_KEY, token] as const) : null,
+    ([, currentToken]) => checkinStatus(currentToken),
     {
       revalidateOnFocus: true,
       revalidateOnReconnect: true,
-      refreshInterval: 300000, // 5 minutos
-    }
-  )
+      refreshInterval: 300000,
+    },
+  );
 
-  // Check-in automático SIMPLIFICADO
   useEffect(() => {
-    const autoCheckin = async (): Promise<void> => {
-      if (!token || !streakData || isLoading) return
+    const autoCheckin = async () => {
+      if (!token || !streakData || isLoading) return;
 
-      const today = getUTCDateString()
-      const lastCheckin = localStorage.getItem('daily_checkin_date')
+      const today = getUTCDateString();
+      const lastCheckin = localStorage.getItem("daily_checkin_date");
 
-      // Evita check-in duplicado no mesmo dia
       if (lastCheckin === today && streakData.has_checked_in_today) {
-        return
+        return;
       }
 
       try {
         if (!streakData.has_checked_in_today) {
-          await checkinDaily(token)
-          mutate() // Revalida os dados
+          await checkinDaily(token);
+          await mutate();
         }
 
-        // Marca como feito
-        localStorage.setItem('daily_checkin_date', today)
+        localStorage.setItem("daily_checkin_date", today);
       } catch (err) {
-        console.error('Falha no check-in automático:', err)
+        console.error("Falha no check-in automático:", err);
       }
-    }
+    };
 
-    if (streakData && !isLoading) {
-      autoCheckin()
-    }
-  }, [token, streakData, isLoading, mutate])
+    autoCheckin();
+  }, [token, streakData, isLoading, mutate]);
 
-  // Animação do número
   useEffect(() => {
-    if (!streakData || isLoading) return
+    if (!streakData || isLoading) return;
 
-    setLoaded(true)
+    const target = streakData.current_streak;
+    const duration = 900;
+    const startTime = performance.now();
 
-    let start = 0
-    const target = streakData.current_streak
-    const duration = 1000
-    const startTime = performance.now()
+    const animateNumber = (timestamp: number) => {
+      const elapsed = timestamp - startTime;
+      const progress = Math.min(1, elapsed / duration);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      const current = Math.floor(eased * target);
 
-    const animateNumber = (timestamp: number): void => {
-      const elapsed = timestamp - startTime
-      const progress = Math.min(1, elapsed / duration)
-      const eased = 1 - Math.pow(1 - progress, 3)
-
-      const current = Math.floor(eased * target)
-      setAnimatedStreak(current)
+      setAnimatedStreak(current);
 
       if (progress < 1) {
-        requestAnimationFrame(animateNumber)
+        requestAnimationFrame(animateNumber);
       } else {
-        setAnimatedStreak(target)
+        setAnimatedStreak(target);
       }
-    }
+    };
 
-    requestAnimationFrame(animateNumber)
-  }, [streakData, isLoading])
+    requestAnimationFrame(animateNumber);
+  }, [streakData, isLoading]);
 
-  // Gerar dias da semana baseado no estado atual - CORRIGIDO
-  const getWeekDays = (): WeekDay[] => {
-    const days = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+  const days = useMemo<WeekDay[]>(() => {
+    const labels = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
     const today = new Date();
     const todayIndex = today.getDay();
 
-    // Calcula datas da semana atual
     const weekDates: string[] = [];
+
     for (let i = 0; i < 7; i++) {
       const date = new Date(today);
       date.setDate(today.getDate() - todayIndex + i);
-      weekDates.push(date.toISOString().split('T')[0]);
+      weekDates.push(date.toISOString().split("T")[0]);
     }
 
-    // Usa dados da API se disponível
     const weekCheckins = streakData?.week_checkins || [];
 
-    return days.map((day, index): WeekDay => {
+    return labels.map((name, index) => {
       const dateStr = weekDates[index];
       const isToday = index === todayIndex;
       const hasCheckedIn = weekCheckins.includes(dateStr);
 
       if (isToday) {
         return {
-          name: day,
-          status: streakData?.has_checked_in_today ? 'done' : 'current'
+          name,
+          status: streakData?.has_checked_in_today ? "done" : "current",
         };
       }
 
       if (index < todayIndex) {
         return {
-          name: day,
-          status: hasCheckedIn ? 'done' : 'missed'
+          name,
+          status: hasCheckedIn ? "done" : "missed",
         };
       }
 
-      return { name: day, status: 'pending' };
+      return { name, status: "pending" };
     });
-  };
-
-  const DAYS = getWeekDays()
-
-  // Função para formatar o texto do streak
-  const getStreakText = (streak: number): string => {
-    return streak === 1 ? 'dia' : 'dias'
-  }
+  }, [streakData]);
 
   if (isLoading) {
-    return (
-      <div className="flex-1 max-w-sm bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-6 shadow-2xl border border-gray-700/50 animate-pulse">
-        <div className="h-5 bg-gray-700 rounded w-24 mb-6"></div>
-        <div className="h-16 bg-gray-700 rounded w-20 mx-auto mb-3"></div>
-        <div className="h-4 bg-gray-700 rounded w-16 mx-auto mb-6"></div>
-        <div className="flex justify-between mb-6">
-          {Array.from({ length: 7 }).map((_, i) => (
-            <div key={i} className="flex flex-col items-center">
-              <div className="w-6 h-6 bg-gray-700 rounded-full mb-1"></div>
-              <div className="h-2 bg-gray-700 rounded w-3"></div>
-            </div>
-          ))}
-        </div>
-        <div className="h-8 bg-gray-700 rounded-full"></div>
-      </div>
-    )
+    return <WeekProgressSkeleton />;
   }
 
   if (error || !streakData) {
     return (
-      <div className="flex-1 max-w-sm bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-6 shadow-2xl border border-gray-700/50 text-center">
-        <div className="flex items-center justify-center gap-2 text-gray-400 mb-4">
-          <Calendar size={20} />
-          <span className="text-sm">Ofensiva</span>
+      <section className="rounded-3xl border border-black/5 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#020B1F] sm:p-6">
+        <div className="flex items-start gap-3">
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-orange-500/10 text-orange-500">
+            <Calendar className="h-5 w-5" />
+          </div>
+
+          <div className="flex-1">
+            <h3 className="font-bold text-gray-950 dark:text-white">
+              Ofensiva
+            </h3>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              Não foi possível carregar seu check-in.
+            </p>
+
+            <button
+              onClick={() => mutate()}
+              className="mt-4 inline-flex items-center gap-2 rounded-xl border border-black/10 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-white/10 dark:text-gray-200 dark:hover:bg-white/5"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Tentar novamente
+            </button>
+          </div>
         </div>
-        <p className="text-xs text-gray-500">Não foi possível carregar</p>
-      </div>
-    )
+      </section>
+    );
   }
 
   return (
-    <div className={`flex-1 max-w-sm bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-6 shadow-2xl border border-gray-700/50 transition-all duration-700 ${loaded ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
-
-      {/* Header elegante */}
-      <div className="flex items-center justify-between mb-6">
+    <section className="rounded-3xl border border-black/5 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#020B1F] sm:p-6">
+      <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Flame size={20} className="text-orange-400" />
-          <span className="text-sm font-semibold text-white">Ofensiva</span>
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-orange-500/10 text-orange-500">
+            <Flame className="h-5 w-5" />
+          </div>
+
+          <div>
+            <h3 className="font-bold text-gray-950 dark:text-white">
+              Ofensiva
+            </h3>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Check-in diário
+            </p>
+          </div>
         </div>
-        <div className="text-xs text-gray-400 flex items-center gap-1">
-          <Calendar size={12} />
-          <span>Hoje</span>
+
+        <div className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600 dark:bg-white/10 dark:text-gray-300">
+          Hoje
         </div>
       </div>
 
-      {/* Streak principal */}
-      <div className="text-center mb-6">
-        <div className="flex items-baseline justify-center gap-2 mb-1">
-          <span className="text-5xl font-bold bg-gradient-to-r from-orange-400 to-orange-500 bg-clip-text text-transparent">
+      <div className="mb-7 text-center">
+        <div className="flex items-end justify-center gap-2">
+          <span className="text-5xl font-black tracking-tight text-gray-950 dark:text-white">
             {animatedStreak}
           </span>
-          <span className="text-lg text-gray-400">{getStreakText(animatedStreak)}</span>
+          <span className="pb-2 text-sm font-medium text-gray-500 dark:text-gray-400">
+            {getStreakText(animatedStreak)}
+          </span>
         </div>
-        <p className="text-xs text-gray-500">sequência atual</p>
+
+        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+          sequência atual
+        </p>
       </div>
 
-      {/* Semana estilizada */}
-      <div className="flex justify-between mb-6 px-1">
-        {DAYS.map((day, index) => (
-          <div key={index} className="flex flex-col items-center">
-            <div className={`w-7 h-7 flex items-center justify-center rounded-full mb-2 transition-all duration-300 ${day.status === "done"
-              ? "bg-gradient-to-br from-orange-500 to-orange-600 shadow-lg shadow-orange-500/25"
-              : day.status === "current"
-                ? "bg-gradient-to-br from-blue-500 to-blue-600 shadow-lg shadow-blue-500/25 ring-2 ring-blue-400/50"
-                : day.status === "missed"
-                  ? "bg-gradient-to-br from-gray-600 to-gray-700"
-                  : "bg-gradient-to-br from-gray-700 to-gray-800 border border-gray-600/50"
-              }`}>
-              {day.status === "done" && <Check className="text-white w-3 h-3" />}
-              {day.status === "current" && <div className="w-2 h-2 bg-white rounded-full"></div>}
-              {day.status === "missed" && <X className="text-white w-3 h-3" />}
+      <div className="grid grid-cols-7 gap-1 sm:gap-2">
+        {days.map((day, index) => (
+          <div key={index} className="flex flex-col items-center gap-2">
+            <div
+              className={[
+                "flex h-8 w-8 items-center justify-center rounded-full transition",
+                day.status === "done"
+                  ? "bg-orange-500 text-white shadow-sm shadow-orange-500/30"
+                  : "",
+                day.status === "current"
+                  ? "bg-[#0E00D0] text-white shadow-sm shadow-[#0E00D0]/30"
+                  : "",
+                day.status === "missed"
+                  ? "bg-gray-200 text-gray-500 dark:bg-white/10 dark:text-gray-400"
+                  : "",
+                day.status === "pending"
+                  ? "border border-gray-200 bg-gray-50 text-gray-300 dark:border-white/10 dark:bg-white/[0.03] dark:text-gray-600"
+                  : "",
+              ].join(" ")}
+            >
+              {day.status === "done" && <Check className="h-4 w-4" />}
+              {day.status === "current" && (
+                <div className="h-2.5 w-2.5 rounded-full bg-white" />
+              )}
+              {day.status === "missed" && <X className="h-4 w-4" />}
             </div>
-            <span className={`text-xs font-medium transition-colors ${day.status === "pending" ? "text-gray-500" : "text-gray-300"
-              }`}>
+
+            <span
+              className={[
+                "text-[11px] font-medium",
+                day.status === "pending"
+                  ? "text-gray-400 dark:text-gray-600"
+                  : "text-gray-600 dark:text-gray-300",
+              ].join(" ")}
+            >
               {day.name}
             </span>
           </div>
         ))}
       </div>
 
-      {/* Recorde */}
-      <div className="flex items-center justify-between mt-4 text-xs">
-        <span className="text-gray-500">Melhor sequência</span>
-        <span className="text-orange-400 font-semibold">
+      <div className="mt-6 flex items-center justify-between rounded-2xl bg-gray-50 px-4 py-3 text-sm dark:bg-white/[0.04]">
+        <span className="text-gray-500 dark:text-gray-400">
+          Melhor sequência
+        </span>
+
+        <span className="font-bold text-orange-500">
           {streakData.longest_streak} {getStreakText(streakData.longest_streak)}
         </span>
       </div>
-    </div>
-  )
+    </section>
+  );
 }

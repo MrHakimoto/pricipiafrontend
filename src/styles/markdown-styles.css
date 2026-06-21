@@ -103,7 +103,7 @@
     border-radius: 6px;
 }
 
-.wmde-markdown pre>code {
+.wmde-markdown pre > code {
     padding: 16px !important;
     display: block;
     overflow: auto;
@@ -178,23 +178,24 @@
 .wmde-markdown table {
     border-spacing: 0;
     border-collapse: collapse;
-    width: max-content;
+    width: 100%;
     max-width: 100%;
     display: block;
     overflow: auto;
     margin-top: 0;
     margin-bottom: 16px;
+    border: 1px solid hsl(var(--border));
 }
 
 .wmde-markdown table th,
 .wmde-markdown table td {
-    padding: 6px 13px;
-    border: 1px solid var(--color-border-default);
+    padding: 0.5em;
+    border: 1px solid hsl(var(--border));
 }
 
 .wmde-markdown table th {
     font-weight: 600;
-    background-color: #f6f8fa;
+    background-color: rgba(0, 0, 0, 0.05);
 }
 
 .wmde-markdown table tr {
@@ -226,15 +227,16 @@
 .wmde-markdown blockquote {
     margin: 0;
     padding: 0 1em;
-    color: #57606a;
-    border-left: 0.25em solid #d0d7de;
+    color: hsl(var(--muted-foreground));
+    border-left: 3px solid hsl(var(--border));
+    background: rgba(var(--muted-rgb, 244, 244, 245), 0.1);
 }
 
-.wmde-markdown blockquote> :first-child {
+.wmde-markdown blockquote > :first-child {
     margin-top: 0;
 }
 
-.wmde-markdown blockquote> :last-child {
+.wmde-markdown blockquote > :last-child {
     margin-bottom: 0;
 }
 
@@ -257,14 +259,14 @@
 }
 
 .wmde-markdown li {
-    word-wrap: break-all;
+    word-wrap: break-word;
 }
 
-.wmde-markdown li>p {
+.wmde-markdown li > p {
     margin-top: 16px;
 }
 
-.wmde-markdown li+li {
+.wmde-markdown li + li {
     margin-top: 0.25em;
 }
 
@@ -285,49 +287,89 @@
     vertical-align: middle;
 }
 
-
 /* ===========================================
-   ✅ 11. MODOS CLARO/ESCURO
+   ✅ 11. MODO ESCURO POR CLASSE .dark
+   Compatível com Tailwind darkMode: "class"
 =========================================== */
-@media (prefers-color-scheme: dark) {
-    :root {
-        --color-canvas-default: #0d1117;
-        --color-fg-default: #c9d1d9;
-        --color-border-muted: #30363d;
-        --color-border-default: #30363d;
-        --color-neutral-muted: rgba(110, 118, 129, 0.4);
+.dark {
+    --color-canvas-default: #0d1117;
+    --color-fg-default: #c9d1d9;
+    --color-border-muted: #30363d;
+    --color-border-default: #30363d;
+    --color-neutral-muted: rgba(110, 118, 129, 0.4);
 
-        /* Cores de syntax highlighting - Modo Escuro */
-        --color-prettylights-syntax-comment: #8b949e;
-        --color-prettylights-syntax-constant: #79c0ff;
-        --color-prettylights-syntax-entity: #d2a8ff;
-        --color-prettylights-syntax-storage-modifier-import: #c9d1d9;
-        --color-prettylights-syntax-entity-tag: #7ee787;
-        --color-prettylights-syntax-keyword: #ff7b72;
-        --color-prettylights-syntax-string: #a5d6ff;
-        --color-prettylights-syntax-variable: #ffa657;
-    }
+    --color-prettylights-syntax-comment: #8b949e;
+    --color-prettylights-syntax-constant: #79c0ff;
+    --color-prettylights-syntax-entity: #d2a8ff;
+    --color-prettylights-syntax-storage-modifier-import: #c9d1d9;
+    --color-prettylights-syntax-entity-tag: #7ee787;
+    --color-prettylights-syntax-keyword: #ff7b72;
+    --color-prettylights-syntax-string: #a5d6ff;
+    --color-prettylights-syntax-variable: #ffa657;
+    --color-prettylights-syntax-brackethighlighter-unmatched: #f85149;
+    --color-prettylights-syntax-string-regexp: #7ee787;
+    --color-prettylights-syntax-markup-heading: #1f6feb;
+}
 
-    .wmde-markdown pre {
-        background-color: #161b22;
-    }
+.dark .wmde-markdown {
+    color: var(--color-fg-default);
+    background-color: var(--color-canvas-default);
+}
 
-    .wmde-markdown table th {
-        background-color: #161b22;
-    }
+.dark .wmde-markdown h6 {
+    color: #8b949e;
+}
 
-    .wmde-markdown table tr:nth-child(2n) {
-        background-color: #161b22;
-    }
+.dark .wmde-markdown pre {
+    background-color: #161b22;
+}
 
-    .wmde-markdown blockquote {
-        color: #8b949e;
-        border-left-color: #3b434b;
-    }
+.dark .wmde-markdown table {
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+.dark .wmde-markdown table th {
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+.dark .wmde-markdown table tr:nth-child(2n) {
+    background-color: #161b22;
+}
+
+.dark .wmde-markdown blockquote {
+    background: rgba(var(--muted-rgb, 39, 39, 42), 0.2);
+    color: rgba(255, 255, 255, 0.7);
+    border-left-color: rgba(255, 255, 255, 0.1);
+}
+
+.dark .wmde-markdown code,
+.dark .wmde-markdown tt {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.dark .wmde-markdown a {
+    color: #60a5fa;
+}
+
+.dark .wmde-markdown a:hover {
+    color: #93c5fd;
+}
+
+.dark .wmde-markdown table th,
+.dark .wmde-markdown table td {
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+.dark .wmde-markdown img {
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+.dark .wmde-markdown img:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 
 /* ===========================================
-   ✅ 12. CLASSES ESPECÍFICAS DO SEU PROJETO
+   ✅ 12. CLASSES ESPECÍFICAS DO PROJETO
 =========================================== */
 .code-highlight {
     font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
@@ -340,33 +382,92 @@
     min-height: 1rem;
 }
 
-.katex-block {
-    margin: 1em 0;
-    text-align: center;
-}
-
 /* Container de imagens personalizado */
 .block.mt-3.mb-3[role="region"] {
     margin: 1rem 0;
 }
 
+/* Preview images */
+.wmde-markdown img {
+    cursor: pointer;
+    transition: transform 0.2s ease;
+    max-width: 100%;
+    height: auto;
+    border-radius: 6px;
+    border: 1px solid hsl(var(--border));
+}
 
+.wmde-markdown img:hover {
+    transform: scale(1.01);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
 
-/* Tema do CodeMirror */
+/* Links */
+.wmde-markdown a {
+    color: hsl(var(--primary));
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+    transition: all 0.2s ease;
+}
+
+.wmde-markdown a:hover {
+    border-bottom-color: hsl(var(--primary));
+}
+
+/* ===========================================
+   ✅ 13. EDITOR MARKDOWN / CODEMIRROR
+=========================================== */
+.markdown-editor-container {
+    border: 1px solid hsl(var(--border));
+    border-radius: 10px;
+    transition: all 0.2s ease;
+}
+
+.markdown-editor-container:focus-within {
+    border-color: hsl(var(--primary));
+    box-shadow:
+        0 0 0 2px rgba(var(--primary-rgb, 59, 130, 246), 0.25),
+        0 6px 20px rgba(0, 0, 0, 0.15);
+    outline: none;
+}
+
 .cm-editor {
-    background-color: #0F172A;
+    background-color: hsl(var(--input)) !important;
     height: 100% !important;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+    user-select: text !important;
+    pointer-events: auto !important;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji' !important;
+}
+
+.cm-editor.cm-focused {
+    outline: none;
+    box-shadow: inset 0 0 0 1px hsl(var(--primary));
 }
 
 .cm-content {
-    background-color: #0F172A;
-    caret-color: black !important;
+    caret-color: auto !important;
     padding: 8px 12px !important;
     min-height: 200px !important;
 }
 
 .cm-line {
     padding: 0 2px !important;
+}
+
+.ͼ1 .cm-scroller {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji' !important;
+}
+
+/* Cursor */
+.cm-cursor {
+    border-left-color: hsl(var(--primary)) !important;
+}
+
+/* Seleção */
+.cm-selectionBackground {
+    background-color: rgba(var(--primary-rgb, 59, 130, 246), 0.15) !important;
 }
 
 /* Backtick pairing */
@@ -391,131 +492,20 @@
     font-family: 'Consolas', 'Monaco', monospace !important;
 }
 
-/* Preview images */
-.wmde-markdown img {
-    cursor: pointer;
-    transition: transform 0.2s ease;
-    max-width: 100%;
-    height: auto;
-    border-radius: 6px;
-}
-
-.wmde-markdown img:hover {
-    transform: scale(1.01);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-
-/* Estilos para as fórmulas KaTeX */
-.wmde-markdown .katex {
-    font-size: 1.05em;
-}
-
-.wmde-markdown .katex-display {
-    margin: 0.5em 0;
-    overflow: auto hidden;
-}
-
-/* Estilo para código inline */
-.wmde-markdown code {
-    background-color: rgba(0, 0, 0, 0.05);
-    padding: 0.2em 0.4em;
-    border-radius: 3px;
-    font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
-}
-
-/* Estilo para links */
-.wmde-markdown a {
-    color: #2563eb;
-    text-decoration: underline;
-}
-
-.wmde-markdown a:hover {
-    color: #1d4ed8;
-}
-
-/* Estilo para tabelas */
-.wmde-markdown table {
-    border-collapse: collapse;
-    width: 100%;
-    margin: 1em 0;
-}
-
-.wmde-markdown table th,
-.wmde-markdown table td {
-    border: 1px solid rgba(0, 0, 0, 0.1);
-    padding: 0.5em;
-}
-
-.wmde-markdown table th {
-    background-color: rgba(0, 0, 0, 0.05);
-    font-weight: 600;
-}
-
-/* Estilo para blockquotes */
-.wmde-markdown blockquote {
-    border-left: 4px solid rgba(0, 0, 0, 0.1);
-    padding-left: 1em;
-    margin-left: 0;
-    color: rgba(0, 0, 0, 0.7);
-}
-
-/* Modo escuro */
-@media (prefers-color-scheme: dark) {
-    .wmde-markdown code {
-        background-color: rgba(255, 255, 255, 0.1);
-    }
-
-    .wmde-markdown a {
-        color: #60a5fa;
-    }
-
-    .wmde-markdown a:hover {
-        color: #93c5fd;
-    }
-
-    .wmde-markdown table th,
-    .wmde-markdown table td {
-        border-color: rgba(255, 255, 255, 0.1);
-    }
-
-    .wmde-markdown table th {
-        background-color: rgba(255, 255, 255, 0.05);
-    }
-
-    .wmde-markdown blockquote {
-        border-left-color: rgba(255, 255, 255, 0.1);
-        color: rgba(255, 255, 255, 0.7);
-    }
-}
-
-
-/* ===========================================
-   ✅ 13. EDITOR MARKDOWN - CORREÇÕES
-=========================================== */
-
-/* Container principal do editor */
-.markdown-editor-container {
-    border: 1px solid hsl(var(--border));
-}
-
-.markdown-editor-container:focus-within {
-    border-color: hsl(var(--ring));
-    box-shadow: 0 0 0 2px rgba(var(--ring-rgb, 59, 130, 246), 0.1);
-    outline: none;
+/* Preview area */
+.wmde-markdown-color {
+    background-color: hsl(var(--input));
 }
 
 /* Abas ativas */
-/* [data-state="on"] {
-    background-color: hsl(var(--input)) !important;
-    border: 1px solid hsl(var(--border)) !important;
-    border-bottom-color: transparent !important;
-    position: relative;
-    z-index: 10;
+[data-state="on"] {
+    box-shadow:
+        0 -2px 10px rgba(var(--primary-rgb, 59, 130, 246), 0.35),
+        inset 0 -2px 0 rgba(255, 255, 255, 0.15);
+    border-radius: 10px 10px 0 0;
+    z-index: 20;
+    font-weight: 600;
 }
-
-[data-state="off"] {
-    border-bottom: 1px solid hsl(var(--border)) !important;
-} */
 
 /* Botões com borda */
 #editor-options button,
@@ -529,97 +519,11 @@
     border-color: hsl(var(--border));
 }
 
-/* Área do editor */
-.cm-editor {
-    background-color: hsl(var(--input)) !important;
-    user-select: text !important;
-    pointer-events: auto !important;
-}
-
-.cm-editor.cm-focused {
-    outline: none;
-}
-
-/* Cursor */
-.cm-cursor {
-    border-left-color: hsl(var(--primary)) !important;
-}
-
-/* Seleção */
-.cm-selectionBackground {
-    background-color: rgba(var(--primary-rgb, 59, 130, 246), 0.15) !important;
-}
-
-/* Preview area - Foco visual */
-.wmde-markdown-color {
-    background-color: hsl(var(--input));
-}
-
-.wmde-markdown img {
-    transition: transform 0.2s ease;
-    max-width: 100%;
-    height: auto;
-    border-radius: 6px;
-    border: 1px solid hsl(var(--border));
-}
-
-.wmde-markdown img:hover {
-    transform: scale(1.01);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
-
-/* Blockquotes com borda */
-.wmde-markdown blockquote {
-    border-left: 3px solid hsl(var(--border));
-    padding-left: 1em;
-    color: hsl(var(--muted-foreground));
-    background: rgba(var(--muted-rgb, 244, 244, 245), 0.1);
-}
-
-/* Tabelas com borda */
-.wmde-markdown table {
-    border: 1px solid hsl(var(--border));
-    border-collapse: collapse;
-}
-
-.wmde-markdown table th,
-.wmde-markdown table td {
-    border: 1px solid hsl(var(--border));
-    padding: 0.5em;
-}
-
-/* Code blocks */
-.wmde-markdown pre {
-    background: hsl(var(--muted)) !important;
-    border: 1px solid hsl(var(--border)) !important;
-    border-radius: 6px;
-}
-
-.wmde-markdown code {
-    background: rgba(var(--muted-rgb, 244, 244, 245), 0.3);
-    padding: 0.2em 0.4em;
-    border-radius: 3px;
-    border: 1px solid rgba(var(--border-rgb, 228, 228, 231), 0.3);
-}
-
-/* Links */
-.wmde-markdown a {
-    color: hsl(var(--primary));
-    text-decoration: none;
-    border-bottom: 1px solid transparent;
-    transition: all 0.2s ease;
-}
-
-.wmde-markdown a:hover {
-    border-bottom-color: hsl(var(--primary));
-}
-
 /* Popovers com borda */
 [role="dialog"] {
     border: 1px solid hsl(var(--border)) !important;
 }
 
-/* Botões do popover */
 [role="dialog"] button {
     border: 1px solid hsl(var(--border)) !important;
 }
@@ -628,99 +532,280 @@
     background-color: hsl(var(--accent)) !important;
 }
 
-/* Modo escuro */
-@media (prefers-color-scheme: dark) {
-    .wmde-markdown blockquote {
-        background: rgba(var(--muted-rgb, 39, 39, 42), 0.2);
-    }
+/* ===========================================
+   ✅ 14. KaTeX — CORREÇÃO TIPOGRÁFICA
+   NÃO sobrescrever font-family em .katex *
+=========================================== */
 
-    .wmde-markdown code {
-        background: rgba(var(--muted-rgb, 39, 39, 42), 0.4);
-        border-color: rgba(var(--border-rgb, 63, 63, 70), 0.4);
-    }
-}
-
-/* Lightbox border */
-/* .fixed.inset-0 button {
-    border: 1px solid rgba(255, 255, 255, 0.2);
-} */
-
-
-/* ===============================
-   🔥 TABS ATIVAS - DESTAQUE REAL
-=============================== */
-
-[data-state="on"] {
-    /* background: linear-gradient(180deg,
-            hsl(var(--primary)) 0%,
-            hsl(var(--primary)) 100%) !important;
-
-    color: hsl(var(--primary-foreground)) !important;
-
-    border: 1px solid hsl(var(--primary)) !important; */
-    /* border-bottom: none !important; */
-
-    box-shadow:
-        0 -2px 10px rgba(var(--primary-rgb, 59, 130, 246), 0.35),
-        inset 0 -2px 0 rgba(255, 255, 255, 0.15);
-
-    border-radius: 10px 10px 0 0;
-    z-index: 20;
-    font-weight: 600;
-}
-
-/* Aba inativa */
-/* [data-state="off"] {
+/* Fórmula inline vinda do processor */
+.wmde-markdown .math-inline {
+    display: inline;
     background: transparent !important;
-    color: hsl(var(--muted-foreground)) !important;
-    border-bottom: 1px solid hsl(var(--border)) !important;
-    opacity: 0.8;
-} */
+    border: 0 !important;
+    padding: 0 !important;
+    margin: 0 0.08em;
+    white-space: nowrap;
+    vertical-align: baseline;
+}
 
-/* Hover da aba inativa */
-/* [data-state="off"]:hover {
-    background: hsl(var(--muted)) !important;
-    opacity: 1;
-}  */
+/* Fórmula em bloco/display vinda do processor */
+.wmde-markdown .math-display {
+    display: block;
+    width: 100%;
+    margin: 0.75rem 0;
+    text-align: center;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+/* Blocos especiais ```KaTeX */
+.wmde-markdown .katex-block {
+    margin: 1em 0;
+    text-align: center;
+}
+
+/* KaTeX geral */
+.wmde-markdown .katex {
+    font-size: 1.08em;
+}
+
+/* Display nativo do KaTeX */
+.wmde-markdown .katex-display {
+    margin: 0.75em 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+/* Quando .katex-display estiver dentro do nosso wrapper, não duplicar espaçamento */
+.wmde-markdown .math-display > .katex-display {
+    margin: 0;
+}
+
+/* Permite que tabelas/arrays matemáticos rolem horizontalmente em telas pequenas */
+.wmde-markdown .math-display .katex,
+.wmde-markdown .math-display .katex-display {
+    max-width: 100%;
+}
+
+/* Neutraliza apenas code que eventualmente contenha KaTeX */
+.wmde-markdown code:has(.katex),
+.wmde-markdown code .katex {
+    background: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+}
+
+/* Erro de renderização KaTeX */
+.wmde-markdown .math-inline-error {
+    color: #ef4444;
+    font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
+    font-size: 0.95em;
+}
+
+/* IMPORTANTE:
+   Não adicionar regras do tipo:
+   .wmde-markdown .katex,
+   .wmde-markdown .katex * {
+       font-family: inherit;
+   }
+
+   Isso destrói mathnormal, mathit, mathbb, mathrm e demais fontes internas do KaTeX.
+*/
+
+/* ===========================================
+   ✅ PREVIEW MARKDOWN COM KATEX
+=========================================== */
+
+.markdown-preview {
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.markdown-preview p {
+  margin: 0;
+}
+
+.markdown-preview .math-inline {
+  display: inline;
+  background: transparent !important;
+  border: 0 !important;
+  padding: 0 !important;
+  margin: 0 0.08em;
+  white-space: nowrap;
+  vertical-align: baseline;
+}
+
+.markdown-preview .math-display {
+  display: block;
+  width: 100%;
+  margin: 0.4rem 0;
+  text-align: center;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.markdown-preview .math-display > .katex-display {
+  margin: 0;
+}
+
+.markdown-preview .katex {
+  font-size: 1.02em;
+}
+
+.markdown-preview .math-inline-error {
+  color: #ef4444;
+  font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
+  font-size: 0.95em;
+}
 
 
-/* ===============================
-   🎯 FOCO NO EDITOR INTEIRO
-=============================== */
 
+/* ===========================================
+   ✅ 16. DARK MODE DO EDITOR / CODEMIRROR
+   Usa .dark, não prefers-color-scheme
+=========================================== */
 .markdown-editor-container {
-    border: 1px solid hsl(var(--border));
-    border-radius: 10px;
-    transition: all 0.2s ease;
+    background: #ffffff;
+    color: #0f172a;
 }
 
-.markdown-editor-container:focus-within {
-    border-color: hsl(var(--primary));
-    box-shadow:
-        0 0 0 2px rgba(var(--primary-rgb, 59, 130, 246), 0.25),
-        0 6px 20px rgba(0, 0, 0, 0.15);
+.dark .markdown-editor-container {
+    background: #050b1a;
+    color: #e5e7eb;
 }
-
 
 .cm-editor {
-    border-radius: 8px;
-    transition: all 0.2s ease;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji' !important;
-}
-.ͼ1 .cm-scroller {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji' !important;
+    background-color: #ffffff !important;
+    color: #0f172a !important;
 }
 
-.cm-editor.cm-focused {
-    outline: none;
-    box-shadow: inset 0 0 0 1px hsl(var(--primary));
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji';
+.dark .cm-editor {
+    background-color: #0f172a !important;
+    color: #e5e7eb !important;
 }
 
-.wmde-markdown code:has(.katex) {
-  background: transparent !important;
-  padding: 0 !important;
-  border: none !important;
-  box-shadow: none !important;
-  border-radius: 0 !important;
+.cm-content {
+    color: #0f172a !important;
+}
+
+.dark .cm-content {
+    color: #e5e7eb !important;
+}
+
+.cm-gutters {
+    background-color: #f8fafc !important;
+    color: #64748b !important;
+    border-right-color: #e2e8f0 !important;
+}
+
+.dark .cm-gutters {
+    background-color: #020617 !important;
+    color: #64748b !important;
+    border-right-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.cm-activeLine {
+    background-color: rgba(14, 0, 208, 0.05) !important;
+}
+
+.dark .cm-activeLine {
+    background-color: rgba(59, 130, 246, 0.08) !important;
+}
+
+.cm-activeLineGutter {
+    background-color: rgba(14, 0, 208, 0.08) !important;
+    color: #0e00d0 !important;
+}
+
+.dark .cm-activeLineGutter {
+    background-color: rgba(59, 130, 246, 0.12) !important;
+    color: #bfdbfe !important;
+}
+
+.cm-selectionBackground,
+.cm-focused .cm-selectionBackground {
+    background-color: rgba(14, 0, 208, 0.16) !important;
+}
+
+.dark .cm-selectionBackground,
+.dark .cm-focused .cm-selectionBackground {
+    background-color: rgba(96, 165, 250, 0.22) !important;
+}
+
+.cm-placeholder {
+    color: #94a3b8 !important;
+}
+
+.dark .cm-placeholder {
+    color: #64748b !important;
+}
+
+.cm-backtick-paired {
+    color: #64748b !important;
+}
+
+.dark .cm-backtick-paired {
+    color: #9ca3af !important;
+}
+
+.cm-backtick-unpaired {
+    color: #0f172a !important;
+}
+
+.dark .cm-backtick-unpaired {
+    color: #ffffff !important;
+}
+
+.cm-math-delimiter {
+    color: #dc2626 !important;
+}
+
+.dark .cm-math-delimiter {
+    color: #f87171 !important;
+}
+
+.cm-math-content {
+    color: #047857 !important;
+}
+
+.dark .cm-math-content {
+    color: #4ec9b0 !important;
+}
+
+.wmde-markdown-color {
+    background-color: #ffffff;
+    color: #0f172a;
+}
+
+.dark .wmde-markdown-color {
+    /* background-color: #0f172a; */
+    color: #e5e7eb;
+}
+
+.dark [role="dialog"] {
+    border-color: rgba(255, 255, 255, 0.1) !important;
+    background-color: #08111f;
+    color: #f8fafc;
+}
+
+.dark [role="dialog"] button {
+    border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.dark [role="dialog"] button:hover {
+    background-color: rgba(59, 130, 246, 0.12) !important;
+}
+
+/* KaTeX no dark sem destruir as fontes internas */
+.dark .wmde-markdown .math-inline-error,
+.dark .markdown-preview .math-inline-error {
+    color: #fca5a5;
+}
+
+.dark .wmde-markdown .katex,
+.dark .markdown-preview .katex {
+    color: inherit;
 }

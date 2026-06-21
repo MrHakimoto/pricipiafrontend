@@ -1,592 +1,772 @@
-"use client"
-import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import {
-    LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
-} from 'recharts';
+"use client";
 
-// --- Tipagens (TypeScript) ---
+import React, { useEffect, useMemo, useState } from "react";
+import { useSession } from "next-auth/react";
+import Link from "next/link";
+import {
+  Activity,
+  AlertTriangle,
+  ArrowRight,
+  BarChart3,
+  BookOpen,
+  CalendarDays,
+  CheckCircle2,
+  Flame,
+  Gauge,
+  Loader2,
+  Medal,
+  Sparkles,
+  Target,
+  Trophy,
+  XCircle,
+} from "lucide-react";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+import {
+  getUserMetrics,
+  type MasteryStatus,
+  type MetricRecommendation,
+  type TopicMetric,
+  type UserMetricsDashboard,
+} from "@/lib/metricas/userMetrics";
+
+const PERIODS = [
+  { label: "7 dias", value: 7 },
+  { label: "30 dias", value: 30 },
+  { label: "90 dias", value: 90 },
+  { label: "180 dias", value: 180 },
+  { label: "1 ano", value: 365 },
+];
+
+function cn(...classes: Array<string | false | null | undefined>) {
+  return classes.filter(Boolean).join(" ");
+}
+
+function formatNumber(value: number | null | undefined) {
+  return new Intl.NumberFormat("pt-BR").format(value ?? 0);
+}
+
+function formatPercent(value: number | null | undefined) {
+  return `${Number(value ?? 0).toLocaleString("pt-BR", {
+    maximumFractionDigits: 1,
+  })}%`;
+}
+
+function formatHours(value: number | null | undefined) {
+  const hours = Number(value ?? 0);
+
+  if (hours < 1 && hours > 0) {
+    return `${Math.round(hours * 60)} min`;
+  }
+
+  return `${hours.toLocaleString("pt-BR", {
+    maximumFractionDigits: 1,
+  })} h`;
+}
+
+function getStatusLabel(status: MasteryStatus) {
+  const labels: Record<MasteryStatus, string> = {
+    dominado: "Dominado",
+    estavel: "Estável",
+    em_construcao: "Em construção",
+    critico: "Crítico",
+    poucos_dados: "Poucos dados",
+  };
+
+  return labels[status];
+}
+
+function getStatusClass(status: MasteryStatus) {
+  const classes: Record<MasteryStatus, string> = {
+    dominado:
+      "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+    estavel:
+      "border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-300",
+    em_construcao:
+      "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300",
+    critico:
+      "border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-300",
+    poucos_dados:
+      "border-slate-400/30 bg-slate-500/10 text-slate-600 dark:text-slate-300",
+  };
+
+  return classes[status];
+}
+
+function getRecommendationClass(severity: MetricRecommendation["severity"]) {
+  const classes = {
+    info: "border-blue-500/25 bg-blue-500/10 text-blue-700 dark:text-blue-200",
+    warning:
+      "border-amber-500/25 bg-amber-500/10 text-amber-700 dark:text-amber-200",
+    critical:
+      "border-rose-500/25 bg-rose-500/10 text-rose-700 dark:text-rose-200",
+    success:
+      "border-emerald-500/25 bg-emerald-500/10 text-emerald-700 dark:text-emerald-200",
+  };
+
+  return classes[severity];
+}
+
+function MetricSkeleton() {
+  return (
+    <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#07111f]">
+      <div className="flex items-center gap-3">
+        <Loader2 className="h-5 w-5 animate-spin text-[#0E00D0]" />
+        <span className="text-sm font-medium text-slate-600 dark:text-slate-300">
+          Carregando métricas...
+        </span>
+      </div>
+
+      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, index) => (
+          <div
+            key={index}
+            className="h-32 animate-pulse rounded-2xl bg-slate-100 dark:bg-white/5"
+          />
+        ))}
+      </div>
+
+      <div className="mt-4 h-80 animate-pulse rounded-2xl bg-slate-100 dark:bg-white/5" />
+    </section>
+  );
+}
+
+function EmptyState() {
+  return (
+    <section className="rounded-3xl border border-dashed border-slate-300 bg-white p-8 text-center shadow-sm dark:border-white/10 dark:bg-[#07111f]">
+      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#0E00D0]/10 text-[#0E00D0]">
+        <BarChart3 className="h-7 w-7" />
+      </div>
+
+      <h2 className="mt-5 text-lg font-bold text-slate-950 dark:text-white">
+        Ainda não há dados suficientes
+      </h2>
+
+      <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-500 dark:text-slate-400">
+        Resolva questões, finalize listas e assista aulas para que o painel
+        consiga formar um diagnóstico de desempenho.
+      </p>
+
+      <Link
+        href="/exercicios"
+        className="mt-6 inline-flex items-center gap-2 rounded-2xl bg-[#0E00D0] px-5 py-3 text-sm font-semibold text-white transition hover:brightness-110"
+      >
+        Resolver questões
+        <ArrowRight className="h-4 w-4" />
+      </Link>
+    </section>
+  );
+}
 
 interface StatCardProps {
-    title: string;
-    value: string;
-    secondaryText?: string;
-    icon: React.FC<{ className?: string }>;
-    colorClass: string;
-    delay?: number;
+  title: string;
+  value: string;
+  description: string;
+  icon: React.ElementType;
+  tone: "blue" | "green" | "rose" | "amber" | "purple" | "slate";
 }
 
-interface MiniStatCardProps {
-    title: string;
-    value: string;
-    secondaryText: string;
-    colorClass: string;
-    delay?: number;
+function StatCard({ title, value, description, icon: Icon, tone }: StatCardProps) {
+  const tones = {
+    blue: "bg-blue-500/10 text-blue-700 dark:text-blue-300",
+    green: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+    rose: "bg-rose-500/10 text-rose-700 dark:text-rose-300",
+    amber: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
+    purple: "bg-violet-500/10 text-violet-700 dark:text-violet-300",
+    slate: "bg-slate-500/10 text-slate-700 dark:text-slate-300",
+  };
+
+  return (
+    <article className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-white/10 dark:bg-[#07111f]">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+            {title}
+          </p>
+          <strong className="mt-3 block text-3xl font-black tracking-tight text-slate-950 dark:text-white">
+            {value}
+          </strong>
+        </div>
+
+        <div className={cn("rounded-2xl p-3", tones[tone])}>
+          <Icon className="h-5 w-5" />
+        </div>
+      </div>
+
+      <p className="mt-4 text-sm leading-6 text-slate-500 dark:text-slate-400">
+        {description}
+      </p>
+    </article>
+  );
 }
 
-interface SkillData {
-    topic: string;
-    percentage: number;
-    description?: string;
-}
-
-interface TableRowData {
-    item: string;
-    rate: string;
-}
-
-interface RankingData {
-    rank: number;
-    name: string;
-    difference: string;
-    colorClass: string;
-}
-
-// --- Dados Mock ---
-
-const dataProgresso = [
-    { name: 'Seg', pontos: 130 },
-    { name: 'Ter', pontos: 160 },
-    { name: 'Qua', pontos: 240 },
-    { name: 'Qui', pontos: 220 },
-    { name: 'Sex', pontos: 270 },
-    { name: 'Sáb', pontos: 300 },
-    { name: 'Dom', pontos: 310 },
-];
-
-const strongPoints: SkillData[] = [
-    { topic: 'Função afim', percentage: 90 },
-    { topic: 'PA e PG', percentage: 85 },
-    { topic: 'Trigonometria', percentage: 80 },
-];
-
-const weakPoints: SkillData[] = [
-    { topic: 'Probabilidade', percentage: 45 },
-    { topic: 'Geometria espacial', percentage: 40 },
-    { topic: 'Análise combinatória', percentage: 35 },
-];
-
-const subjectRate: TableRowData[] = [
-    { item: 'Função quadrática', rate: '80%' },
-    { item: 'Logarítmos', rate: '72%' },
-    { item: 'Polinômios', rate: '66%' },
-    { item: 'Trigonometria', rate: '57%' },
-];
-
-const simulatedRate: TableRowData[] = [
-    { item: 'Simulado 1', rate: '80%' },
-    { item: 'Simulado 2', rate: '72%' },
-    { item: 'Simulado 3', rate: '66%' },
-    { item: 'Simulado 4', rate: '57%' },
-];
-
-const rankingGlobal: RankingData[] = [
-    { rank: 1, name: 'Milton Junio', difference: '-15p', colorClass: 'text-red-500' },
-    { rank: 2, name: 'Sofia Paiva', difference: '-15p', colorClass: 'text-red-500' },
-    { rank: 3, name: 'Filipe Ozanam', difference: '+3p', colorClass: 'text-green-500' },
-    { rank: 4, name: 'Thulio', difference: '+1p', colorClass: 'text-green-500' },
-    { rank: 5, name: 'Arthur Miranda', difference: '-7p', colorClass: 'text-red-500' },
-];
-
-// --- Ícones ---
-
-const PiIcon: React.FC<{ className?: string }> = ({ className = "w-6 h-6" }) => (
-    <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 14h-2v-4h-2v-2h4v6zM7.5 7.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3z"/>
-    </svg>
-);
-
-const StarIcon: React.FC<{ className?: string }> = ({ className = "w-6 h-6" }) => (
-    <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M12 17.27l6.18 3.73-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73-1.64 7.03z"/>
-    </svg>
-);
-
-const CheckCircleIcon: React.FC<{ className?: string }> = ({ className = "w-6 h-6" }) => (
-    <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/>
-    </svg>
-);
-
-const XCircleIcon: React.FC<{ className?: string }> = ({ className = "w-6 h-6" }) => (
-    <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm5 13.59L15.59 17 12 13.41 8.41 17 7 15.59 10.59 12 7 8.41 8.41 7 12 10.59 15.59 7 17 8.41 13.41 12 17 15.59z"/>
-    </svg>
-);
-
-const BookOpenIcon: React.FC<{ className?: string }> = ({ className = "w-5 h-5" }) => (
-    <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M21 4H7v16h14V4zm-2 2v12H9V6h10zm-6 3H9v2h4V9zm0 4H9v2h4v-2z"/>
-    </svg>
-);
-
-const ClockIcon: React.FC<{ className?: string }> = ({ className = "w-5 h-5" }) => (
-    <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.62z"/>
-    </svg>
-);
-
-const CalendarIcon: React.FC<{ className?: string }> = ({ className = "w-5 h-5" }) => (
-    <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11zM5 7V6h14v1H5z"/>
-    </svg>
-);
-
-const FilterIcon: React.FC<{ className?: string }> = ({ className = "w-5 h-5" }) => (
-    <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z"/>
-    </svg>
-);
-
-const ThumbsUpIcon: React.FC<{ className?: string }> = ({ className = "w-5 h-5" }) => (
-    <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M1 21h4V9H1v12zm22-11c0-1.1-.9-2-2-2h-6.31l.95-4.57.03-.32c0-.43-.18-.83-.49-1.13L15.36 2 10.43 6.93c-.63.63-.92 1.43-.92 2.45v8.52c0 1.1.9 2 2 2h8.49c.88 0 1.6-.53 1.83-1.28l1.85-6.19c.2-.67.07-1.39-.33-1.95z"/>
-    </svg>
-);
-
-const ThumbsDownIcon: React.FC<{ className?: string }> = ({ className = "w-5 h-5" }) => (
-    <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M15.36 21l-4.93-4.93c-.63-.63-.92-1.43-.92-2.45V4.1c0-1.1.9-2 2-2h8.49c.88 0 1.6.53 1.83 1.28l1.85 6.19c.2.67.07 1.39-.33 1.95L22 13h-6.31l.95 4.57.03.32c0 .43-.18.83-.49 1.13L15.36 21zM1 13h4v8H1v-8z"/>
-    </svg>
-);
-
-const ListIcon: React.FC<{ className?: string }> = ({ className = "w-5 h-5" }) => (
-    <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zm0-8h14V7H7v2z"/>
-    </svg>
-);
-
-const TrophyIcon: React.FC<{ className?: string }> = ({ className = "w-5 h-5" }) => (
-    <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M21.5 6a3 3 0 00-3-3H5a3 3 0 00-3 3v8a3 3 0 003 3h4.5v3H12v-3h4.5a3 3 0 003-3V6zM5 5h13.5a1 1 0 011 1v.5a.5.5 0 01-.5.5h-15a.5.5 0 01-.5-.5V6a1 1 0 011-1zm14 8a1 1 0 01-1 1h-13a1 1 0 01-1-1v-4a1 1 0 011-1h13a1 1 0 011 1v4z"/>
-    </svg>
-);
-
-// --- Componentes Reutilizáveis ---
-
-// Card de Estatística Principal (Primeira Linha)
-const StatCard: React.FC<StatCardProps> = ({ title, value, secondaryText, icon: Icon, colorClass, delay = 0 }) => {
-    return (
-        <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: delay }}
-            className="flex flex-col p-6 rounded-xl bg-[#1D2132] border border-transparent hover:border-indigo-600 transition duration-300 shadow-xl cursor-pointer"
-        >
-            <div className={`flex items-center text-sm font-semibold ${colorClass} mb-2`}>
-                <Icon className={`w-5 h-5 mr-2 ${colorClass}`} />
-                {title}
-            </div>
-            <div className="text-4xl font-extrabold text-white">
-                {value}
-            </div>
-            {secondaryText && (
-                <p className="text-sm font-light text-gray-400 mt-1">
-                    {secondaryText}
-                </p>
+function RecommendationCard({
+  recommendation,
+}: {
+  recommendation: MetricRecommendation;
+}) {
+  return (
+    <section
+      className={cn(
+        "rounded-3xl border p-5 shadow-sm",
+        getRecommendationClass(recommendation.severity)
+      )}
+    >
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="flex gap-4">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/60 dark:bg-white/10">
+            {recommendation.severity === "critical" ? (
+              <AlertTriangle className="h-6 w-6" />
+            ) : (
+              <Sparkles className="h-6 w-6" />
             )}
-        </motion.div>
-    );
-};
+          </div>
 
-// Card de Estatística Secundária (Terceira Linha)
-const MiniStatCard: React.FC<MiniStatCardProps> = ({ title, value, secondaryText, colorClass, delay = 0 }) => {
-    let IconComponent: React.FC<{ className?: string }>;
-    let iconColorClass = 'text-indigo-400';
-
-    if (title.includes('Aulas assistidas')) {
-        IconComponent = BookOpenIcon;
-        iconColorClass = 'text-indigo-400';
-    } else if (title.includes('Tempo total')) {
-        IconComponent = ClockIcon;
-        iconColorClass = 'text-blue-400';
-    } else if (title.includes('Sequência')) {
-        IconComponent = CalendarIcon;
-        iconColorClass = 'text-red-500';
-    } else {
-        IconComponent = StarIcon;
-    }
-
-    return (
-        <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: delay }}
-            className="flex flex-col p-6 rounded-xl bg-[#1D2132] border border-transparent hover:border-pink-600 transition duration-300 shadow-lg cursor-pointer"
-        >
-            <div className={`text-sm font-semibold text-gray-400 mb-2 flex items-center`}>
-                <IconComponent className={`w-5 h-5 mr-2 ${iconColorClass}`} />
-                {title}
-            </div>
-            <div className="text-3xl font-extrabold text-white">
-                <span className={colorClass}>{value}</span>
-            </div>
-            <p className="text-xs text-gray-400 mt-1">
-                {secondaryText}
+          <div>
+            <h2 className="text-base font-black">Próxima melhor ação</h2>
+            <p className="mt-1 text-lg font-bold">{recommendation.title}</p>
+            <p className="mt-2 max-w-3xl text-sm leading-6 opacity-85">
+              {recommendation.description}
             </p>
-        </motion.div>
-    );
-};
-
-// Componente de Barra de Progresso customizada
-const ProgressBar: React.FC<{ percentage: number, barColor: string, delay: number }> = ({ percentage, barColor, delay }) => {
-    return (
-        <motion.div
-            initial={{ width: 0 }}
-            animate={{ width: `${percentage}%` }}
-            transition={{ duration: 1.0, delay: delay + 0.5, ease: "easeOut" }}
-            className={`h-2 rounded-full ${barColor}`}
-        />
-    );
-};
-
-// Componente para listar Pontos Fortes/Fracos
-const SkillSection: React.FC<{ title: string, data: SkillData[], icon: React.FC<{ className?: string }>, iconColor: string, isStrong: boolean }> = ({ title, data, icon: Icon, iconColor, isStrong }) => {
-    return (
-        <div className="flex flex-col p-6 rounded-xl bg-[#1D2132] shadow-lg h-full">
-            <div className={`flex items-center text-lg font-semibold ${iconColor} mb-4`}>
-                <Icon className={`w-5 h-5 mr-2 ${iconColor}`} />
-                {title}
-            </div>
-            
-            <div className="space-y-4 flex-grow">
-                {data.map((item, index) => {
-                    const barColor = isStrong ? 'bg-indigo-600' : 'bg-red-600';
-                    const accentColor = isStrong ? 'text-indigo-400' : 'text-red-400';
-                    const delay = index * 0.1;
-
-                    return (
-                        <motion.div
-                            key={item.topic}
-                            initial={{ opacity: 0, x: -20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ duration: 0.5, delay: delay }}
-                            className="text-sm"
-                        >
-                            <div className="flex justify-between mb-1">
-                                <span className="font-medium text-gray-200">{item.topic}</span>
-                                <span className={`text-sm ${accentColor}`}>{item.percentage}% de acerto</span>
-                            </div>
-                            <div className="h-2 rounded-full bg-slate-700/70">
-                                <ProgressBar percentage={item.percentage} barColor={barColor} delay={delay} />
-                            </div>
-                        </motion.div>
-                    );
-                })}
-            </div>
+          </div>
         </div>
-    );
-};
 
-// Componente de Tabela de Taxa de Acerto/Simulados
-const RateTable: React.FC<{ title: string, data: TableRowData[], icon: React.FC<{ className?: string }>, iconColor: string, delay: number }> = ({ title, data, icon: Icon, iconColor, delay }) => {
-    return (
-        <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: delay }}
-            className="flex flex-col p-6 rounded-xl bg-[#1D2132] shadow-lg relative"
+        {recommendation.href && (
+          <Link
+            href={recommendation.href}
+            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-bold text-slate-950 shadow-sm transition hover:-translate-y-0.5 dark:bg-white/10 dark:text-white"
+          >
+            {recommendation.action_label}
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function EvolutionChart({ data }: { data: UserMetricsDashboard["evolution"] }) {
+  return (
+    <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#07111f]">
+      <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h2 className="text-lg font-black text-slate-950 dark:text-white">
+            Evolução no período
+          </h2>
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            Acertos, erros e taxa de aproveitamento por dia.
+          </p>
+        </div>
+      </div>
+
+      <div className="h-[320px]">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={data} margin={{ top: 10, right: 12, left: -18, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" className="stroke-slate-200 dark:stroke-white/10" />
+            <XAxis
+              dataKey="label"
+              tickLine={false}
+              axisLine={false}
+              className="text-xs"
+            />
+            <YAxis tickLine={false} axisLine={false} className="text-xs" />
+            <Tooltip
+              cursor={{ opacity: 0.12 }}
+              contentStyle={{
+                borderRadius: 16,
+                border: "1px solid rgba(148, 163, 184, 0.25)",
+              }}
+              formatter={(value, name) => {
+                const label =
+                  name === "questions_correct"
+                    ? "Acertos"
+                    : name === "questions_wrong"
+                    ? "Erros"
+                    : "Questões";
+
+                return [value, label];
+              }}
+            />
+            <Bar dataKey="questions_correct" stackId="a" radius={[8, 8, 0, 0]} />
+            <Bar dataKey="questions_wrong" stackId="a" radius={[8, 8, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </section>
+  );
+}
+
+function AccuracyLineChart({ data }: { data: UserMetricsDashboard["evolution"] }) {
+  return (
+    <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#07111f]">
+      <h2 className="text-lg font-black text-slate-950 dark:text-white">
+        Taxa de acerto
+      </h2>
+      <p className="text-sm text-slate-500 dark:text-slate-400">
+        O objetivo é estabilizar acima de 70% antes de intensificar simulados.
+      </p>
+
+      <div className="mt-5 h-[260px]">
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={data} margin={{ top: 10, right: 12, left: -18, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" className="stroke-slate-200 dark:stroke-white/10" />
+            <XAxis dataKey="label" tickLine={false} axisLine={false} className="text-xs" />
+            <YAxis tickLine={false} axisLine={false} className="text-xs" domain={[0, 100]} />
+            <Tooltip
+              contentStyle={{
+                borderRadius: 16,
+                border: "1px solid rgba(148, 163, 184, 0.25)",
+              }}
+              formatter={(value) => [`${value}%`, "Taxa"]}
+            />
+            <Line
+              type="monotone"
+              dataKey="accuracy_rate"
+              strokeWidth={3}
+              dot={false}
+              activeDot={{ r: 5 }}
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+    </section>
+  );
+}
+
+function TopicList({
+  title,
+  description,
+  data,
+  type,
+}: {
+  title: string;
+  description: string;
+  data: TopicMetric[];
+  type: "strong" | "weak";
+}) {
+  return (
+    <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#07111f]">
+      <div className="flex items-start gap-3">
+        <div
+          className={cn(
+            "rounded-2xl p-3",
+            type === "strong"
+              ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+              : "bg-rose-500/10 text-rose-700 dark:text-rose-300"
+          )}
         >
-            <div className={`flex items-center text-lg font-semibold ${iconColor} mb-4`}>
-                <Icon className={`w-5 h-5 mr-2 ${iconColor}`} />
-                {title}
-            </div>
-            
-            <div className="space-y-3">
-                <div className="grid grid-cols-2 text-sm font-bold text-gray-400 border-b border-slate-700 pb-2">
-                    <span>{data.length > 4 ? 'Assunto' : 'Simulado'}</span>
-                    <span className="text-right">Taxa de acerto</span>
+          {type === "strong" ? (
+            <CheckCircle2 className="h-5 w-5" />
+          ) : (
+            <XCircle className="h-5 w-5" />
+          )}
+        </div>
+
+        <div>
+          <h2 className="text-lg font-black text-slate-950 dark:text-white">
+            {title}
+          </h2>
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            {description}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-5 space-y-4">
+        {data.length === 0 ? (
+          <p className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-500 dark:bg-white/5 dark:text-slate-400">
+            Ainda não há volume estatístico suficiente.
+          </p>
+        ) : (
+          data.map((topic) => (
+            <div key={topic.id}>
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-bold text-slate-800 dark:text-slate-100">
+                    {topic.name}
+                  </p>
+                  {topic.subject && (
+                    <p className="truncate text-xs text-slate-500 dark:text-slate-400">
+                      {topic.subject}
+                    </p>
+                  )}
                 </div>
-                {data.map((row, index) => (
-                    <div key={index} className="grid grid-cols-2 text-gray-200 text-base py-1 border-b border-slate-800/50 last:border-b-0">
-                        <span className='font-light'>{row.item}</span>
-                        <span className="text-right font-medium text-indigo-400">{row.rate}</span>
-                    </div>
-                ))}
-                <div className="absolute top-0 right-0 h-full w-0.5 bg-indigo-500 rounded-r-xl" />
+
+                <span className="shrink-0 text-sm font-black text-slate-950 dark:text-white">
+                  {formatPercent(topic.accuracy_rate)}
+                </span>
+              </div>
+
+              <div className="h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-white/10">
+                <div
+                  className={cn(
+                    "h-full rounded-full",
+                    type === "strong" ? "bg-emerald-500" : "bg-rose-500"
+                  )}
+                  style={{ width: `${Math.min(100, topic.accuracy_rate)}%` }}
+                />
+              </div>
+
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                {topic.correct}/{topic.attempts} acertos
+              </p>
             </div>
-        </motion.div>
-    );
-};
+          ))
+        )}
+      </div>
+    </section>
+  );
+}
 
-// Componente de Ranking Global
-const RankingList: React.FC<{ delay: number }> = ({ delay }) => {
-    return (
-        <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: delay }}
-            className="flex flex-col p-6 rounded-xl bg-[#1D2132] shadow-lg"
-        >
-            <div className="flex items-center text-lg font-semibold text-indigo-400 mb-4">
-                <TrophyIcon className='w-5 h-5 mr-2 text-indigo-400' />
-                Ranking global
-            </div>
+function SubjectTable({ data }: { data: UserMetricsDashboard["subjects"] }) {
+  return (
+    <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#07111f]">
+      <div className="mb-5">
+        <h2 className="text-lg font-black text-slate-950 dark:text-white">
+          Matriz por assunto
+        </h2>
+        <p className="text-sm text-slate-500 dark:text-slate-400">
+          Uma visão de domínio, volume e aproveitamento.
+        </p>
+      </div>
 
-            <ol className="space-y-3">
-                {rankingGlobal.map((item) => (
-                    <li key={item.rank} className="flex justify-between items-center text-gray-200">
-                        <span className="font-light">
-                            {item.rank}. <span className='font-medium'>{item.name}</span>
-                        </span>
-                        <span className={`text-sm ${item.colorClass} font-semibold`}>
-                            {item.difference}
-                        </span>
-                    </li>
-                ))}
-            </ol>
-        </motion.div>
-    );
-};
+      <div className="overflow-x-auto">
+        <div className="min-w-[680px]">
+          <div className="grid grid-cols-[1.6fr_.7fr_.7fr_.7fr_.9fr] border-b border-slate-200 pb-3 text-xs font-bold uppercase tracking-[0.14em] text-slate-400 dark:border-white/10">
+            <span>Assunto</span>
+            <span className="text-right">Tentativas</span>
+            <span className="text-right">Acertos</span>
+            <span className="text-right">Taxa</span>
+            <span className="text-right">Status</span>
+          </div>
 
-// --- Componente Principal da Dashboard de Estatísticas ---
-
-const Dashboard: React.FC = () => {
-    const [startDate, setStartDate] = useState('11/11/2025');
-    const [endDate, setEndDate] = useState('15/11/2025');
-
-    const topStats: StatCardProps[] = [
-        {
-            title: 'Total de pontos',
-            value: '19π',
-            secondaryText: '+5 nesta semana',
-            icon: PiIcon,
-            colorClass: 'text-indigo-400',
-            delay: 0.0,
-        },
-        {
-            title: 'Nível atual',
-            value: 'Nível 7',
-            secondaryText: '+11 pontos para o próximo nível',
-            icon: StarIcon,
-            colorClass: 'text-blue-400',
-            delay: 0.1,
-        },
-        {
-            title: 'Questões acertadas',
-            value: '197',
-            secondaryText: 'de 250 respondidas',
-            icon: CheckCircleIcon,
-            colorClass: 'text-green-500',
-            delay: 0.2,
-        },
-        {
-            title: 'Questões erradas',
-            value: '53',
-            secondaryText: 'de 250 respondidas',
-            icon: XCircleIcon,
-            colorClass: 'text-red-500',
-            delay: 0.3,
-        },
-    ];
-
-    const bottomStats: MiniStatCardProps[] = [
-        {
-            title: 'Aulas assistidas',
-            value: '37 aulas',
-            secondaryText: '(+50% assistidas)',
-            colorClass: 'text-indigo-400',
-            delay: 0.5,
-        },
-        {
-            title: 'Tempo total de estudo',
-            value: '17 dias',
-            secondaryText: 'desde o início da jornada',
-            colorClass: 'text-blue-400',
-            delay: 0.6,
-        },
-        {
-            title: 'Sequência de estudos',
-            value: '11 dias',
-            secondaryText: 'Maior sequência: 19 dias',
-            colorClass: 'text-pink-500',
-            delay: 0.7,
-        },
-    ];
-    
-    const chartVariants = {
-        hidden: { opacity: 0, y: 30 },
-        visible: { opacity: 1, y: 0, transition: { duration: 0.7, delay: 0.8 } },
-    };
-    
-    const background_color = 'bg-[#0A0E18]';
-    const card_background = 'bg-[#1D2132]';
-    const filter_input_background = 'bg-[#1A1F2D]';
-
-    return (
-        <div className={`min-h-screen ${background_color} p-4 sm:p-8 lg:p-12 text-white font-sans`}>
-            <header className="flex items-center mb-10">
-                <h1 className="text-2xl sm:text-3xl font-bold">Minhas estatísticas</h1>
-                <span className="ml-3 text-gray-500 cursor-pointer hover:text-white transition text-xl">?</span>
-            </header>
-
-            {/* 1. Grid de Estatísticas Principais (Top Stats) */}
-            <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
-                {topStats.map((stat, index) => (
-                    <StatCard key={index} {...stat} delay={stat.delay} />
-                ))}
-            </section>
-
-            {/* 2. Filtro por Período */}
-            <motion.section
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: 0.4 }}
-                className={`p-6 rounded-xl ${card_background} mb-10 shadow-lg`}
-            >
-                <div className="flex items-center text-lg font-semibold text-indigo-400 mb-4">
-                    <FilterIcon className='w-5 h-5 mr-2 text-indigo-400' />
-                    Filtrar por período
-                </div>
-                <p className="text-sm text-gray-400 mb-4">
-                    Selecione um intervalo de dias para visualizar acertos, erros e taxa de acerto.
-                </p>
-                
-                <div className="flex flex-wrap items-center gap-4">
-                    <div className='relative'>
-                        <input
-                            type="text"
-                            value={startDate}
-                            onChange={(e) => setStartDate(e.target.value)}
-                            className={`${filter_input_background} text-gray-200 border border-slate-700/60 rounded-md p-3 w-36 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150`}
-                        />
-                    </div>
-
-                    <div className='relative'>
-                        <input
-                            type="text"
-                            value={endDate}
-                            onChange={(e) => setEndDate(e.target.value)}
-                            className={`${filter_input_background} text-gray-200 border border-slate-700/60 rounded-md p-3 w-36 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150`}
-                        />
-                    </div>
-                    
-                    <motion.button
-                        whileHover={{ scale: 1.03 }}
-                        whileTap={{ scale: 0.98 }}
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-md shadow-md transition duration-200"
-                        onClick={() => console.log('Filtrar aplicado')}
+          <div className="divide-y divide-slate-100 dark:divide-white/10">
+            {data.length === 0 ? (
+              <p className="py-5 text-sm text-slate-500 dark:text-slate-400">
+                Nenhum assunto registrado no período.
+              </p>
+            ) : (
+              data.map((item) => (
+                <div
+                  key={`${item.id}-${item.name}`}
+                  className="grid grid-cols-[1.6fr_.7fr_.7fr_.7fr_.9fr] items-center py-4 text-sm"
+                >
+                  <span className="font-bold text-slate-800 dark:text-slate-100">
+                    {item.name}
+                  </span>
+                  <span className="text-right text-slate-500 dark:text-slate-400">
+                    {item.attempts}
+                  </span>
+                  <span className="text-right text-slate-500 dark:text-slate-400">
+                    {item.correct}
+                  </span>
+                  <span className="text-right font-black text-slate-950 dark:text-white">
+                    {formatPercent(item.accuracy_rate)}
+                  </span>
+                  <span className="text-right">
+                    <span
+                      className={cn(
+                        "inline-flex rounded-full border px-2.5 py-1 text-xs font-bold",
+                        getStatusClass(item.status)
+                      )}
                     >
-                        Filtrar
-                    </motion.button>
+                      {getStatusLabel(item.status)}
+                    </span>
+                  </span>
                 </div>
-            </motion.section>
-
-            {/* 3. Grid de Estatísticas Secundárias (Bottom Stats) */}
-            <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
-                {bottomStats.map((stat, index) => (
-                    <MiniStatCard key={index} {...stat} delay={stat.delay} />
-                ))}
-            </section>
-            
-            {/* 4. Gráfico de Progresso (Chart) */}
-            <motion.section
-                variants={chartVariants}
-                initial="hidden"
-                animate="visible"
-                className={`p-6 rounded-xl ${card_background} shadow-2xl`}
-            >
-                <div className="flex items-center text-lg font-semibold text-indigo-400 mb-6">
-                    <PiIcon className='w-5 h-5 mr-2 text-indigo-400' />
-                    Progresso de Pontos π ao longo dos dias
-                </div>
-
-                <div className="h-80">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={dataProgresso} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#374151" /> 
-                            <XAxis dataKey="name" stroke="#9CA3AF" />
-                            <YAxis stroke="#9CA3AF" domain={[0, 320]} />
-                            <Tooltip 
-                                contentStyle={{ backgroundColor: '#1F2937', border: 'none', borderRadius: '8px' }}
-                                labelStyle={{ color: '#E5E7EB', fontWeight: 'bold' }}
-                                formatter={(value: number, name: string) => [`${value} Pontos`, name]}
-                            />
-                            <Line 
-                                type="monotone" 
-                                dataKey="pontos" 
-                                stroke="#EC4899"
-                                strokeWidth={3} 
-                                dot={{ fill: '#EC4899', r: 6 }}
-                                activeDot={{ fill: '#EC4899', r: 8, stroke: '#FFFFFF', strokeWidth: 2 }}
-                            />
-                        </LineChart>
-                    </ResponsiveContainer>
-                </div>
-            </motion.section>
+              ))
+            )}
+          </div>
         </div>
-    );
-};
+      </div>
+    </section>
+  );
+}
 
-// --- Componente Principal da Dashboard de Performance ---
+function RecentSimulados({ data }: { data: UserMetricsDashboard["recent_lists"] }) {
+  return (
+    <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#07111f]">
+      <div className="mb-5 flex items-center justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-black text-slate-950 dark:text-white">
+            Simulados recentes
+          </h2>
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            Aproveitamento nas últimas provas e simulados.
+          </p>
+        </div>
+
+        <Trophy className="h-5 w-5 text-amber-500" />
+      </div>
+
+      <div className="space-y-3">
+        {data.length === 0 ? (
+          <p className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-500 dark:bg-white/5 dark:text-slate-400">
+            Nenhum simulado finalizado ainda.
+          </p>
+        ) : (
+          data.map((item) => (
+            <div
+              key={item.id}
+              className="rounded-2xl border border-slate-100 p-4 dark:border-white/10"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-bold text-slate-900 dark:text-white">
+                    {item.name}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    {item.correct}/{item.total} acertos
+                  </p>
+                </div>
+
+                <span className="shrink-0 text-sm font-black text-slate-950 dark:text-white">
+                  {formatPercent(item.accuracy_rate)}
+                </span>
+              </div>
+
+              <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-white/10">
+                <div
+                  className="h-full rounded-full bg-[#0E00D0]"
+                  style={{ width: `${Math.min(100, item.accuracy_rate)}%` }}
+                />
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </section>
+  );
+}
+
+function Header({
+  days,
+  setDays,
+}: {
+  days: number;
+  setDays: (days: number) => void;
+}) {
+  return (
+    <header className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+      <div>
+        <p className="text-sm font-bold uppercase tracking-[0.22em] text-[#0E00D0] dark:text-blue-300">
+          Métricas do usuário
+        </p>
+
+        <h1 className="mt-2 text-3xl font-black tracking-tight text-slate-950 dark:text-white sm:text-4xl">
+          Diagnóstico de desempenho
+        </h1>
+
+        <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-500 dark:text-slate-400">
+          Acompanhe acertos, erros, constância, simulados e lacunas de domínio.
+        </p>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {PERIODS.map((period) => (
+          <button
+            key={period.value}
+            type="button"
+            onClick={() => setDays(period.value)}
+            className={cn(
+              "rounded-2xl border px-4 py-2 text-sm font-bold transition",
+              days === period.value
+                ? "border-[#0E00D0] bg-[#0E00D0] text-white shadow-sm"
+                : "border-slate-200 bg-white text-slate-600 hover:border-[#0E00D0]/40 hover:text-[#0E00D0] dark:border-white/10 dark:bg-white/5 dark:text-slate-300"
+            )}
+          >
+            {period.label}
+          </button>
+        ))}
+      </div>
+    </header>
+  );
+}
 
 const PerformanceDashboard: React.FC = () => {
-    const background_color = 'bg-[#0A0E18]';
+  const { data: session, status } = useSession();
+  const [days, setDays] = useState(30);
+  const [data, setData] = useState<UserMetricsDashboard | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [erro, setErro] = useState<string | null>(null);
 
+  const token =
+    (session as any)?.laravelToken ||
+    (session as any)?.accessToken ||
+    (session as any)?.user?.laravelToken;
+
+  useEffect(() => {
+    if (status === "loading") return;
+
+    if (!token) {
+      setLoading(false);
+      setErro("Sessão não encontrada.");
+      return;
+    }
+
+    let active = true;
+
+    setLoading(true);
+    setErro(null);
+
+    getUserMetrics(token, days)
+      .then((response) => {
+        if (!active) return;
+        setData(response);
+      })
+      .catch((error) => {
+        if (!active) return;
+        setErro(error.message || "Erro ao carregar métricas.");
+      })
+      .finally(() => {
+        if (!active) return;
+        setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [token, status, days]);
+
+  const stats = useMemo(() => {
+    if (!data) return [];
+
+    return [
+      {
+        title: "Taxa de acerto",
+        value: formatPercent(data.resumo.accuracy_rate),
+        description: `${formatNumber(data.resumo.questions_correct)} acertos em ${formatNumber(data.resumo.questions_answered)} questões.`,
+        icon: Target,
+        tone: "blue" as const,
+      },
+      {
+        title: "Questões erradas",
+        value: formatNumber(data.resumo.questions_wrong),
+        description: "Erros registrados no período selecionado.",
+        icon: XCircle,
+        tone: "rose" as const,
+      },
+      {
+        title: "Tempo estudado",
+        value: formatHours(data.resumo.hours_studied),
+        description: `${formatNumber(data.resumo.lessons_completed)} aulas concluídas no período.`,
+        icon: BookOpen,
+        tone: "purple" as const,
+      },
+      {
+        title: "Sequência",
+        value: `${formatNumber(data.resumo.current_streak)} dias`,
+        description: `Maior sequência: ${formatNumber(data.resumo.longest_streak)} dias.`,
+        icon: Flame,
+        tone: "amber" as const,
+      },
+      {
+        title: "Pontos π",
+        value: formatNumber(data.gamification.points),
+        description: `Nível ${formatNumber(data.gamification.level)} na gamificação.`,
+        icon: Sparkles,
+        tone: "green" as const,
+      },
+      {
+        title: "Ranking",
+        value: data.gamification.ranking_global
+          ? `#${formatNumber(data.gamification.ranking_global)}`
+          : "—",
+        description: "Posição aproximada pelo total de pontos.",
+        icon: Medal,
+        tone: "slate" as const,
+      },
+    ];
+  }, [data]);
+
+  if (loading) {
     return (
-        <div className={`min-h-screen ${background_color} p-4 sm:p-8 lg:p-12 text-white font-sans`}>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                
-                {/* 1. Pontos Fortes */}
-                <motion.div 
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ duration: 0.5, delay: 0 }}
-                >
-                    <SkillSection 
-                        title="Pontos fortes"
-                        data={strongPoints}
-                        icon={ThumbsUpIcon}
-                        iconColor="text-green-500"
-                        isStrong={true}
-                    />
-                </motion.div>
-
-                {/* 2. Pontos Fracos */}
-                <motion.div 
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ duration: 0.5, delay: 0.1 }}
-                >
-                    <SkillSection 
-                        title="Pontos fracos"
-                        data={weakPoints}
-                        icon={ThumbsDownIcon}
-                        iconColor="text-red-500"
-                        isStrong={false}
-                    />
-                </motion.div>
-            </div>
-
-            {/* 3. Taxa de acerto por assunto (Linha Cheia) */}
-            <RateTable 
-                title="Taxa de acerto por assunto"
-                data={subjectRate}
-                icon={StarIcon}
-                iconColor="text-blue-400"
-                delay={0.2}
-            />
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
-                {/* 4. Simulados (2/3 da largura no desktop) */}
-                <div className="lg:col-span-2 relative">
-                    <RateTable 
-                        title="Simulados"
-                        data={simulatedRate}
-                        icon={ListIcon}
-                        iconColor="text-blue-400"
-                        delay={0.3}
-                    />
-                </div>
-
-                {/* 5. Ranking global (1/3 da largura no desktop) */}
-                <div className="relative">
-                    <RankingList delay={0.4} />
-                </div>
-            </div>
-        </div>
+      <div className="space-y-6">
+        <Header days={days} setDays={setDays} />
+        <MetricSkeleton />
+      </div>
     );
+  }
+
+  if (erro) {
+    return (
+      <section className="rounded-3xl border border-rose-500/20 bg-rose-500/10 p-6 text-rose-700 dark:text-rose-200">
+        <div className="flex items-center gap-3">
+          <AlertTriangle className="h-5 w-5" />
+          <strong>Não foi possível carregar as métricas.</strong>
+        </div>
+        <p className="mt-2 text-sm opacity-85">{erro}</p>
+      </section>
+    );
+  }
+
+  if (!data) {
+    return <EmptyState />;
+  }
+
+  const hasAnyMetric =
+    data.resumo.questions_answered > 0 ||
+    data.resumo.lessons_completed > 0 ||
+    data.resumo.seconds_studied > 0;
+
+  if (!hasAnyMetric) {
+    return (
+      <div className="space-y-6">
+        <Header days={days} setDays={setDays} />
+        <EmptyState />
+      </div>
+    );
+  }
+
+  return (
+    <section className="space-y-6">
+      <Header days={days} setDays={setDays} />
+
+      <RecommendationCard recommendation={data.recommendation} />
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        {stats.map((stat) => (
+          <StatCard key={stat.title} {...stat} />
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.4fr_.9fr]">
+        <EvolutionChart data={data.evolution} />
+        <AccuracyLineChart data={data.evolution} />
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+        <TopicList
+          title="Pontos fortes"
+          description="Tópicos com maior domínio estatístico."
+          data={data.strengths}
+          type="strong"
+        />
+
+        <TopicList
+          title="Pontos de atenção"
+          description="Tópicos que merecem revisão prioritária."
+          data={data.weaknesses}
+          type="weak"
+        />
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.35fr_.75fr]">
+        <SubjectTable data={data.subjects} />
+        <RecentSimulados data={data.recent_lists} />
+      </div>
+    </section>
+  );
 };
 
-export { Dashboard, PerformanceDashboard };
-export default Dashboard;
+export { PerformanceDashboard };
+export default PerformanceDashboard;

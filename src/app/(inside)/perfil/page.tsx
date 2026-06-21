@@ -2,37 +2,68 @@
 
 import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { fetchMyProfile, saveMyProfile, setPassword, unlinkGoogleAccount, checkGoogleStatus, removerAvatar, salvarAvatar } from "@/lib/perfil/userData";
+import {
+  fetchMyProfile,
+  saveMyProfile,
+  salvarAvatar,
+  removerAvatar,
+  setPassword,
+  checkGoogleStatus,
+  linkGoogleAccount,
+  unlinkGoogleAccount,
+  getLevelTitle,
+} from "@/lib/perfil/userData";
 import { useSession, signIn } from "next-auth/react"; // <--- Importei signIn
-
 import type { UserProfile } from "@/lib/perfil/userData";
+
+// import type { UserProfile } from "@/lib/perfil/userData";
 import ProfileSkeleton from "@/components/Skeletons/ProfileCardSkeleton";
 import ProfileEditorModal from "@/components/editor/ProfileEditorModal";
 import { useImageUpload } from "@/hooks/useImageUpload";
-import { getUser } from '@/lib/dailyCheck/daily'; // Importe a função getUser
-
+import { getUser } from "@/lib/dailyCheck/daily"; // Importe a função getUser
+import { AnimatedRoleName } from "@/components/user/AnimatedRoleName";
+import { useRouter } from "next/navigation";
 
 const CameraIcon = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg
+    width="20"
+    height="20"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
     <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
     <circle cx="12" cy="13" r="4" />
   </svg>
 );
 
 const TrashIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg
+    width="18"
+    height="18"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
     <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
   </svg>
 );
 
 const EditIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg
+    width="18"
+    height="18"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
     <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
     <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
   </svg>
 );
-
-
 
 type ProfileForm = UserProfile & {
   celular: string;
@@ -42,19 +73,34 @@ type ErrorMap = Record<string, string>;
 
 export default function Profile() {
   const [form, setForm] = useState<ProfileForm>({
-    id: "",
+    id: null,
+    user_id: null,
     name: "",
+    email: "",
+    avatar: "",
     cpf: "",
     birth_date: "",
     gender: "",
+    phone: "",
     celular: "",
-  });
+    roles: [],
+    role: null,
+    gamification: null,
 
+    subscription: null,
+    access: null,
+    member_since: null,
+    profile_created_at: null,
+    created_at: null,
+    updated_at: null,
+  });
+  const router = useRouter();
   const [errors, setErrors] = useState<ErrorMap>({});
-  const [abaAtiva, setAbaAtiva] = useState<"dadosPessoais" | "dadosAcesso" | "assinaturas">(
-    "dadosPessoais"
-  );
-  const [mostrarAlterarSenha, setMostrarAlterarSenha] = useState<boolean>(false);
+  const [abaAtiva, setAbaAtiva] = useState<
+    "dadosPessoais" | "dadosAcesso" | "assinaturas"
+  >("dadosPessoais");
+  const [mostrarAlterarSenha, setMostrarAlterarSenha] =
+    useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [existProfile, setExistProfile] = useState<boolean>(false);
@@ -66,15 +112,21 @@ export default function Profile() {
   const [popup, setPopup] = useState({
     open: false,
     title: "",
-    message: ""
+    message: "",
   });
 
   // const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [isAvatarLoading, setIsAvatarLoading] = useState<boolean>(false);
   const [isHoveringAvatar, setIsHoveringAvatar] = useState<boolean>(false);
-  const [avatarAction, setAvatarAction] = useState<'idle' | 'uploading' | 'removing'>('idle');
-  const currentAvatar = session?.user?.image || null;
+  const [avatarAction, setAvatarAction] = useState<
+    "idle" | "uploading" | "removing"
+  >("idle");
 
+  const subscription = form.subscription;
+  const hasActiveSubscription = Boolean(subscription?.is_active);
+  const canAccessCourses = Boolean(form.access?.can_access_courses);
+
+  const currentAvatar = form.avatar || session?.user?.image || null;
 
   //console.log("CDN PUBLIC:", process.env.NEXT_PUBLIC_CDN_URL);
 
@@ -85,11 +137,10 @@ export default function Profile() {
     handleFileSelect,
     openFileSelector,
     confirmImageUpload,
-    setEditingImageFile
+    setEditingImageFile,
   } = useImageUpload();
 
   const sessionAny = session as any;
-
 
   // useEffect(() => {
   //   if (status === "authenticated" && sessionAny?.laravelToken) {
@@ -97,7 +148,6 @@ export default function Profile() {
   //       setAvatarUrl(session?.user?.image)
   //     }
   //   }
-
 
   // }, [status, session, sessionAny?.laravelToken, update])
 
@@ -140,44 +190,71 @@ export default function Profile() {
   //   syncImageWithBackend();
   // }, [status, session, sessionAny?.laravelToken, update]);
 
-
-
   useEffect(() => {
     const loadData = async (): Promise<void> => {
       try {
         setIsLoading(true);
-        const responseGoogle = await checkGoogleStatus(sessionAny?.laravelToken);
+        const responseGoogle = await checkGoogleStatus(
+          sessionAny?.laravelToken,
+        );
         const data: any = await fetchMyProfile(sessionAny?.laravelToken);
         console.log("fetchMyProfile ->", data);
 
         if (data) {
-          setIsGoogle(responseGoogle)
+          setIsGoogle(responseGoogle);
           const formatarData = (dataISO?: string | null): string => {
             if (!dataISO) return "";
 
-            const date = new Date(dataISO);
-            const dia = String(date.getDate()).padStart(2, "0");
-            const mes = String(date.getMonth() + 1).padStart(2, "0");
-            const ano = date.getFullYear();
-            return `${dia}/${mes}/${ano}`;
+            const cleanDate = dataISO.includes("T")
+              ? dataISO.split("T")[0]
+              : dataISO;
+
+            if (/^\d{4}-\d{2}-\d{2}$/.test(cleanDate)) {
+              const [ano, mes, dia] = cleanDate.split("-");
+              return `${dia}/${mes}/${ano}`;
+            }
+
+            return "";
           };
 
           const mapearGender = (gender?: string | null): string => {
             switch (gender?.toUpperCase()) {
-              case "M": return "masculino";
-              case "F": return "feminino";
-              case "O": return "nao-informar"; // ← Usar "O" do backend
-              default: return "nao-informar";
+              case "M":
+                return "masculino";
+              case "F":
+                return "feminino";
+              case "O":
+                return "nao-informar"; // ← Usar "O" do backend
+              default:
+                return "nao-informar";
             }
           };
 
           setForm({
-            id: String(data.user_id ?? ""),
-            name: sessionAny?.user?.name ?? "",
+            id: data.id ?? null,
+            user_id: data.user_id ?? null,
+
+            name: data.name ?? sessionAny?.user?.name ?? "",
+            email: data.email ?? sessionAny?.user?.email ?? "",
+            avatar: data.avatar ?? sessionAny?.user?.image ?? "",
+
             cpf: aplicarMascaraCPF(String(data.cpf ?? "")),
             birth_date: formatarData(data.birth_date),
             gender: mapearGender(data.gender),
+            phone: data.phone ?? "",
             celular: aplicarMascaraTelefone(String(data.phone ?? "")),
+
+            roles: data.roles ?? [],
+            role: data.role ?? data.roles?.[0] ?? null,
+            gamification: data.gamification ?? null,
+
+            subscription: data.subscription ?? null,
+            access: data.access ?? null,
+
+            member_since: data.member_since ?? data.created_at ?? null,
+            profile_created_at: data.profile_created_at ?? null,
+            created_at: data.created_at ?? null,
+            updated_at: data.updated_at ?? null,
           });
         }
       } catch (error) {
@@ -199,13 +276,14 @@ export default function Profile() {
     const numbers = value.replace(/\D/g, "");
 
     if (numbers.length <= 3) return numbers;
-    if (numbers.length <= 6) return `${numbers.slice(0, 3)}.${numbers.slice(3)}`;
+    if (numbers.length <= 6)
+      return `${numbers.slice(0, 3)}.${numbers.slice(3)}`;
     if (numbers.length <= 9)
       return `${numbers.slice(0, 3)}.${numbers.slice(3, 6)}.${numbers.slice(6)}`;
 
     return `${numbers.slice(0, 3)}.${numbers.slice(3, 6)}.${numbers.slice(6, 9)}-${numbers.slice(
       9,
-      11
+      11,
     )}`;
   };
 
@@ -218,20 +296,66 @@ export default function Profile() {
 
   const converterGenderParaBackend = (gender: string): string | undefined => {
     switch (gender) {
-      case "masculino": return "M";
-      case "feminino": return "F";
-      case "nao-informar": return "O"; // ← Corrigido para "O"
-      default: return undefined;
+      case "masculino":
+        return "M";
+      case "feminino":
+        return "F";
+      case "nao-informar":
+        return "O"; // ← Corrigido para "O"
+      default:
+        return undefined;
+    }
+  };
+
+  const formatDateBR = (value?: string | null): string => {
+    if (!value) return "—";
+
+    const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) return "—";
+
+    return date.toLocaleDateString("pt-BR");
+  };
+
+  const formatDaysRemaining = (value?: number | null): string => {
+    if (typeof value !== "number" || !Number.isFinite(value)) return "";
+
+    const days = Math.max(0, Math.ceil(value));
+
+    if (days === 0) return " • expira hoje";
+    if (days === 1) return " • 1 dia restante";
+
+    return ` • ${days} dias restantes`;
+  };
+
+  const getSubscriptionStatusLabel = (status?: string | null): string => {
+    switch (status) {
+      case "active":
+        return "Ativa";
+      case "pending":
+        return "Pendente";
+      case "canceled":
+        return "Cancelada";
+      case "expired":
+        return "Expirada";
+      case "refunded":
+        return "Reembolsada";
+      default:
+        return "Indefinida";
     }
   };
 
   const handleSaveAvatar = async (file: File) => {
-    if (!sessionAny?.laravelToken || !form.id) return;
+    if (!sessionAny?.laravelToken || !form.user_id) return;
 
-    setAvatarAction('uploading');
+    setAvatarAction("uploading");
     try {
       const imageUrl = await confirmImageUpload(file);
-      const response = await salvarAvatar(sessionAny.laravelToken, form.id, imageUrl);
+      const response = await salvarAvatar(
+        sessionAny.laravelToken,
+        form.user_id,
+        imageUrl,
+      );
 
       if (response) {
         // ✅ Atualiza apenas a session - remove estado local
@@ -245,7 +369,7 @@ export default function Profile() {
         setPopup({
           open: true,
           title: "Sucesso!",
-          message: "Avatar atualizado com sucesso."
+          message: "Avatar atualizado com sucesso.",
         });
       }
     } catch (error) {
@@ -253,20 +377,22 @@ export default function Profile() {
       setPopup({
         open: true,
         title: "Erro",
-        message: "Não foi possível atualizar o avatar."
+        message: "Não foi possível atualizar o avatar.",
       });
     } finally {
-      setAvatarAction('idle');
+      setAvatarAction("idle");
     }
   };
 
-
   const handleRemoveAvatar = async () => {
-    if (!sessionAny?.laravelToken || !form.id) return;
+    if (!sessionAny?.laravelToken || !form.user_id) return;
 
-    setAvatarAction('removing');
+    setAvatarAction("removing");
     try {
-      const response = await removerAvatar(sessionAny.laravelToken, form.id);
+      const response = await removerAvatar(
+        sessionAny.laravelToken,
+        form.user_id,
+      );
 
       if (response !== null) {
         // ✅ CORREÇÃO: Atualiza a session corretamente
@@ -280,9 +406,8 @@ export default function Profile() {
         setPopup({
           open: true,
           title: "Sucesso!",
-          message: "Avatar removido com sucesso."
+          message: "Avatar removido com sucesso.",
         });
-
       } else {
         throw new Error("Falha ao remover avatar no servidor");
       }
@@ -291,10 +416,10 @@ export default function Profile() {
       setPopup({
         open: true,
         title: "Erro",
-        message: error.message || "Não foi possível remover o avatar."
+        message: error.message || "Não foi possível remover o avatar.",
       });
     } finally {
-      setAvatarAction('idle');
+      setAvatarAction("idle");
     }
   };
 
@@ -310,7 +435,10 @@ export default function Profile() {
       return;
     }
     if (newPassword !== confirmPassword) {
-      setErrors((prev) => ({ ...prev, confirmPassword: "As senhas não conferem" }));
+      setErrors((prev) => ({
+        ...prev,
+        confirmPassword: "As senhas não conferem",
+      }));
       return;
     }
 
@@ -322,7 +450,7 @@ export default function Profile() {
       setPopup({
         open: true,
         title: "Senha atualizada!",
-        message: "Sua senha foi alterada com sucesso."
+        message: "Sua senha foi alterada com sucesso.",
       });
 
       SetNewPassword("");
@@ -333,12 +461,12 @@ export default function Profile() {
       setPopup({
         open: true,
         title: "Erro",
-        message: "Não foi possível alterar sua senha. Tente novamente."
+        message: "Não foi possível alterar sua senha. Tente novamente.",
       });
     } finally {
       setIsChangingPassword(false);
     }
-  }
+  };
 
   const validarCPF = (cpfRaw: string): boolean => {
     const cpf = cpfRaw.replace(/\D/g, "");
@@ -373,8 +501,10 @@ export default function Profile() {
     const numbers = value.replace(/\D/g, "");
 
     if (numbers.length <= 2) return numbers;
-    if (numbers.length <= 6) return `(${numbers.slice(0, 2)}) ${numbers.slice(2)}`;
-    if (numbers.length <= 10) return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 6)}-${numbers.slice(6)}`;
+    if (numbers.length <= 6)
+      return `(${numbers.slice(0, 2)}) ${numbers.slice(2)}`;
+    if (numbers.length <= 10)
+      return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 6)}-${numbers.slice(6)}`;
 
     return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7, 11)}`;
   };
@@ -383,12 +513,15 @@ export default function Profile() {
     const numbers = value.replace(/\D/g, "");
 
     if (numbers.length <= 2) return numbers;
-    if (numbers.length <= 4) return `${numbers.slice(0, 2)}/${numbers.slice(2)}`;
+    if (numbers.length <= 4)
+      return `${numbers.slice(0, 2)}/${numbers.slice(2)}`;
 
     return `${numbers.slice(0, 2)}/${numbers.slice(2, 4)}/${numbers.slice(4, 8)}`;
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>): void => {
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
+  ): void => {
     const { name, value } = e.target as HTMLInputElement;
     let valorFormatado = value;
 
@@ -445,15 +578,22 @@ export default function Profile() {
     return Object.keys(novosErros).length === 0;
   };
 
-  const converterDataParaISO = (data?: string): string => {
+  const converterDataParaISO = (data?: string | null): string => {
     if (!data) return "";
+
     const partes = data.split("/");
     if (partes.length !== 3) return "";
+
     const [dia, mes, ano] = partes;
+
+    if (!dia || !mes || !ano) return "";
+
     return `${ano}-${mes}-${dia}`;
   };
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>): Promise<void> => {
+  const handleSubmit = async (
+    e: React.FormEvent<HTMLFormElement>,
+  ): Promise<void> => {
     e.preventDefault();
     setIsSubmitting(true);
 
@@ -466,7 +606,7 @@ export default function Profile() {
       id: form.id,
       name: (form.name ?? "").trim(),
       cpf: (form.cpf ?? "").replace(/\D/g, ""),
-      phone: form.celular.replace(/\D/g, ""),
+      phone: (form.celular ?? "").replace(/\D/g, ""),
       gender: form.gender ? converterGenderParaBackend(form.gender) : undefined,
       birth_date: converterDataParaISO(form.birth_date),
     };
@@ -489,14 +629,14 @@ export default function Profile() {
       setPopup({
         open: true,
         title: "Perfil atualizado",
-        message: "Seus dados foram salvos com sucesso."
+        message: "Seus dados foram salvos com sucesso.",
       });
     } catch (error) {
       console.error("Erro ao salvar perfil:", error);
       setPopup({
         open: true,
         title: "Erro",
-        message: "Erro ao salvar os dados. Tente novamente."
+        message: "Erro ao salvar os dados. Tente novamente.",
       });
     } finally {
       setIsSubmitting(false);
@@ -514,10 +654,7 @@ export default function Profile() {
     if (response) {
       setIsGoogle(false);
     }
-  }
-
-
-
+  };
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -564,14 +701,13 @@ export default function Profile() {
         className="hidden"
       />
       {/* Main */}
-      <main className="flex flex-col md:flex-row gap-8 mx-auto p-6 md:p-8 max-w-5xl items-start">
-
+      <main className="mx-auto flex w-full max-w-6xl flex-col gap-8 p-6 md:flex-row md:p-8">
         {/* Sidebar */}
         <motion.aside
           initial={{ opacity: 0, x: -50 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.5 }}
-          className="bg-[#1b1f27] p-8 md:p-12 rounded-lg w-full md:w-64 text-center"
+          className="w-full shrink-0 rounded-xl bg-[#1b1f27] p-6 text-center md:w-[320px] md:p-8"
         >
           {/* Container do Avatar com Hover */}
           <div
@@ -591,8 +727,17 @@ export default function Profile() {
                   className="w-full h-full object-cover rounded-full"
                 />
               ) : (
-                <svg width="64" height="64" viewBox="0 0 94 93" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M94 46.5C94 20.8785 72.897 0 47 0C21.103 0 0 20.8785 0 46.5C0 59.985 5.875 72.1215 15.181 80.631C15.181 80.6775 15.181 80.6775 15.134 80.724C15.604 81.189 16.168 81.561 16.638 81.9795C16.92 82.212 17.155 82.4445 17.437 82.6305C18.283 83.328 19.223 83.979 20.116 84.63C20.445 84.8625 20.727 85.0485 21.056 85.281C21.949 85.8855 22.889 86.4435 23.876 86.955C24.205 87.141 24.581 87.3735 24.91 87.5595C25.85 88.071 26.837 88.536 27.871 88.9545C28.247 89.1405 28.623 89.3265 28.999 89.466C30.033 89.8845 31.067 90.2565 32.101 90.582C32.477 90.7215 32.853 90.861 33.229 90.954C34.357 91.2795 35.485 91.5585 36.613 91.8375C36.942 91.9305 37.271 92.0235 37.647 92.07C38.963 92.349 40.279 92.535 41.642 92.6745C41.83 92.6745 42.018 92.721 42.206 92.7675C43.804 92.907 45.402 93 47 93C48.598 93 50.196 92.907 51.747 92.7675C51.935 92.7675 52.123 92.721 52.311 92.6745C53.674 92.535 54.99 92.349 56.306 92.07C56.635 92.0235 56.964 91.884 57.34 91.8375C58.468 91.5585 59.643 91.326 60.724 90.954C61.1 90.8145 61.476 90.675 61.852 90.582C62.886 90.21 63.967 89.8845 64.954 89.466C65.33 89.3265 65.706 89.1405 66.082 88.9545C67.069 88.536 68.056 88.071 69.043 87.5595C69.419 87.3735 69.748 87.141 70.077 86.955C71.017 86.397 71.957 85.8855 72.897 85.281C73.226 85.095 73.508 84.8625 73.837 84.63C74.777 83.979 75.67 83.328 76.516 82.6305C76.798 82.398 77.033 82.1655 77.315 81.9795C77.832 81.561 78.349 81.1425 78.819 80.724C78.819 80.6775 78.819 80.6775 78.772 80.631C88.125 72.1215 94 59.985 94 46.5ZM70.218 69.6105C57.481 61.1475 36.613 61.1475 23.782 69.6105C21.714 70.959 20.022 72.54 18.612 74.2605C11.468 67.0995 7.05 57.288 7.05 46.5C7.05 24.6915 24.957 6.975 47 6.975C69.043 6.975 86.95 24.6915 86.95 46.5C86.95 57.288 82.532 67.0995 75.388 74.2605C74.025 72.54 72.286 70.959 70.218 69.6105Z" fill="white" />
+                <svg
+                  width="64"
+                  height="64"
+                  viewBox="0 0 94 93"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M94 46.5C94 20.8785 72.897 0 47 0C21.103 0 0 20.8785 0 46.5C0 59.985 5.875 72.1215 15.181 80.631C15.181 80.6775 15.181 80.6775 15.134 80.724C15.604 81.189 16.168 81.561 16.638 81.9795C16.92 82.212 17.155 82.4445 17.437 82.6305C18.283 83.328 19.223 83.979 20.116 84.63C20.445 84.8625 20.727 85.0485 21.056 85.281C21.949 85.8855 22.889 86.4435 23.876 86.955C24.205 87.141 24.581 87.3735 24.91 87.5595C25.85 88.071 26.837 88.536 27.871 88.9545C28.247 89.1405 28.623 89.3265 28.999 89.466C30.033 89.8845 31.067 90.2565 32.101 90.582C32.477 90.7215 32.853 90.861 33.229 90.954C34.357 91.2795 35.485 91.5585 36.613 91.8375C36.942 91.9305 37.271 92.0235 37.647 92.07C38.963 92.349 40.279 92.535 41.642 92.6745C41.83 92.6745 42.018 92.721 42.206 92.7675C43.804 92.907 45.402 93 47 93C48.598 93 50.196 92.907 51.747 92.7675C51.935 92.7675 52.123 92.721 52.311 92.6745C53.674 92.535 54.99 92.349 56.306 92.07C56.635 92.0235 56.964 91.884 57.34 91.8375C58.468 91.5585 59.643 91.326 60.724 90.954C61.1 90.8145 61.476 90.675 61.852 90.582C62.886 90.21 63.967 89.8845 64.954 89.466C65.33 89.3265 65.706 89.1405 66.082 88.9545C67.069 88.536 68.056 88.071 69.043 87.5595C69.419 87.3735 69.748 87.141 70.077 86.955C71.017 86.397 71.957 85.8855 72.897 85.281C73.226 85.095 73.508 84.8625 73.837 84.63C74.777 83.979 75.67 83.328 76.516 82.6305C76.798 82.398 77.033 82.1655 77.315 81.9795C77.832 81.561 78.349 81.1425 78.819 80.724C78.819 80.6775 78.819 80.6775 78.772 80.631C88.125 72.1215 94 59.985 94 46.5ZM70.218 69.6105C57.481 61.1475 36.613 61.1475 23.782 69.6105C21.714 70.959 20.022 72.54 18.612 74.2605C11.468 67.0995 7.05 57.288 7.05 46.5C7.05 24.6915 24.957 6.975 47 6.975C69.043 6.975 86.95 24.6915 86.95 46.5C86.95 57.288 82.532 67.0995 75.388 74.2605C74.025 72.54 72.286 70.959 70.218 69.6105Z"
+                    fill="white"
+                  />
                 </svg>
               )}
 
@@ -611,7 +756,7 @@ export default function Profile() {
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.9 }}
                         onClick={openFileSelector}
-                        disabled={avatarAction !== 'idle'}
+                        disabled={avatarAction !== "idle"}
                         className="p-2 cursor-pointer bg-blue-600 rounded-full text-white hover:bg-blue-700 transition-colors"
                         title="Alterar avatar"
                       >
@@ -624,7 +769,7 @@ export default function Profile() {
                           whileHover={{ scale: 1.1 }}
                           whileTap={{ scale: 0.9 }}
                           onClick={handleRemoveAvatar}
-                          disabled={avatarAction !== 'idle'}
+                          disabled={avatarAction !== "idle"}
                           className="p-2 cursor-pointer bg-red-600 rounded-full text-white hover:bg-red-700 transition-colors"
                           title="Remover avatar"
                         >
@@ -637,11 +782,15 @@ export default function Profile() {
               </AnimatePresence>
 
               {/* Loading Overlay - ✅ Usando avatarAction */}
-              {avatarAction !== 'idle' && (
+              {avatarAction !== "idle" && (
                 <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center rounded-full">
                   <motion.div
                     animate={{ rotate: 360 }}
-                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                    transition={{
+                      duration: 1,
+                      repeat: Infinity,
+                      ease: "linear",
+                    }}
                     className="w-6 h-6 border-2 border-white border-t-transparent rounded-full"
                   />
                 </div>
@@ -654,7 +803,7 @@ export default function Profile() {
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.9 }}
                 onClick={openFileSelector}
-                disabled={avatarAction !== 'idle'}
+                disabled={avatarAction !== "idle"}
                 className="absolute -bottom-1 -right-1 p-2 bg-[#0e00d0] rounded-full text-white hover:bg-blue-700 transition-colors shadow-lg"
                 title="Adicionar avatar"
               >
@@ -663,26 +812,57 @@ export default function Profile() {
             )}
           </div>
 
-          <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }} className="font-semibold text-white">
-            {sessionAny?.user?.name ?? "Usuário"}
-          </motion.p>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.2 }}
+            className="w-full min-w-0 text-white"
+          >
+            <AnimatedRoleName
+              name={form.name ?? "Usuário"}
+              roles={form.roles ?? []}
+              role={form.role ?? form.roles?.[0] ?? null}
+              level={form.gamification?.current_level ?? 1}
+              levelTitle={
+                form.gamification?.level_title ??
+                getLevelTitle(form.gamification?.current_level ?? 1)
+              }
+              className="mx-auto max-w-full"
+              nameClassName="text-xl sm:text-2xl"
+            />
+          </motion.div>
 
-          <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }} className="text-sm text-gray-400 mb-4">
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.3 }}
+            className="text-sm text-gray-400 mb-4"
+          >
             {sessionAny?.user?.email ?? "—"}
           </motion.p>
 
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
+            onClick={() => router.push("/metricas")}
             className="cursor-pointer bg-[#0e00d0] text-white px-4 py-2 rounded mb-4 hover:bg-blue-700 font-medium w-full"
           >
             Ver minhas estatísticas
           </motion.button>
 
-          <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }} className="text-sm text-white">
-            <span className="font-medium">Nível 19 | Ranking 1</span>
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.4 }}
+            className="text-sm text-white"
+          >
+            <span className="font-medium">
+              Nível {form.gamification?.current_level ?? 1}
+            </span>
             <br />
-            desde 01/01/2025
+            {form.created_at
+              ? `desde ${new Date(form.created_at).toLocaleDateString("pt-BR")}`
+              : "desde —"}
           </motion.p>
         </motion.aside>
 
@@ -699,11 +879,16 @@ export default function Profile() {
               <motion.button
                 key={tab}
                 variants={tabVariants}
-                className={`cursor-pointer pb-2 ${abaAtiva === tab
-                  ? "border-b-2 border-black text-black dark:border-white dark:text-white font-medium"
-                  : "text-gray-800 hover:text-gray-950 dark:text-gray-400 dark:hover:text-white"
-                  }`}
-                onClick={() => setAbaAtiva(tab as "dadosPessoais" | "dadosAcesso" | "assinaturas")}
+                className={`cursor-pointer pb-2 ${
+                  abaAtiva === tab
+                    ? "border-b-2 border-black text-black dark:border-white dark:text-white font-medium"
+                    : "text-gray-800 hover:text-gray-950 dark:text-gray-400 dark:hover:text-white"
+                }`}
+                onClick={() =>
+                  setAbaAtiva(
+                    tab as "dadosPessoais" | "dadosAcesso" | "assinaturas",
+                  )
+                }
               >
                 {tab === "dadosPessoais" && "Dados pessoais"}
                 {tab === "dadosAcesso" && "Dados de acesso"}
@@ -730,11 +915,16 @@ export default function Profile() {
                   className="grid grid-cols-1 md:grid-cols-2 gap-4"
                 >
                   {/* Nome */}
-                  <motion.div variants={itemVariants} className="col-span-1 md:col-span-2">
-                    <label className="block mb-1 text-sm text-black dark:text-gray-300">Nome *</label>
+                  <motion.div
+                    variants={itemVariants}
+                    className="col-span-1 md:col-span-2"
+                  >
+                    <label className="block mb-1 text-sm text-black dark:text-gray-300">
+                      Nome *
+                    </label>
                     <input
                       name="name"
-                      value={form.name}
+                      value={form.name ?? ""}
                       onChange={handleChange}
                       placeholder="Digite seu nome completo"
                       className="    w-full rounded p-2 bg-white text-gray-900
@@ -743,7 +933,11 @@ export default function Profile() {
     dark:bg-transparent dark:text-white dark:placeholder-gray-500 dark:border-gray-600"
                     />
                     {errors.name && (
-                      <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-red-400 text-xs mt-1">
+                      <motion.p
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="text-red-400 text-xs mt-1"
+                      >
                         {errors.name}
                       </motion.p>
                     )}
@@ -751,10 +945,12 @@ export default function Profile() {
 
                   {/* CPF */}
                   <motion.div variants={itemVariants}>
-                    <label className="block mb-1 text-sm text-black dark:text-gray-300">CPF</label>
+                    <label className="block mb-1 text-sm text-black dark:text-gray-300">
+                      CPF
+                    </label>
                     <input
                       name="cpf"
-                      value={form.cpf}
+                      value={form.cpf ?? ""}
                       onChange={handleChange}
                       placeholder="000.000.000-00"
                       maxLength={14}
@@ -764,7 +960,11 @@ export default function Profile() {
     dark:bg-transparent dark:text-white dark:placeholder-gray-500 dark:border-gray-600"
                     />
                     {errors.cpf && (
-                      <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-red-400 text-xs mt-1">
+                      <motion.p
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="text-red-400 text-xs mt-1"
+                      >
                         {errors.cpf}
                       </motion.p>
                     )}
@@ -772,10 +972,12 @@ export default function Profile() {
 
                   {/* Nascimento */}
                   <motion.div variants={itemVariants}>
-                    <label className="block mb-1 text-sm text-black dark:text-gray-300">Nascimento</label>
+                    <label className="block mb-1 text-sm text-black dark:text-gray-300">
+                      Nascimento
+                    </label>
                     <input
                       name="birth_date"
-                      value={form.birth_date}
+                      value={form.birth_date ?? ""}
                       onChange={handleChange}
                       placeholder="DD/MM/AAAA"
                       maxLength={10}
@@ -785,7 +987,11 @@ export default function Profile() {
     dark:bg-transparent dark:text-white dark:placeholder-gray-500 dark:border-gray-600"
                     />
                     {errors.birth_date && (
-                      <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-red-400 text-xs mt-1">
+                      <motion.p
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="text-red-400 text-xs mt-1"
+                      >
                         {errors.birth_date}
                       </motion.p>
                     )}
@@ -799,7 +1005,7 @@ export default function Profile() {
 
                     <select
                       name="gender"
-                      value={form.gender}
+                      value={form.gender ?? ""}
                       onChange={handleChange}
                       className="
       w-full rounded p-2 
@@ -819,10 +1025,11 @@ export default function Profile() {
                     </select>
                   </motion.div>
 
-
                   {/* Celular */}
                   <motion.div variants={itemVariants}>
-                    <label className="block mb-1 text-sm text-black dark:text-gray-300">Celular</label>
+                    <label className="block mb-1 text-sm text-black dark:text-gray-300">
+                      Celular
+                    </label>
                     <input
                       name="celular"
                       value={form.celular}
@@ -835,14 +1042,21 @@ export default function Profile() {
     dark:bg-transparent dark:text-white dark:placeholder-gray-500 dark:border-gray-600"
                     />
                     {errors.celular && (
-                      <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-red-400 text-xs mt-1">
+                      <motion.p
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="text-red-400 text-xs mt-1"
+                      >
                         {errors.celular}
                       </motion.p>
                     )}
                   </motion.div>
 
                   {/* Save */}
-                  <motion.div variants={itemVariants} className="col-span-1 md:col-span-2 flex justify-end">
+                  <motion.div
+                    variants={itemVariants}
+                    className="col-span-1 md:col-span-2 flex justify-end"
+                  >
                     <motion.button
                       type="submit"
                       disabled={isSubmitting}
@@ -853,14 +1067,24 @@ export default function Profile() {
                       {isSubmitting ? (
                         <motion.div
                           animate={{ rotate: 360 }}
-                          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                          transition={{
+                            duration: 1,
+                            repeat: Infinity,
+                            ease: "linear",
+                          }}
                         >
                           ⏳
                         </motion.div>
                       ) : (
                         <>
                           Salvar
-                          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="20"
+                            height="20"
+                            viewBox="0 0 24 24"
+                            fill="currentColor"
+                          >
                             <path d="M21 7v12q0 .825-.587 1.413T19 21H5q-.825 0-1.412-.587T3 19V5q0-.825.588-1.412T5 3h12zm-9 11q1.25 0 2.125-.875T15 15t-.875-2.125T12 12t-2.125.875T9 15t.875 2.125T12 18m-6-8h9V6H6z" />
                           </svg>
                         </>
@@ -872,26 +1096,52 @@ export default function Profile() {
 
               {/* Dados de acesso */}
               {abaAtiva === "dadosAcesso" && (
-                <motion.div initial="hidden" animate="visible" variants={containerVariants} className="space-y-6 text-sm">
+                <motion.div
+                  initial="hidden"
+                  animate="visible"
+                  variants={containerVariants}
+                  className="space-y-6 text-sm"
+                >
                   {/* Seção de Email e Senha */}
                   <div className="space-y-4">
                     <motion.div variants={itemVariants}>
-                      <p className="text-black dark:text-gray-300 mb-1 font-medium">Email:</p>
+                      <p className="text-black dark:text-gray-300 mb-1 font-medium">
+                        Email:
+                      </p>
                       <p className="text-black dark:text-gray-300 bg-gray-100 dark:bg-gray-800/50 p-2 rounded border border-gray-300 dark:border-gray-700">
                         {sessionAny?.user?.email ?? "—"}
                       </p>
                     </motion.div>
 
                     <motion.div variants={itemVariants}>
-                      <p className="text-black dark:text-gray-300 mb-2 font-medium">Senha:</p>
+                      <p className="text-black dark:text-gray-300 mb-2 font-medium">
+                        Senha:
+                      </p>
                       <motion.button
                         onClick={() => setMostrarAlterarSenha(true)}
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
                         className="cursor-pointer text-white bg-[#0e00d0] px-4 py-2 rounded text-sm hover:bg-blue-700 flex items-center gap-2"
                       >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="16"
+                          height="16"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <rect
+                            x="3"
+                            y="11"
+                            width="18"
+                            height="11"
+                            rx="2"
+                            ry="2"
+                          ></rect>
                           <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
                         </svg>
                         Alterar senha
@@ -903,10 +1153,14 @@ export default function Profile() {
 
                   {/* Seção de Login Social */}
                   <motion.div variants={itemVariants} className="space-y-3">
-                    <h3 className="text-black dark:text-white font-medium text-base">Login Social</h3>
+                    <h3 className="text-black dark:text-white font-medium text-base">
+                      Login Social
+                    </h3>
 
                     <p className="text-gray-600 dark:text-gray-400 text-xs mb-3">
-                      Habilite o login com o Google se o e-mail da sua conta Google for o mesmo do seu cadastro atual ({sessionAny?.user?.email}).
+                      Habilite o login com o Google se o e-mail da sua conta
+                      Google for o mesmo do seu cadastro atual (
+                      {sessionAny?.user?.email}).
                     </p>
 
                     {/* BOTÃO GOOGLE */}
@@ -917,10 +1171,11 @@ export default function Profile() {
                       whileTap={!isGoogle ? { scale: 0.98 } : {}}
                       className={`
       flex items-center gap-3 px-4 py-2 rounded-lg border shadow-sm transition-all 
-      ${isGoogle
-                          ? "bg-green-500 border-green-600 text-white cursor-not-allowed shadow-md"
-                          : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50 cursor-pointer dark:bg-[#1b1f27] dark:border-gray-600 dark:text-white dark:hover:bg-[#252a35]"
-                        }
+      ${
+        isGoogle
+          ? "bg-green-500 border-green-600 text-white cursor-not-allowed shadow-md"
+          : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50 cursor-pointer dark:bg-[#1b1f27] dark:border-gray-600 dark:text-white dark:hover:bg-[#252a35]"
+      }
     `}
                     >
                       {/* Ícone Google */}
@@ -931,14 +1186,28 @@ export default function Profile() {
                         viewBox="0 0 48 48"
                         className={`${isGoogle ? "opacity-80" : ""}`}
                       >
-                        <path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z" />
-                        <path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z" />
-                        <path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z" />
-                        <path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571c0.001-0.001,0.002-0.001,0.003-0.002l6.19,5.238C36.971,39.205,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z" />
+                        <path
+                          fill="#FFC107"
+                          d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"
+                        />
+                        <path
+                          fill="#FF3D00"
+                          d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"
+                        />
+                        <path
+                          fill="#4CAF50"
+                          d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"
+                        />
+                        <path
+                          fill="#1976D2"
+                          d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571c0.001-0.001,0.002-0.001,0.003-0.002l6.19,5.238C36.971,39.205,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z"
+                        />
                       </svg>
 
                       <span className="font-medium">
-                        {isGoogle ? "Conta Google conectada!" : "Conectar conta Google"}
+                        {isGoogle
+                          ? "Conta Google conectada!"
+                          : "Conectar conta Google"}
                       </span>
                     </motion.button>
 
@@ -952,26 +1221,175 @@ export default function Profile() {
                       </button>
                     )}
                   </motion.div>
-
-
                 </motion.div>
               )}
 
               {/* Assinaturas */}
+              {/* Assinaturas */}
               {abaAtiva === "assinaturas" && (
-                <motion.div initial="hidden" animate="visible" variants={containerVariants} className="flex flex-col items-center justify-center text-center space-y-4">
-                  <motion.p variants={itemVariants} className="text-white font-medium">
-                    Nenhuma assinatura cadastrada.
-                  </motion.p>
+                <motion.div
+                  initial="hidden"
+                  animate="visible"
+                  variants={containerVariants}
+                  className="w-full space-y-5"
+                >
+                  {hasActiveSubscription && subscription ? (
+                    <motion.div
+                      variants={itemVariants}
+                      className="relative overflow-hidden rounded-2xl border border-emerald-400/25 bg-gradient-to-br from-emerald-500/15 via-emerald-500/5 to-[#0E00D0]/10 p-6 shadow-[0_18px_50px_rgba(0,0,0,0.22)]"
+                    >
+                      <div className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-emerald-400/20 blur-3xl" />
+                      <div className="pointer-events-none absolute -bottom-20 -left-20 h-44 w-44 rounded-full bg-[#0E00D0]/20 blur-3xl" />
 
-                  <motion.button
-                    variants={itemVariants}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    className="cursor-pointer bg-[#0e00d0] text-white px-4 py-2 rounded hover:bg-blue-700 text-sm"
-                  >
-                    Ir para cursos
-                  </motion.button>
+                      <div className="relative flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                        <div className="min-w-0">
+                          <h3 className="mt-4 text-2xl font-black tracking-tight text-white">
+                            {subscription.product_name ??
+                              "Principia Matemática"}
+                          </h3>
+
+                          <p className="mt-1 text-sm font-medium text-slate-300">
+                            {subscription.plan ?? "Plano ativo"}
+                          </p>
+
+                          <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+                              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                                Status
+                              </p>
+                              <p className="mt-1 text-sm font-black text-emerald-200">
+                                {getSubscriptionStatusLabel(
+                                  subscription.status,
+                                )}
+                              </p>
+                            </div>
+
+                            <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+                              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                                Validade
+                              </p>
+                              <p className="mt-1 text-sm font-black text-white">
+                                {formatDateBR(subscription.access_expires_at)}
+                              </p>
+                              <p className="mt-1 text-xs font-semibold text-emerald-200">
+                                {formatDaysRemaining(
+                                  subscription.days_remaining,
+                                ).replace(" • ", "")}
+                              </p>
+                            </div>
+
+                            <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+                              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                                Último pagamento
+                              </p>
+                              <p className="mt-1 text-sm font-black text-white">
+                                {formatDateBR(subscription.last_payment_at)}
+                              </p>
+                            </div>
+
+                            <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+                              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                                Identificação
+                              </p>
+                              <p className="mt-1 truncate text-sm font-black text-white">
+                                {subscription.subscription_id ?? "—"}
+                              </p>
+                            </div>
+                          </div>
+
+                          <p className="mt-4 text-sm text-slate-300">
+                            {form.access?.reason ??
+                              "Sua assinatura está ativa."}
+                          </p>
+                        </div>
+
+                        <div className="flex shrink-0 flex-col gap-2 sm:flex-row lg:flex-col">
+                          <button
+                            type="button"
+                            onClick={() => router.push("/conteudo")}
+                            className="cursor-pointer rounded-xl bg-[#0E00D0] px-5 py-2.5 text-sm font-black text-white transition hover:bg-blue-700"
+                          >
+                            Ir para meus cursos
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => router.push("/exercicios")}
+                            className="cursor-pointer rounded-xl border border-white/10 bg-white/5 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-white/10"
+                          >
+                            Resolver questões
+                          </button>
+                        </div>
+                      </div>
+                    </motion.div>
+                  ) : null}
+
+                  {!hasActiveSubscription && canAccessCourses ? (
+                    <motion.div
+                      variants={itemVariants}
+                      className="rounded-2xl border border-blue-400/25 bg-blue-500/10 p-6"
+                    >
+                      <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-200">
+                        Acesso institucional
+                      </p>
+
+                      <h3 className="mt-3 text-2xl font-black text-white">
+                        Cursos liberados pelo cargo
+                      </h3>
+
+                      <p className="mt-2 text-sm text-slate-300">
+                        {form.access?.reason ??
+                          "Seu cargo permite acessar os cursos."}
+                      </p>
+
+                      <button
+                        type="button"
+                        onClick={() => router.push("/conteudo")}
+                        className="cursor-pointer mt-5 rounded-xl bg-[#0E00D0] px-5 py-2.5 text-sm font-black text-white transition hover:bg-blue-700"
+                      >
+                        Ir para cursos
+                      </button>
+                    </motion.div>
+                  ) : null}
+
+                  {!canAccessCourses ? (
+                    <motion.div
+                      variants={itemVariants}
+                      className="rounded-2xl border border-yellow-400/25 bg-yellow-500/10 p-6"
+                    >
+                      <p className="text-xs font-black uppercase tracking-[0.18em] text-yellow-200">
+                        Sem assinatura ativa
+                      </p>
+
+                      <h3 className="mt-3 text-2xl font-black text-white">
+                        Você ainda não possui acesso aos cursos
+                      </h3>
+
+                      <p className="mt-2 text-sm text-slate-300">
+                        Assine o Principia para liberar aulas, listas de curso,
+                        simulados e acompanhamento de desempenho.
+                      </p>
+
+                      <div className="mt-5 flex flex-col gap-2 sm:flex-row">
+                        <button
+                          type="button"
+                          onClick={() => router.push("/conteudo")}
+                          className="rounded-xl border border-white/10 bg-white/5 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-white/10"
+                        >
+                          Ver cursos
+                        </button>
+
+                        <a
+                          href="LINK_DO_CHECKOUT_HOTMART"
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex justify-center rounded-xl bg-[#0E00D0] px-5 py-2.5 text-sm font-black text-white transition hover:bg-blue-700"
+                        >
+                          Assinar agora
+                        </a>
+                      </div>
+                    </motion.div>
+                  ) : null}
                 </motion.div>
               )}
             </AnimatePresence>
@@ -998,47 +1416,65 @@ export default function Profile() {
               <button
                 onClick={() => {
                   setMostrarAlterarSenha(false);
-                  setErrors((prev) => ({ ...prev, newPassword: "", confirmPassword: "" }));
+                  setErrors((prev) => ({
+                    ...prev,
+                    newPassword: "",
+                    confirmPassword: "",
+                  }));
                 }}
                 className="cursor-pointer absolute top-2 right-2 text-white text-xl hover:text-[#D0004C]"
               >
                 &times;
               </button>
 
-              <h2 className="text-white font-semibold text-lg mb-1">Alterar senha</h2>
-              <p className="text-gray-400 text-sm mb-4">Digite uma nova senha para alterar a atual.</p>
+              <h2 className="text-white font-semibold text-lg mb-1">
+                Alterar senha
+              </h2>
+              <p className="text-gray-400 text-sm mb-4">
+                Digite uma nova senha para alterar a atual.
+              </p>
 
               <div className="mb-4">
-                <label className="block text-sm text-white font-semibold mb-1">Nova senha</label>
+                <label className="block text-sm text-white font-semibold mb-1">
+                  Nova senha
+                </label>
                 <input
                   type="password"
                   name="newPassword"
                   value={newPassword}
                   onChange={(e) => {
                     SetNewPassword(e.target.value);
-                    if (errors.newPassword) setErrors((p) => ({ ...p, newPassword: "" }));
+                    if (errors.newPassword)
+                      setErrors((p) => ({ ...p, newPassword: "" }));
                   }}
                   className="w-full p-2 bg-transparent border border-gray-600 rounded text-white focus:outline-none focus:ring-2 focus:ring-[#0e00d0]"
                 />
                 {errors.newPassword && (
-                  <p className="text-red-400 text-xs mt-1">{errors.newPassword}</p>
+                  <p className="text-red-400 text-xs mt-1">
+                    {errors.newPassword}
+                  </p>
                 )}
               </div>
 
               <div className="mb-6">
-                <label className="block text-sm text-white font-semibold mb-1">Confirmar nova senha</label>
+                <label className="block text-sm text-white font-semibold mb-1">
+                  Confirmar nova senha
+                </label>
                 <input
                   type="password"
                   name="confirmPassword"
                   value={confirmPassword}
                   onChange={(e) => {
                     SetConfirmPassword(e.target.value);
-                    if (errors.confirmPassword) setErrors((p) => ({ ...p, confirmPassword: "" }));
+                    if (errors.confirmPassword)
+                      setErrors((p) => ({ ...p, confirmPassword: "" }));
                   }}
                   className="w-full p-2 bg-transparent border border-gray-600 rounded text-white focus:outline-none focus:ring-2 focus:ring-[#0e00d0]"
                 />
                 {errors.confirmPassword && (
-                  <p className="text-red-400 text-xs mt-1">{errors.confirmPassword}</p>
+                  <p className="text-red-400 text-xs mt-1">
+                    {errors.confirmPassword}
+                  </p>
                 )}
               </div>
 
@@ -1074,8 +1510,12 @@ export default function Profile() {
             >
               <div className="flex flex-col gap-3">
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{popup.title}</h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-300">{popup.message}</p>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    {popup.title}
+                  </h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-300">
+                    {popup.message}
+                  </p>
                 </div>
                 <div className="flex justify-end">
                   <button

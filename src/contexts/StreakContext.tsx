@@ -1,106 +1,148 @@
-// contexts/StreakContext.tsx
-'use client'
+"use client";
 
-import React, { createContext, useContext, useEffect } from 'react'
-import { useSession } from 'next-auth/react'
-import useSWR from 'swr'
-import { checkinStatus, checkinDaily } from '@/lib/dailyCheck/daily'
-import { getUTCDateString } from '@/utils/dateHelpers'
-
-interface UserStreak {
-  id: number
-  user_id: number
-  current_streak: number
-  longest_streak: number
-  last_checkin_date: string
-  has_checked_in_today: boolean
-}
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useRef,
+  type ReactNode,
+} from "react";
+import { useSession } from "next-auth/react";
+import useSWR, { type KeyedMutator } from "swr";
+import {
+  checkinStatus,
+  checkinDaily,
+  type CheckinStatusResponse,
+} from "@/lib/dailyCheck/daily";
 
 interface StreakContextType {
-  streakData: UserStreak | undefined
-  isLoading: boolean
-  error: any
-  mutate: () => void
+  streakData: CheckinStatusResponse | undefined;
+  isLoading: boolean;
+  error: unknown;
+  mutate: KeyedMutator<CheckinStatusResponse>;
 }
 
-const StreakContext = createContext<StreakContextType | undefined>(undefined)
+const StreakContext = createContext<StreakContextType | undefined>(undefined);
 
-export function StreakProvider({ children }: { children: React.ReactNode }) {
-  const { data: session } = useSession()
-  const token = session?.laravelToken
+const CHECKIN_COOKIE_NAME = "daily_checkin";
+
+function getCookie(name: string): string | null {
+  if (typeof document === "undefined") return null;
+
+  const cookie = document.cookie
+    .split("; ")
+    .find((row) => row.startsWith(`${name}=`));
+
+  if (!cookie) return null;
+
+  return decodeURIComponent(cookie.split("=")[1] ?? "");
+}
+
+function setCheckinCookie(date: string): void {
+  if (typeof document === "undefined") return;
+
+  /*
+   * Não precisa tentar calcular meia-noite local aqui.
+   * O cookie é apenas um freio client-side contra chamadas repetidas.
+   * A verdade permanece no backend.
+   */
+  const maxAge = 60 * 60 * 24;
+
+  document.cookie = `${CHECKIN_COOKIE_NAME}=${encodeURIComponent(
+    date,
+  )}; path=/; max-age=${maxAge}; SameSite=Lax`;
+}
+
+export function StreakProvider({ children }: { children: ReactNode }) {
+  const { data: session, status } = useSession();
+  const token = session?.laravelToken;
+
+  const isCheckingInRef = useRef(false);
 
   const {
     data: streakData,
     error,
     isLoading,
     mutate,
-  } = useSWR<UserStreak>(
-    token ? ['/checkin-status', token] : null,
-    ([url, token]: [string, string]) => checkinStatus(token),
+  } = useSWR<CheckinStatusResponse>(
+    token ? ["checkin-status", token] : null,
+    () => checkinStatus(token as string),
     {
       revalidateOnFocus: true,
       revalidateOnReconnect: true,
-      refreshInterval: 300000, // 5 minutos
-    }
-  )
+      refreshInterval: 300000,
+      dedupingInterval: 15000,
+      shouldRetryOnError: false,
+    },
+  );
 
-  // Check-in automático global
   useEffect(() => {
-    const autoCheckin = async (): Promise<void> => {
-      if (!token || !streakData) return
-      
-      const today = getUTCDateString()
-      const lastCheckinCookie = getCheckinCookie()
-      
-      // Verificar se já fez check-in hoje
-      if (lastCheckinCookie === today && streakData.has_checked_in_today) {
-        return
+    async function autoCheckin() {
+      if (!token) return;
+      if (!streakData) return;
+      if (isCheckingInRef.current) return;
+
+      const backendToday = streakData.today;
+
+      if (!backendToday) return;
+
+      const lastCheckinCookie = getCookie(CHECKIN_COOKIE_NAME);
+
+      if (streakData.has_checked_in_today) {
+        if (lastCheckinCookie !== backendToday) {
+          setCheckinCookie(backendToday);
+        }
+
+        return;
+      }
+
+      if (lastCheckinCookie === backendToday) {
+        /*
+         * O cookie diz que houve tentativa hoje, mas o backend ainda diz que não.
+         * Nesse caso, revalida em vez de bater POST novamente.
+         */
+        await mutate();
+        return;
       }
 
       try {
-        if (!streakData.has_checked_in_today) {
-          const newStreakData = await checkinDaily(token)
-          mutate(newStreakData.streak, false)
-          setCheckinCookie(today)
+        isCheckingInRef.current = true;
+
+        const result = await checkinDaily(token);
+
+        if (result.status) {
+          await mutate(result.status, false);
         } else {
-          setCheckinCookie(today)
+          await mutate();
         }
+
+        setCheckinCookie(backendToday);
       } catch (err) {
-        console.error('Falha no check-in automático:', err)
+        console.error("Falha no check-in automático:", err);
+        await mutate();
+      } finally {
+        isCheckingInRef.current = false;
       }
     }
 
-    if (streakData && !isLoading) {
-      autoCheckin()
+    if (status === "authenticated" && streakData && !isLoading) {
+      autoCheckin();
     }
-  }, [streakData, isLoading, token, mutate])
-
-  // Funções de cookie (manter as mesmas)
-  const getCheckinCookie = (): string | null => {
-    if (typeof window === 'undefined') return null
-    const cookies = document.cookie.split(';')
-    const checkinCookie = cookies.find(cookie => cookie.trim().startsWith('daily_checkin='))
-    return checkinCookie ? checkinCookie.split('=')[1] : null
-  }
-
-  const setCheckinCookie = (date?: string): void => {
-    if (typeof window === 'undefined') return
-    const checkinDate = date || getUTCDateString()
-    const expires = new Date(Date.now() + 24 * 60 * 60 * 1000)
-    document.cookie = `daily_checkin=${checkinDate}; path=/; expires=${expires.toUTCString()}; SameSite=Lax`
-  }
+  }, [status, token, streakData, isLoading, mutate]);
 
   return (
     <StreakContext.Provider value={{ streakData, isLoading, error, mutate }}>
       {children}
     </StreakContext.Provider>
-  )
+  );
 }
 
 export function useStreak() {
-  const context = useContext(StreakContext)
+  const context = useContext(StreakContext);
+
   if (context === undefined) {
-    throw new Error('useStreak must be used within a StreakProvider')
+    throw new Error("useStreak must be used within a StreakProvider");
   }
-  return context
+
+  return context;
 }

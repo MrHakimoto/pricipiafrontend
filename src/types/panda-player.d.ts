@@ -1,7 +1,11 @@
+// types/panda-player.d.ts
+export {};
+
 declare global {
   interface Window {
-    PandaPlayer: any;
+    pandascripttag?: Array<() => void>;
+    PandaPlayer?: any;
   }
-}
 
-export {};
+  const PandaPlayer: any;
+}

@@ -6,7 +6,6 @@ import CodeMirror from "@uiw/react-codemirror";
 import { markdown } from "@codemirror/lang-markdown";
 import { defaultKeymap } from "@codemirror/commands";
 import { EditorView, keymap, ViewUpdate } from "@codemirror/view";
-import { dracula } from "@uiw/codemirror-theme-dracula";
 import { languages } from "@codemirror/language-data";
 import { mathStructurePlugin } from "./mathStructurePlugin";
 import { processMarkdown } from "../../utils/markdownProcessor";
@@ -88,32 +87,36 @@ const TabButton: React.FC<TabButtonProps> = ({ isActive, onClick, label, icon: I
     onClick={onClick}
     aria-pressed={isActive}
     data-state={isActive ? "on" : "off"}
-    className={`
-  relative flex items-center gap-1.5 px-4 h-full text-xs font-semibold
-  transition-all duration-200 outline-none
-  focus-visible:ring-2 focus-visible:ring-[#0E00D0]/40
+    className={`cursor-pointer
+      relative inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl px-3 text-xs font-black
+      transition-all duration-200 outline-none
+      focus-visible:ring-2 focus-visible:ring-[#0E00D0]/40
+      sm:px-4
 
-  ${isActive
+      ${isActive
         ? `
-          bg-[#0F172A]        
+          border border-[#0E00D0]/40
+          bg-[#0E00D0]
           text-white
-          border border-[#0E00D0]
-          shadow-md
-          rounded-t-lg
-
-      `
+          shadow-md shadow-[#0E00D0]/15
+        `
         : `
-          bg-muted/50        
-          text-muted-foreground
-          border-b border-border
-          hover:bg-[#111C36]
-      `
+          border border-transparent
+          bg-transparent
+          text-slate-600
+          hover:border-slate-200
+          hover:bg-white
+          hover:text-slate-950
+          dark:text-slate-300
+          dark:hover:border-white/10
+          dark:hover:bg-white/10
+          dark:hover:text-white
+        `
       }
-`}
-
+    `}
     aria-label={label}
   >
-    <Icon className="w-4 h-4" aria-hidden="true" />
+    <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
     <span className="hidden sm:block">{label}</span>
   </button>
 );
@@ -124,7 +127,7 @@ const ActionButton: React.FC<ActionButtonProps> = ({ onClick, title, icon: Icon,
     onClick={onClick}
     title={title}
     disabled={disabled}
-    className="inline-flex items-center justify-center rounded-md font-medium transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 hover:bg-accent hover:text-accent-foreground size-8 p-1 text-xs h-7 w-7 cursor-pointer border border-transparent hover:border-border"
+    className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl border border-transparent p-1 text-xs font-medium text-slate-600 transition-all hover:border-slate-200 hover:bg-white hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0E00D0]/30 disabled:pointer-events-none disabled:opacity-50 dark:text-slate-300 dark:hover:border-white/10 dark:hover:bg-white/10 dark:hover:text-white sm:h-8 sm:w-8"
     aria-label={title}
   >
     <Icon className="w-4 h-4 shrink-0" aria-hidden="true" />
@@ -136,7 +139,7 @@ const VisibleActionButton: React.FC<Omit<ActionButtonProps, 'disabled'>> = ({ on
     type="button"
     onClick={onClick}
     title={title}
-    className="items-center justify-center rounded-md text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&>svg]:w-4 [&>svg]:h-4 gap-2 hover:bg-accent hover:text-accent-foreground sm:flex h-7 w-7 flex cursor-pointer border border-transparent hover:border-border"
+    className="flex h-9 w-9 cursor-pointer items-center justify-center gap-2 rounded-xl border border-transparent text-sm font-medium text-slate-600 transition-all hover:border-slate-200 hover:bg-white hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0E00D0]/30 disabled:pointer-events-none disabled:opacity-50 dark:text-slate-300 dark:hover:border-white/10 dark:hover:bg-white/10 dark:hover:text-white sm:h-8 sm:w-8 [&>svg]:h-4 [&>svg]:w-4"
     aria-label={title}
   >
     <Icon aria-hidden="true" className="w-4 h-4" />
@@ -148,7 +151,7 @@ const HiddenActionButton: React.FC<Omit<ActionButtonProps, 'disabled'>> = ({ onC
     type="button"
     onClick={onClick}
     title={title}
-    className="items-center justify-center rounded-md text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&>svg]:w-4 [&>svg]:h-4 gap-2 hover:bg-accent hover:text-accent-foreground hidden sm:flex h-7 w-7 cursor-pointer border border-transparent hover:border-border"
+    className="hidden h-8 w-8 cursor-pointer items-center justify-center gap-2 rounded-xl border border-transparent text-sm font-medium text-slate-600 transition-all hover:border-slate-200 hover:bg-white hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0E00D0]/30 disabled:pointer-events-none disabled:opacity-50 dark:text-slate-300 dark:hover:border-white/10 dark:hover:bg-white/10 dark:hover:text-white sm:flex [&>svg]:h-4 [&>svg]:w-4"
     aria-label={title}
   >
     <Icon aria-hidden="true" className="w-4 h-4" />
@@ -158,10 +161,50 @@ const HiddenActionButton: React.FC<Omit<ActionButtonProps, 'disabled'>> = ({ onC
 // ========== POPOVER COMPONENT ==========
 const Popover: React.FC<PopoverProps> = ({ trigger, children, onClose }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [coords, setCoords] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+  const [coords, setCoords] = useState<{
+    top: number;
+    left: number;
+    maxHeight: number;
+  }>({
+    top: 0,
+    left: 0,
+    maxHeight: 520,
+  });
 
   const triggerRef = useRef<HTMLDivElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
+
+  const closePopover = useCallback(() => {
+    setIsOpen(false);
+    onClose?.();
+  }, [onClose]);
+
+  const updatePosition = useCallback(() => {
+    if (!triggerRef.current) return;
+
+    const rect = triggerRef.current.getBoundingClientRect();
+    const panelWidth = Math.min(430, window.innerWidth - 24);
+    const safeLeft = Math.min(
+      Math.max(12, rect.left),
+      Math.max(12, window.innerWidth - panelWidth - 12),
+    );
+
+    const gap = 8;
+    const safePadding = 12;
+    const spaceBelow = window.innerHeight - rect.bottom - safePadding;
+    const spaceAbove = rect.top - safePadding;
+    const shouldOpenUp = spaceBelow < 360 && spaceAbove > spaceBelow;
+    const availableSpace = shouldOpenUp ? spaceAbove : spaceBelow;
+    const maxHeight = Math.max(240, Math.min(520, availableSpace - gap));
+
+    setCoords({
+      top: shouldOpenUp
+        ? Math.max(safePadding, rect.top - maxHeight - gap)
+        : Math.min(rect.bottom + gap, window.innerHeight - safePadding),
+      left: safeLeft,
+      maxHeight,
+    });
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -171,36 +214,36 @@ const Popover: React.FC<PopoverProps> = ({ trigger, children, onClose }) => {
         triggerRef.current &&
         !triggerRef.current.contains(event.target as Node)
       ) {
-        setIsOpen(false);
-        onClose?.();
+        closePopover();
       }
     };
 
     if (isOpen) {
       document.addEventListener('mousedown', handleClickOutside as any);
+      window.addEventListener('resize', updatePosition);
+      window.addEventListener('scroll', updatePosition, true);
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside as any);
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
     };
-  }, [isOpen, onClose]);
+  }, [isOpen, closePopover, updatePosition]);
 
   const toggle = () => {
     if (!triggerRef.current) return;
 
-    const rect = triggerRef.current.getBoundingClientRect();
-
-    setCoords({
-      top: rect.bottom + 8, // abre logo abaixo do botão
-      left: rect.left
-    });
+    if (!isOpen) {
+      updatePosition();
+    }
 
     setIsOpen(prev => !prev);
   };
 
   return (
     <>
-      <div ref={triggerRef} onClick={toggle} className="cursor-pointer inline-flex">
+      <div ref={triggerRef} onClick={toggle} className="inline-flex cursor-pointer">
         {trigger}
       </div>
 
@@ -211,11 +254,12 @@ const Popover: React.FC<PopoverProps> = ({ trigger, children, onClose }) => {
             position: 'fixed',
             top: coords.top,
             left: coords.left,
-            zIndex: 999999
+            maxHeight: coords.maxHeight,
+            zIndex: 999999,
           }}
-          className="bg-muted/50 border border-border rounded-md shadow-lg"
+          className="w-[calc(100vw-24px)] max-w-[430px] overflow-y-auto overflow-x-hidden rounded-2xl"
         >
-          {React.cloneElement(children, { onClose: () => setIsOpen(false) })}
+          {React.cloneElement(children, { onClose: closePopover })}
         </div>
       )}
     </>
@@ -225,65 +269,110 @@ const Popover: React.FC<PopoverProps> = ({ trigger, children, onClose }) => {
 
 // ========== SYMBOLS PANEL ==========
 const SymbolsPanel: React.FC<SymbolsPanelProps> = ({ onClose, onInsert }) => {
-  const symbols: Symbol[] = [
-    { symbol: '∑', title: 'sigma' },
-    { symbol: '∆', title: 'Delta' },
-    { symbol: 'δ', title: 'delta' },
-    { symbol: 'α', title: 'alpha' },
-    { symbol: 'β', title: 'beta' },
-    { symbol: 'η', title: 'eta' },
-    { symbol: 'γ', title: 'gamma' },
-    { symbol: 'θ', title: 'theta' },
-    { symbol: 'λ', title: 'lambda' },
-    { symbol: 'μ', title: 'mu' },
-    { symbol: 'π', title: 'pi' },
-    { symbol: 'ρ', title: 'rho' },
-    { symbol: 'τ', title: 'tau' },
-    { symbol: 'Φ', title: 'Phi' },
-    { symbol: 'φ', title: 'phi' },
-    { symbol: 'Ψ', title: 'psi' },
-    { symbol: 'Ω', title: 'Omega' },
-    { symbol: 'ω', title: 'omega' },
-    { symbol: '≈', title: 'aproximadamente' },
-    { symbol: '±', title: 'mais-menos' },
-    { symbol: '√', title: 'raíz quadrada' },
-    { symbol: '∛', title: 'raíz cubica' },
-    { symbol: '∞', title: 'infinito' },
-    { symbol: '≠', title: 'diferente' },
-    { symbol: '≤', title: 'menor ou igual' },
-    { symbol: '≥', title: 'maior ou igual' },
-    { symbol: '×', title: 'multiplicação' },
-    { symbol: '·', title: 'multiplicação' },
-    { symbol: '÷', title: 'divisão' }
+  const symbolGroups: Array<{ title: string; items: Symbol[] }> = [
+    {
+      title: "Gregas",
+      items: [
+        { symbol: "α", title: "alpha" },
+        { symbol: "β", title: "beta" },
+        { symbol: "γ", title: "gamma" },
+        { symbol: "δ", title: "delta" },
+        { symbol: "∆", title: "Delta" },
+        { symbol: "θ", title: "theta" },
+        { symbol: "λ", title: "lambda" },
+        { symbol: "μ", title: "mu" },
+        { symbol: "π", title: "pi" },
+        { symbol: "ρ", title: "rho" },
+        { symbol: "τ", title: "tau" },
+        { symbol: "φ", title: "phi" },
+        { symbol: "Φ", title: "Phi" },
+        { symbol: "Ψ", title: "psi" },
+        { symbol: "Ω", title: "Omega" },
+        { symbol: "ω", title: "omega" },
+      ],
+    },
+    {
+      title: "Operações",
+      items: [
+        { symbol: "∑", title: "somatório" },
+        { symbol: "√", title: "raiz quadrada" },
+        { symbol: "∛", title: "raiz cúbica" },
+        { symbol: "±", title: "mais-menos" },
+        { symbol: "×", title: "multiplicação" },
+        { symbol: "·", title: "multiplicação" },
+        { symbol: "÷", title: "divisão" },
+        { symbol: "≈", title: "aproximadamente" },
+        { symbol: "∞", title: "infinito" },
+      ],
+    },
+    {
+      title: "Comparação e conjuntos",
+      items: [
+        { symbol: "≠", title: "diferente" },
+        { symbol: "≤", title: "menor ou igual" },
+        { symbol: "≥", title: "maior ou igual" },
+        { symbol: "∈", title: "pertence" },
+        { symbol: "∉", title: "não pertence" },
+        { symbol: "⊂", title: "subconjunto" },
+        { symbol: "⊃", title: "contém" },
+        { symbol: "∪", title: "união" },
+        { symbol: "∩", title: "interseção" },
+      ],
+    },
   ];
 
   return (
-    <div className="z-50 rounded-lg border bg-muted/50 p-4 shadow-md w-[320px]">
-      <h5 className="font-medium text-sm mb-4 text-muted-foreground">
-        Símbolos
-      </h5>
+    <div className="z-50 max-h-[min(78vh,520px)] w-full overflow-y-auto rounded-2xl border border-slate-200 bg-white p-3 shadow-2xl dark:border-white/10 dark:bg-[#08111F] sm:p-4">
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div>
+          <h5 className="text-sm font-black text-slate-950 dark:text-white">
+            Símbolos
+          </h5>
 
-      <div className="grid grid-cols-7 gap-2">
-        {symbols.map((sym, index) => (
-          <button
-            key={index}
-            type="button"
-            title={sym.title}
-            onClick={() => {
-              onInsert(sym.symbol);
-              onClose?.();
-            }}
-            className="inline-flex items-center justify-center text-base font-medium transition-colors rounded-md border border-border hover:bg-accent h-9 w-9"
-          >
-            {sym.symbol}
-          </button>
+          <p className="mt-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+            Toque em um símbolo para inserir no ponto atual do editor.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={onClose}
+          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-slate-200 text-slate-500 transition hover:bg-slate-50 hover:text-slate-950 dark:border-white/10 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
+          aria-label="Fechar símbolos"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+
+      <div className="space-y-4">
+        {symbolGroups.map((group) => (
+          <section key={group.title} className="space-y-2">
+            <h6 className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+              {group.title}
+            </h6>
+
+            <div className="grid grid-cols-5 gap-2 sm:grid-cols-8">
+              {group.items.map((sym) => (
+                <button
+                  key={`${group.title}-${sym.symbol}`}
+                  type="button"
+                  title={sym.title}
+                  onClick={() => {
+                    onInsert(sym.symbol);
+                    onClose?.();
+                  }}
+                  className="inline-flex h-10 min-w-0 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-lg font-black text-slate-800 transition hover:border-[#0E00D0]/40 hover:bg-[#0E00D0]/10 hover:text-[#0E00D0] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0E00D0]/30 dark:border-white/10 dark:bg-white/5 dark:text-slate-100 dark:hover:border-blue-400/40 dark:hover:bg-blue-500/10 dark:hover:text-blue-100"
+                >
+                  {sym.symbol}
+                </button>
+              ))}
+            </div>
+          </section>
         ))}
       </div>
     </div>
   );
 };
-
-
 
 
 // ========== IMAGE LIGHTBOX ==========
@@ -361,6 +450,40 @@ const customKeymap: CustomKeymap[] = [
   }
 ];
 
+const principiaEditorTheme = EditorView.theme({
+  "&": {
+    minHeight: "100%",
+    backgroundColor: "transparent",
+    color: "inherit",
+    fontSize: "0.92rem",
+  },
+  ".cm-scroller": {
+    fontFamily:
+      "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
+    lineHeight: "1.6",
+  },
+  ".cm-content": {
+    minHeight: "12rem",
+    padding: "1rem",
+    caretColor: "#0E00D0",
+  },
+  ".cm-line": {
+    padding: "0 0.25rem",
+  },
+  ".cm-selectionBackground": {
+    backgroundColor: "rgba(14, 0, 208, 0.22) !important",
+  },
+  ".cm-focused": {
+    outline: "none",
+  },
+  ".cm-cursor": {
+    borderLeftColor: "#0E00D0",
+  },
+  ".cm-activeLine": {
+    backgroundColor: "transparent",
+  },
+});
+
 // ========== COMPONENTE PRINCIPAL ==========
 export default function MarkdownEditor({ initialContent = "", onChange }: MarkdownEditorProps) {
   const [content, setContent] = useState<string>(initialContent);
@@ -385,6 +508,7 @@ export default function MarkdownEditor({ initialContent = "", onChange }: Markdo
     }),
     keymap.of([...defaultKeymap, ...customKeymap]),
     EditorView.lineWrapping,
+    principiaEditorTheme,
     mathStructurePlugin,
     EditorView.updateListener.of((update: ViewUpdate) => {
       if (update.docChanged) {
@@ -558,9 +682,7 @@ export default function MarkdownEditor({ initialContent = "", onChange }: Markdo
   // ========== RENDER ==========
   return (
     <div
-      className="flex flex-col bg-input rounded-md border border-border
-    transition-all
-    "
+      className="flex max-h-[80vh] min-h-[240px] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all dark:border-white/10 dark:bg-[#020617]"
       role="presentation"
       tabIndex={0}
       onDragOver={handleDragOver}
@@ -578,9 +700,9 @@ export default function MarkdownEditor({ initialContent = "", onChange }: Markdo
       />
 
       {/* TOOLBAR */}
-      <div className="flex flex-row justify-between bg-muted/50 h-9 shrink-0">
+      <div className="flex min-h-12 shrink-0 flex-col gap-2 border-b border-slate-200 bg-slate-50 p-2 dark:border-white/10 dark:bg-[#08111F] sm:min-h-0 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
         {/* TABS */}
-        <div className="translate-y-[0px] mr-auto flex">
+        <div className="mr-auto flex w-full gap-1 sm:w-auto">
           <TabButton
             isActive={tab === 'edit'}
             onClick={() => setTab('edit')}
@@ -597,8 +719,8 @@ export default function MarkdownEditor({ initialContent = "", onChange }: Markdo
 
         {/* BOTÕES DE FORMATAÇÃO */}
         {tab === 'edit' && (
-          <div className="flex items-center gap-1 px-2 py-1">
-            <div className="flex items-center gap-1" id="editor-options">
+          <div className="flex w-full flex-wrap items-center justify-end gap-1 sm:w-auto sm:flex-nowrap">
+            <div className="flex flex-wrap items-center justify-end gap-1 sm:flex-nowrap" id="editor-options">
               <Popover
                 trigger={<ActionButton
                   title="Expressões matemáticas"
@@ -607,11 +729,9 @@ export default function MarkdownEditor({ initialContent = "", onChange }: Markdo
                 />}
                 onClose={() => { }}
               >
-                <div>
-                  <MathExpressionsPanel
-                    onInsert={insertAtCursor}
-                  />
-                </div>
+                <MathExpressionsPanel
+                  onInsert={insertAtCursor}
+                />
               </Popover>
 
               <Popover
@@ -672,8 +792,8 @@ bg-[#0F172A]
       
       ">
         {tab === 'edit' && isDragging && (
-          <div className="absolute inset-0 bg-blue-500/20 border-2 border-dashed border-blue-400 rounded-md z-10 flex items-center justify-center">
-            <div className="text-blue-400 text-center">
+          <div className="absolute inset-3 z-10 flex items-center justify-center rounded-2xl border-2 border-dashed border-blue-400 bg-blue-500/10 dark:bg-blue-500/20">
+            <div className="text-center text-[#0E00D0] dark:text-blue-400">
               <ImagePlus size={48} className="mx-auto mb-2" />
               <p className="font-semibold">Solte a imagem aqui</p>
             </div>
@@ -681,17 +801,16 @@ bg-[#0F172A]
         )}
 
         {tab === 'edit' && isUploading && (
-          <div className="absolute inset-0 bg-black/50 rounded-md z-20 flex items-center justify-center">
-            <div className="text-white text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-2"></div>
+          <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/75 backdrop-blur-sm dark:bg-black/50">
+            <div className="text-center text-slate-950 dark:text-white">
+              <div className="mx-auto mb-2 h-8 w-8 animate-spin rounded-full border-b-2 border-[#0E00D0] dark:border-white"></div>
               <p>Enviando imagem...</p>
             </div>
           </div>
         )}
 
         {tab === "edit" ? (
-          <div className="
-          cursor-text w-full text-sm placeholder:text-muted-foreground/50 disabled:cursor-not-allowed disabled:opacity-50 min-h-[6rem]">
+          <div className="min-h-[12rem] w-full cursor-text text-sm text-slate-900 placeholder:text-slate-400 disabled:cursor-not-allowed disabled:opacity-50 dark:text-slate-100">
             <CodeMirror
               ref={editorViewRef}
               value={content}
@@ -701,7 +820,6 @@ bg-[#0F172A]
                 setContent(value);
                 onChange?.(value);
               }}
-              theme={dracula}
               basicSetup={{
                 lineNumbers: false,
                 foldGutter: false,
@@ -725,10 +843,10 @@ bg-[#0F172A]
           </div>
         ) : (
           <div
-            className="wmde-markdown wmde-markdown-color w-full text-sm rounded-md placeholder:text-muted-foreground/50 [&_ul]:list-disc [&_ol]:list-[upper-roman] [&_.mord]:!mr-0 px-3 py-2 flex-1 min-h-[6rem] overflow-auto"
+            className="wmde-markdown wmde-markdown-color w-full flex-1 overflow-auto rounded-none bg-white px-4 py-4 text-sm text-slate-900 placeholder:text-slate-400 dark:bg-[#0F172A] dark:text-slate-100 [&_.mord]:!mr-0 [&_ol]:list-[upper-roman] [&_ul]:list-disc"
             style={{
-              '--color-canvas-default': 'rgb(var(--input))',
-              '--color-fg-default': 'rgb(var(--foreground))',
+              '--color-canvas-default': 'transparent',
+              '--color-fg-default': 'currentColor',
               fontSize: '0.875rem',
               lineHeight: '1.25rem'
             } as React.CSSProperties}
@@ -739,14 +857,14 @@ bg-[#0F172A]
             }}
           >
             {isProcessing ? (
-              <div className="flex items-center justify-center h-full">
+              <div className="flex h-full min-h-[12rem] items-center justify-center text-slate-600 dark:text-slate-300">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
                 <span className="ml-2">Processando...</span>
               </div>
             ) : previewHTML ? (
               <div dangerouslySetInnerHTML={{ __html: previewHTML }} />
             ) : (
-              <div className="text-gray-500 italic text-center py-8">
+              <div className="py-8 text-center italic text-slate-500 dark:text-slate-400">
                 Nenhum conteúdo para visualizar
               </div>
             )}

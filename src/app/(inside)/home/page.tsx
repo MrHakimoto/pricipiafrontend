@@ -3,74 +3,57 @@
 
 import { useEffect, useState } from "react";
 import { useProgressBar } from "@/components/Context/ProgressBarContext";
-import LogoutButton from "@/components/LogoutButton";
 import { useSession } from "next-auth/react";
 import HomeSkeleton from "@/components/Skeletons/HomeSkeleton";
 import { motion } from "framer-motion";
 import BannerCarousel from "@/components/home/BannerCarousel";
 import UserCard from "@/components/home/UserCard";
-import CoursesSection from "@/components/home/CoursesSection";
-import GoalsSection from "@/components/home/metricas/GoalsSection";
 import WeekProgress from "@/components/home/metricas/WeekProgress";
 import MyLists from "@/components/home/metricas/MyLists";
 import MetricsSection from "@/components/home/metricas/MetricsSection";
 import { FooterHome } from "@/components/home/FooterHome";
 import ContinueWatchingCard from "@/components/home/ContinueWatchingCard";
 import { getHomeStats, type HomeStats } from "@/lib/dashboard/homeStats";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
 export default function HomePage() {
   const { done } = useProgressBar();
   const { data: session, status } = useSession();
-  const [continueWatching, setContinueWatching] = useState(null);
+
   const [stats, setStats] = useState<HomeStats | null>(null);
   const [loadingStats, setLoadingStats] = useState(true);
 
-  console.log("SESSION USER:", session);
-  console.log("SESSION USER ID:", session?.user?.id);
-
-
-  useEffect(() => {
-    console.log(session);
-    const fetchContinueWatching = async () => {
-      try {
-        const response = await fetch("/api/dashboard/continuar-assistindo");
-        if (response.ok) {
-          const data = await response.json();
-          setContinueWatching(data);
-        }
-      } catch (error) {
-        console.error("Erro ao buscar continuar assistindo:", error);
-      }
-    };
-
-    fetchContinueWatching();
-  }, []);
-
-  useEffect(() => {
-    const loadStats = async () => {
-      if (session?.laravelToken) {
-        try {
-          setLoadingStats(true);
-          const data = await getHomeStats(session.laravelToken);
-          setStats(data);
-        } catch (error) {
-          console.error("Erro ao carregar stats:", error);
-        } finally {
-          setLoadingStats(false);
-        }
-      }
-    };
-
-    if (status === "authenticated") {
-      loadStats();
-    }
-  }, [session?.laravelToken, status]);
-
-  const isLoading = status === "loading" || loadingStats;
+  useDocumentTitle("Home");
 
   useEffect(() => {
     done();
-  }, []);
+  }, [done]);
+
+  useEffect(() => {
+    const loadStats = async () => {
+      if (status === "loading") return;
+
+      if (status !== "authenticated" || !session?.laravelToken) {
+        setLoadingStats(false);
+        return;
+      }
+
+      try {
+        setLoadingStats(true);
+        const data = await getHomeStats(session.laravelToken);
+        setStats(data);
+      } catch (error) {
+        console.error("Erro ao carregar stats:", error);
+        setStats(null);
+      } finally {
+        setLoadingStats(false);
+      }
+    };
+
+    loadStats();
+  }, [session?.laravelToken, status]);
+
+  const isLoading = status === "loading" || loadingStats;
 
   if (isLoading) {
     return <HomeSkeleton />;
@@ -78,47 +61,45 @@ export default function HomePage() {
 
   return (
     <>
-      <main className="min-h-screen bg-[#F6F6F6] text-gray-900 dark:bg-[#00091A] dark:text-white px-6 pb-20">
-        <div className="max-w-7xl mx-auto">
+      <main className="min-h-screen bg-[#F6F6F6] px-4 pb-20 pt-4 text-gray-950 dark:bg-[#00091A] dark:text-white sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl space-y-8">
           <BannerCarousel />
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
+
+          <motion.section
+            initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2, duration: 0.6 }}
-            className="mt-6"
+            transition={{ duration: 0.45 }}
           >
             <UserCard
               nome={session?.user?.name ?? null}
               token={session?.laravelToken as string}
             />
-          </motion.div>
+          </motion.section>
 
-          <section className="mt-12 space-y-12">
-            <div className="flex gap-6">
+          <section className="mt-8">
+            <div className="grid grid-cols-1 gap-5 lg:grid-cols-[360px_1fr]">
               <WeekProgress />
-              {/* <ContinueWatchingCard /> */}
+
+              <div className="space-y-5">
+                <ContinueWatchingCard />
+              </div>
             </div>
           </section>
-        </div>
 
-        <section className="mt-12">
-          <div className="max-w-7xl mx-auto space-y-12">
-            <motion.div
-              initial={{ opacity: 0, y: 40 }}
+          {stats && (
+            <motion.section
+              initial={{ opacity: 0, y: 24 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.7 }}
-              className="grid grid-cols-1 md:grid-cols-2 gap-6"
+              transition={{ delay: 0.16, duration: 0.45 }}
+              className="grid grid-cols-1 gap-5 lg:grid-cols-2"
             >
-              {stats && (
-                <>
-                  <MyLists dados={stats.listas_stats} />
-                  <MetricsSection dados={stats.questoes_stats} />
-                </>
-              )}
-            </motion.div>
-          </div>
-        </section>
+              <MyLists dados={stats.listas_stats} />
+              <MetricsSection dados={stats.questoes_stats} />
+            </motion.section>
+          )}
+        </div>
       </main>
+
       <FooterHome />
     </>
   );

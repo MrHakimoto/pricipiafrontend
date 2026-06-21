@@ -58,16 +58,33 @@ export type Prova = {
 export type Questao = {
   id: number;
   prova_id: number | null;
-  alternativa_correta_id: number;
+
+  tipo?:
+    | "objetiva"
+    | "discursiva"
+    | "resposta_numerica"
+    | "certo_errado"
+    | string
+    | null;
+
+  alternativa_correta_id: number | null;
   enunciado: string;
-  gabarito_comentado_texto: string;
+
+  gabarito_comentado_texto: string | null;
   gabarito_video: string | null;
-  minutagem: number | null;
-  tempo_resolucao?: number;
+  resposta_esperada?: string | null;
+  criterio_correcao?: string | null;
+  resposta_numerica?: string | number | null;
+  gabarito_certo_errado?: string | boolean | null;
+
+  minutagem: number | string | null;
+  tempo_resolucao?: number | null;
   dificuldade: number;
-  adaptado?: boolean;
+  adaptado?: boolean | number | null;
+
   created_at: string;
   updated_at: string;
+
   pivot?: {
     lista_id: number;
     questao_id: number;
@@ -75,6 +92,7 @@ export type Questao = {
     updated_at: string;
     order: number;
   };
+
   alternativas: Alternativa[];
   prova: Prova;
   topicos: Topico[];

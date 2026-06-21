@@ -1,6 +1,4 @@
-// lib/course/like.tsx
 import { api } from "../axios";
-import type { AxiosError } from "axios";
 
 export interface ToggleLikeResponse {
   message: string;
@@ -9,13 +7,10 @@ export interface ToggleLikeResponse {
 }
 
 export interface ToggleLikeRequest {
-  entity_type: "aula" | "duvida" | "comentario";
+  entity_type: "aula" | "duvida" | "comentario" | "resposta_forum";
   entity_id: number;
 }
 
-/**
- * Alterna o like em uma entidade (aula, dúvida ou comentário)
- */
 export const toggleLike = async (
   session: string,
   data: ToggleLikeRequest
@@ -26,13 +21,9 @@ export const toggleLike = async (
         Authorization: `Bearer ${session}`,
       },
     });
-    
-    console.log("toggleLike - Sucesso:", response.data);
+
     return response.data;
-
   } catch (error: any) {
-    console.error("toggleLike - Erro:", error);
-
     const message =
       error.response?.data?.message ||
       error.message ||
@@ -42,29 +33,25 @@ export const toggleLike = async (
   }
 };
 
-/**
- * Obtém o estado de like de uma entidade
- * (Nota: Você precisará criar este endpoint no backend se ainda não existir)
- */
 export const getLikeStatus = async (
   session: string,
-  entity_type: "aula" | "duvida" | "comentario",
+  entity_type: "aula" | "duvida" | "comentario" | "resposta_forum",
   entity_id: number
 ): Promise<{ liked: boolean; likes_count: number }> => {
   try {
-    const response = await api.get(`/likes/status`, {
+    const response = await api.get("/likes/status", {
       params: { entity_type, entity_id },
       headers: {
         Authorization: `Bearer ${session}`,
       },
     });
-    
-    return response.data;
 
+    return response.data;
   } catch (error: any) {
-    console.error("getLikeStatus - Erro:", error);
-    
-    // Se o endpoint não existir, retorna estado padrão
+    if (process.env.NODE_ENV === "development") {
+      console.error("getLikeStatus - Erro:", error);
+    }
+
     return { liked: false, likes_count: 0 };
   }
 };

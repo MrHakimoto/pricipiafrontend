@@ -1,9 +1,11 @@
+//exercicios/page.tsx
 "use client";
 import { useState, useEffect } from "react";
 import {ModelQuestions} from "@/components/questions/ModelQuestions"
 import {FilterPanel} from "@/components/Panel/PanelFilter"
 import {ExercisesHeader} from "@/components/questions/ExercisesHeader"
 import { useRouter } from "next/navigation";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
 export default function ExercisesPanel() {
 
@@ -11,11 +13,13 @@ export default function ExercisesPanel() {
 
   const router = useRouter();
 
-  useEffect(() => {
-    router.replace("/exercicios/listas-oficiais/");
-  }, [router]);
+  useDocumentTitle("Exercícios");
 
-  return null; // Nada é exibido porque redireciona imediatamente
+  // useEffect(() => {
+  //   router.replace("/exercicios/listas-oficiais/");
+  // }, [router]);
+
+  // return null; // Nada é exibido porque redireciona imediatamente
 
 
   return (

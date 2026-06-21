@@ -9,18 +9,21 @@ import { useModuloStore } from "@/store/useModuloStore";
 export default function ModuloRedirectPage() {
   const router = useRouter();
   const params = useParams();
-  const { moduloId, moduloSlug } = params as { moduloId: string; moduloSlug: string };
 
-  // Estados do store
+  const { moduloId, moduloSlug } = params as {
+    moduloId: string;
+    moduloSlug: string;
+  };
+
   const contents = useModuloStore((state) => state.contents);
   const initialLoading = useModuloStore((state) => state.initialLoading);
   const loadedModuloId = useModuloStore((state) => state.loadedModuloId);
 
-  // Estado local para controlar redirecionamento
   const [hasRedirected, setHasRedirected] = useState(false);
 
   function toSlug(str: string) {
     if (!str) return "";
+
     return str
       .toLowerCase()
       .normalize("NFD")
@@ -30,65 +33,127 @@ export default function ModuloRedirectPage() {
       .replace(/\s+/g, "-");
   }
 
- useEffect(() => {
-  // 1. Espera terminar o carregamento inicial
-  if (initialLoading) return;
+  function isCompletedValue(value: unknown): boolean {
+    return (
+      value === true ||
+      value === 1 ||
+      value === "1" ||
+      value === "true"
+    );
+  }
 
-  // 2. Garante que o módulo certo foi carregado no store
-  if (loadedModuloId !== moduloId) return;
+  function isLessonCompleted(lesson: any): boolean {
+    if (lesson?.content_type && lesson.content_type !== "aula") {
+      return false;
+    }
 
-  // 3. Evita redirecionamento duplo
-  if (hasRedirected) return;
+    return isCompletedValue(lesson?.user_progress?.is_completed);
+  }
 
-  // 4. Só segue se houver conteúdos
-  if (!contents || contents.length === 0) return;
-
-  // 5. Encontrar a primeira aula NÃO concluída
-  const firstUncompleted = contents.find(
-    (lesson) => !lesson.user_progress?.is_completed
-  );
-
-  // 6. Fallback: se todas concluídas, vai para a primeira do módulo
-  const targetLesson = firstUncompleted ?? contents[0];
-
-  // 7. Gerar slug
-  const slug = toSlug(targetLesson.title);
-
-  // 8. Montar URL final
-  const url = `/modulos/${moduloId}/${moduloSlug}/${targetLesson.id}/${slug}`;
-
-  console.log("🔥 Redirecionando para:", url);
-
-  // 9. Marcar como redirecionado e enviar
-  setHasRedirected(true);
-  router.replace(url);
-
-}, [
-  initialLoading,
-  contents,
-  loadedModuloId,
-  moduloId,
-  moduloSlug,
-  hasRedirected,
-  router
-]);
-
-  // Log para debug
   useEffect(() => {
-    console.log("🔄 Estado atual do redirecionamento:", {
-      initialLoading,
-      contentsLength: contents.length,
-      hasRedirected,
-      loadedModuloId,
-      currentModuloId: moduloId
+    if (initialLoading) return;
+
+    if (String(loadedModuloId) !== String(moduloId)) return;
+
+    if (hasRedirected) return;
+
+    const aulas = (contents ?? []).filter(
+      (content: any) => !content?.content_type || content.content_type === "aula",
+    );
+
+    if (aulas.length === 0) return;
+
+    const ordered = [...aulas].sort((a, b) => {
+      const indexA = aulas.findIndex((lesson) => lesson.id === a.id);
+      const indexB = aulas.findIndex((lesson) => lesson.id === b.id);
+
+      const orderA = Number(
+        a.order ?? a.ordem ?? a.position ?? a.pivot?.order ?? indexA,
+      );
+
+      const orderB = Number(
+        b.order ?? b.ordem ?? b.position ?? b.pivot?.order ?? indexB,
+      );
+
+      return orderA - orderB;
     });
-  }, [initialLoading, contents.length, hasRedirected, loadedModuloId, moduloId]);
+
+    let lastCompletedIndex = -1;
+
+    ordered.forEach((lesson, index) => {
+      if (isLessonCompleted(lesson)) {
+        lastCompletedIndex = index;
+      }
+    });
+
+    const nextAfterLastCompleted = ordered[lastCompletedIndex + 1];
+
+    const firstUncompleted = ordered.find(
+      (lesson) => !isLessonCompleted(lesson),
+    );
+
+    const targetLesson =
+      nextAfterLastCompleted ?? firstUncompleted ?? ordered[0];
+
+    if (!targetLesson) return;
+
+    const slug = toSlug(targetLesson.title);
+
+    const url = `/modulos/${moduloId}/${moduloSlug}/${targetLesson.id}/${slug}`;
+
+    setHasRedirected(true);
+
+    router.replace(url, {
+      scroll: false,
+    });
+  }, [
+    initialLoading,
+    contents,
+    loadedModuloId,
+    moduloId,
+    moduloSlug,
+    hasRedirected,
+    router,
+  ]);
 
   return (
-    <div className="p-6">
-      <Skeleton className="h-64 w-full mb-4" />
-      <Skeleton className="h-6 w-1/3 mb-2" />
-      <Skeleton className="h-4 w-1/2" />
+    <div className="space-y-5 p-3 sm:p-6">
+      <div className="overflow-hidden rounded-2xl border border-white/10 bg-[#0B1120] shadow-2xl">
+        <Skeleton
+          variant="rectangular"
+          animation="wave"
+          className="h-[240px] w-full sm:h-[380px] lg:h-[600px]"
+          sx={{
+            bgcolor: "rgba(148, 163, 184, 0.10)",
+          }}
+        />
+      </div>
+
+      <div className="space-y-3 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+        <Skeleton
+          animation="wave"
+          className="h-6 w-1/3 rounded-lg"
+          sx={{
+            bgcolor: "rgba(148, 163, 184, 0.12)",
+          }}
+        />
+
+        <Skeleton
+          animation="wave"
+          className="h-4 w-1/2 rounded-lg"
+          sx={{
+            bgcolor: "rgba(148, 163, 184, 0.10)",
+          }}
+        />
+
+        <Skeleton
+          animation="wave"
+          className="h-4 w-2/5 rounded-lg"
+          sx={{
+            bgcolor: "rgba(148, 163, 184, 0.08)",
+          }}
+        />
+      </div>
     </div>
   );
 }

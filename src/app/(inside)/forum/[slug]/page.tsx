@@ -1,115 +1,1422 @@
+// app/forum/[slug]/page.tsx
 "use client";
-import { useState, useEffect } from "react";
+
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
-import { ImageLightbox } from "@/components/editor/ImageLightbox";
 import { useSession } from "next-auth/react";
 import {
-  getForumThreadDetails,
-  postForumReply,
-  markBestReply,
-  reopenThread,
-  closeForumThread,
-  updateForumThread,
-  updateForumReply,
-  deleteForumThread,
-  deleteForumReply,
-  type ForumThread,
-  type ForumReply,
-  type CourseContent,
-} from "@/lib/forum/forum";
+  ArrowLeft,
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  Edit3,
+  Loader2,
+  Lock,
+  MessageCircle,
+  MoreVertical,
+  Send,
+  Trash2,
+  Unlock,
+  ThumbsUp,
+  UserCircle2,
+} from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
+
+import { api } from "@/lib/axios";
 import { processMarkdown } from "@/utils/markdownProcessor";
+import { toggleLike } from "@/lib/course/like";
+import { markdownProcessorAlternativas } from "@/utils/markdownProcessorAlternativas";
+import { ImageLightbox } from "@/components/editor/ImageLightbox";
 import MarkdownEditor from "@/components/editor/MarkDownEditor";
+import { ModelQuestions } from "@/components/questions/ModelQuestions";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { AnimatedRoleName } from "@/components/user/AnimatedRoleName";
+import {
+  type ForumAuthor,
+  type ForumRole,
+  getAuthorLevel,
+  getAuthorLevelTitle,
+  getAuthorPrimaryRole,
+  getAuthorRoles,
+} from "@/lib/forum/author";
 
-const ThreadDetail = () => {
-  const params = useParams();
-  const router = useRouter();
-  const { data: session, status } = useSession();
-  const [thread, setThread] = useState<ForumThread | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [replyBody, setReplyBody] = useState("");
-  const [posting, setPosting] = useState(false);
-  const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [processingContent, setProcessingContent] = useState(false);
-  const [threadHtml, setThreadHtml] = useState<string>("");
-  const [repliesHtml, setRepliesHtml] = useState<Record<number, string>>({});
-  const [editingThread, setEditingThread] = useState(false);
-  const [editThreadTitle, setEditThreadTitle] = useState("");
-  const [editThreadBody, setEditThreadBody] = useState("");
+type ForumReply = {
+  id: number;
+  user_id: number;
+  forum_thread_id?: number;
+  body: string;
+  is_solution?: boolean;
+  likes_count?: number;
+  liked_by_me?: boolean;
+  created_at: string;
+  updated_at: string;
+  author?: ForumAuthor | null;
+};
 
-  const [deleteModal, setDeleteModal] = useState<{
-    open: boolean;
-    type: "thread" | "reply" | null;
-    replyId?: number;
-  }>({
-    open: false,
-    type: null,
-  });
+type Alternativa = {
+  id: number;
+  letra?: string | null;
+  texto: string;
+  ordem?: number | null;
+};
 
-  const [editingReplyId, setEditingReplyId] = useState<number | null>(null);
-  const [editReplyBody, setEditReplyBody] = useState("");
-  const [zoomedImageUrl, setZoomedImageUrl] = useState<string | null>(null);
+type Topico = {
+  id: number;
+  nome: string;
+  assunto?: {
+    id: number;
+    nome: string;
+    frente?: {
+      id: number;
+      nome: string;
+    } | null;
+  } | null;
+};
 
-  const threadId = params.slug as string;
+type ForumQuestaoLinkable = {
+  id: number;
+  prova_id?: number | null;
+  tipo?: string | null;
+  alternativa_correta_id?: number | null;
+  enunciado: string;
+  resposta_esperada?: string | null;
+  criterio_correcao?: string | null;
+  gabarito_certo_errado?: string | null;
+  resposta_numerica?: string | null;
+  gabarito_comentado_texto?: string | null;
+  gabarito_video?: string | null;
+  minutagem?: string | null;
+  tempo_resolucao?: number | null;
+  adaptado?: boolean | number | null;
+  dificuldade?: number | null;
+  alternativas?: Alternativa[];
+  prova?: {
+    id?: number;
+    nome?: string | null;
+    sigla?: string | null;
+    ano?: number | string | null;
+    banca?: {
+      id?: number;
+      nome?: string | null;
+      sigla?: string | null;
+    } | null;
+  } | null;
+  topicos?: Topico[];
+  created_at?: string;
+  updated_at?: string;
+};
 
-  const loadThread = async () => {
-    if (!session?.laravelToken) return;
+type ForumThread = {
+  id: number;
+  user_id: number;
+  title: string;
+  body: string;
+  linkable_type?: string | null;
+  linkable_id?: number | null;
+  linkable?: ForumQuestaoLinkable | ForumCourseLinkable | null;
+  is_closed: boolean;
+  best_reply_id?: number | null;
+  replies?: ForumReply[];
+  replies_count?: number;
+  likes_count?: number;
+  liked_by_me?: boolean;
+  created_at: string;
+  updated_at: string;
+  author?: ForumAuthor | null;
+};
 
-    setLoading(true);
+type ModelQuestao = {
+  id: number;
+  tipo: string;
+  enunciado: string;
+  alternativas: Array<{
+    id: number;
+    letra: string;
+    texto: string;
+  }>;
+  alternativa_correta_id: number;
+  gabarito_video?: string | null;
+  gabarito_comentado_texto?: string | null;
+  dificuldade?: number | null;
+  adaptado?: boolean | number | null;
+  topicos?: Array<{
+    id: number;
+    nome: string;
+  }>;
+  prova?: ForumQuestaoLinkable["prova"];
+};
+
+type ForumCourseLinkable = {
+  id: number;
+  module_id?: number | null;
+  title?: string | null;
+  content_type?: string | null;
+  estimated_time_minutes?: number | null;
+  duration_in_seconds?: number | null;
+  content_url?: string | null;
+  list_id?: number | null;
+};
+
+function safeArray<T>(value: T[] | undefined | null): T[] {
+  return Array.isArray(value) ? value : [];
+}
+
+function getTokenFromSession(session: any): string {
+  return String(
+    session?.laravelToken ||
+      session?.accessToken ||
+      session?.user?.laravelToken ||
+      "",
+  )
+    .replace(/^Bearer\s+/i, "")
+    .trim();
+}
+
+function getUserIdFromSession(session: any): number | null {
+  const rawId = session?.user?.id ?? session?.id ?? null;
+  const id = Number(rawId);
+
+  return Number.isFinite(id) ? id : null;
+}
+
+function authHeaders(token: string) {
+  if (!token) return {};
+
+  return {
+    Authorization: `Bearer ${token}`,
+    Accept: "application/json",
+  };
+}
+
+function formatDate(value?: string | null) {
+  if (!value) return "";
+
+  try {
+    return new Date(value).toLocaleString("pt-BR", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return value;
+  }
+}
+
+function isCourseThread(thread: ForumThread | null): boolean {
+  return (
+    thread?.linkable_type === "App\\Models\\CourseContent" &&
+    Boolean(thread?.linkable)
+  );
+}
+
+function formatDurationFromSeconds(seconds?: number | null) {
+  const totalSeconds = Number(seconds ?? 0);
+
+  if (!Number.isFinite(totalSeconds) || totalSeconds <= 0) {
+    return null;
+  }
+
+  const minutes = Math.floor(totalSeconds / 60);
+  const remainingSeconds = totalSeconds % 60;
+
+  if (minutes >= 60) {
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+
+    return `${hours}h ${remainingMinutes}min`;
+  }
+
+  return `${minutes}min${remainingSeconds > 0 ? ` ${remainingSeconds}s` : ""}`;
+}
+
+function isQuestaoThread(thread: ForumThread | null): boolean {
+  return (
+    thread?.linkable_type === "App\\Models\\Questao" &&
+    Boolean(thread?.linkable)
+  );
+}
+
+function isForumQuestaoLinkable(
+  linkable: ForumThread["linkable"],
+): linkable is ForumQuestaoLinkable {
+  return Boolean(
+    linkable &&
+    "enunciado" in linkable &&
+    typeof linkable.enunciado === "string",
+  );
+}
+
+function isForumCourseLinkable(
+  linkable: ForumThread["linkable"],
+): linkable is ForumCourseLinkable {
+  return Boolean(
+    linkable &&
+    !("enunciado" in linkable) &&
+    ("content_url" in linkable ||
+      "content_type" in linkable ||
+      "duration_in_seconds" in linkable ||
+      "list_id" in linkable),
+  );
+}
+
+function getDifficultyLabel(dificuldade?: number | null) {
+  switch (Number(dificuldade)) {
+    case 1:
+      return "Muito Fácil";
+    case 2:
+      return "Fácil";
+    case 3:
+      return "Médio";
+    case 4:
+      return "Difícil";
+    case 5:
+      return "Muito Difícil";
+    default:
+      return null;
+  }
+}
+
+function getDifficultyClass(dificuldade?: number | null) {
+  switch (Number(dificuldade)) {
+    case 1:
+      return "border-green-400 bg-green-100 text-green-800";
+    case 2:
+      return "border-lime-400 bg-lime-100 text-lime-800";
+    case 3:
+      return "border-yellow-400 bg-yellow-100 text-yellow-800";
+    case 4:
+      return "border-orange-500 bg-orange-100 text-orange-800";
+    case 5:
+      return "border-red-500 bg-red-100 text-red-800";
+    default:
+      return "border-slate-300 bg-slate-100 text-slate-700";
+  }
+}
+
+function ForumAuthorAvatar({
+  author,
+  sizeClassName = "h-9 w-9",
+}: {
+  author?: ForumAuthor | null;
+  sizeClassName?: string;
+}) {
+  const avatar = (author as any)?.avatar;
+  const name = author?.name ?? "Usuário";
+
+  return (
+    <span
+      className={`inline-flex ${sizeClassName} shrink-0 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-slate-100 text-slate-600 shadow-sm dark:border-white/10 dark:bg-white/10 dark:text-slate-300`}
+    >
+      {avatar ? (
+        <img
+          src={avatar}
+          alt={`Avatar de ${name}`}
+          className="h-full w-full object-cover"
+        />
+      ) : (
+        <UserCircle2 className="h-[70%] w-[70%]" />
+      )}
+    </span>
+  );
+}
+
+function ActionMenu({
+  children,
+  align = "right",
+}: {
+  children: ReactNode;
+  align?: "left" | "right";
+}) {
+  return (
+    <details className="group relative inline-flex">
+      <summary
+        className="inline-flex min-h-10 w-10 cursor-pointer list-none items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50 hover:text-slate-950 [&::-webkit-details-marker]:hidden dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
+        aria-label="Abrir ações"
+        title="Ações"
+      >
+        <MoreVertical className="h-4 w-4" />
+      </summary>
+
+      <div
+        className={[
+          "absolute top-[calc(100%+8px)] z-50 min-w-[180px] rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl dark:border-white/10 dark:bg-[#08111F]",
+          align === "right" ? "right-0" : "left-0",
+        ].join(" ")}
+      >
+        <div className="grid gap-1">{children}</div>
+      </div>
+    </details>
+  );
+}
+
+function ForumThreadLikeButton({
+  token,
+  threadId,
+  initialLiked = false,
+  initialCount = 0,
+}: {
+  token: string;
+  threadId: number;
+  initialLiked?: boolean;
+  initialCount?: number;
+}) {
+  const [liked, setLiked] = useState(initialLiked);
+  const [likesCount, setLikesCount] = useState(initialCount);
+  const [loading, setLoading] = useState(false);
+  const [burstKey, setBurstKey] = useState(0);
+
+  const disabled = !token || loading || !threadId;
+
+  const handleToggleLike = async (
+    event: React.MouseEvent<HTMLButtonElement>,
+  ) => {
+    event.stopPropagation();
+
+    if (disabled) return;
+
+    const previousLiked = liked;
+    const previousCount = likesCount;
+
+    const nextLiked = !previousLiked;
+    const nextCount = nextLiked
+      ? previousCount + 1
+      : Math.max(0, previousCount - 1);
+
+    setLiked(nextLiked);
+    setLikesCount(nextCount);
+
+    if (nextLiked) {
+      setBurstKey((key) => key + 1);
+    }
+
     try {
-      const data = await getForumThreadDetails(session.laravelToken, threadId);
-      setThread(data);
+      setLoading(true);
+
+      const response = await toggleLike(token, {
+        entity_type: "duvida",
+        entity_id: threadId,
+      });
+
+      setLiked(response.liked);
+      setLikesCount(response.likes_count);
     } catch (error) {
-      console.error("Erro ao carregar thread:", error);
+      console.error("Erro ao curtir dúvida do fórum:", error);
+
+      setLiked(previousLiked);
+      setLikesCount(previousCount);
     } finally {
       setLoading(false);
     }
   };
 
-  // Efeito 1: Carregar o thread
-useEffect(() => {
-  if (status === "authenticated" && session?.laravelToken && threadId) {
-    loadThread();
-  }
-}, [status, session?.laravelToken, threadId]);
+  return (
+    <motion.button
+      type="button"
+      onClick={handleToggleLike}
+      disabled={disabled}
+      aria-pressed={liked}
+      title={liked ? "Remover curtida" : "Curtir dúvida"}
+      whileTap={{ scale: disabled ? 1 : 0.92 }}
+      whileHover={{ scale: disabled ? 1 : 1.04 }}
+      className={`cursor-pointer
+        relative inline-flex min-h-10 items-center justify-center gap-1.5 overflow-hidden
+        rounded-xl border px-3 py-2 text-xs font-bold transition
+        disabled:cursor-not-allowed disabled:opacity-50
+        ${
+          liked
+            ? "border-blue-500/40 bg-blue-50 text-[#0E00D0] dark:bg-blue-500/15 dark:text-blue-200"
+            : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-950 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
+        }
+      `}
+    >
+      <AnimatePresence>
+        {liked && (
+          <motion.span
+            key={burstKey}
+            initial={{ scale: 0.2, opacity: 0.45 }}
+            animate={{ scale: 2.5, opacity: 0 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.45, ease: "easeOut" }}
+            className="absolute h-8 w-8 rounded-full bg-blue-500/30"
+          />
+        )}
+      </AnimatePresence>
 
-  // Efeito para lidar com clique em imagens
+      <motion.span
+        animate={
+          liked
+            ? {
+                scale: [1, 1.25, 1],
+                rotate: [0, -8, 8, 0],
+              }
+            : {
+                scale: 1,
+                rotate: 0,
+              }
+        }
+        transition={{ duration: 0.32 }}
+        className="relative z-10 inline-flex"
+      >
+        <ThumbsUp className="h-4 w-4" fill={liked ? "currentColor" : "none"} />
+      </motion.span>
+
+      <span className="relative z-10">{liked ? "Curtido" : "Curtir"}</span>
+
+      {likesCount > 0 && (
+        <motion.span
+          key={likesCount}
+          initial={{ y: -3, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          className="relative z-10 text-[11px] opacity-80"
+        >
+          {likesCount}
+        </motion.span>
+      )}
+
+      {loading && (
+        <span className="absolute bottom-0 left-0 h-[2px] w-full overflow-hidden">
+          <motion.span
+            className="block h-full w-1/2 bg-blue-400"
+            animate={{ x: ["-100%", "220%"] }}
+            transition={{ repeat: Infinity, duration: 0.8, ease: "linear" }}
+          />
+        </span>
+      )}
+    </motion.button>
+  );
+}
+
+function ForumReplyLikeButton({
+  token,
+  replyId,
+  initialLiked = false,
+  initialCount = 0,
+}: {
+  token: string;
+  replyId: number;
+  initialLiked?: boolean;
+  initialCount?: number;
+}) {
+  const [liked, setLiked] = useState(initialLiked);
+  const [likesCount, setLikesCount] = useState(initialCount);
+  const [loading, setLoading] = useState(false);
+  const [burstKey, setBurstKey] = useState(0);
+
+  const disabled = !token || loading || !replyId;
+
+  const handleToggleLike = async (
+    event: React.MouseEvent<HTMLButtonElement>,
+  ) => {
+    event.stopPropagation();
+
+    if (disabled) return;
+
+    const previousLiked = liked;
+    const previousCount = likesCount;
+
+    const nextLiked = !previousLiked;
+    const nextCount = nextLiked
+      ? previousCount + 1
+      : Math.max(0, previousCount - 1);
+
+    setLiked(nextLiked);
+    setLikesCount(nextCount);
+
+    if (nextLiked) {
+      setBurstKey((key) => key + 1);
+    }
+
+    try {
+      setLoading(true);
+
+      const response = await toggleLike(token, {
+        entity_type: "resposta_forum",
+        entity_id: replyId,
+      });
+
+      setLiked(response.liked);
+      setLikesCount(response.likes_count);
+    } catch (error) {
+      console.error("Erro ao curtir resposta do fórum:", error);
+
+      setLiked(previousLiked);
+      setLikesCount(previousCount);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <motion.button
+      type="button"
+      onClick={handleToggleLike}
+      disabled={disabled}
+      aria-pressed={liked}
+      title={liked ? "Remover curtida" : "Curtir resposta"}
+      whileTap={{ scale: disabled ? 1 : 0.92 }}
+      whileHover={{ scale: disabled ? 1 : 1.04 }}
+      className={`
+        relative inline-flex items-center justify-center gap-1.5 overflow-hidden
+        rounded-lg border px-2.5 py-1.5 text-xs font-bold transition
+        disabled:cursor-not-allowed disabled:opacity-50
+        ${
+          liked
+            ? "border-blue-500/40 bg-blue-50 text-[#0E00D0] dark:bg-blue-500/15 dark:text-blue-200"
+            : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-950 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
+        }
+      `}
+    >
+      <AnimatePresence>
+        {liked && (
+          <motion.span
+            key={burstKey}
+            initial={{ scale: 0.2, opacity: 0.45 }}
+            animate={{ scale: 2.4, opacity: 0 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.45, ease: "easeOut" }}
+            className="absolute h-7 w-7 rounded-full bg-blue-500/30"
+          />
+        )}
+      </AnimatePresence>
+
+      <motion.span
+        animate={
+          liked
+            ? {
+                scale: [1, 1.25, 1],
+                rotate: [0, -8, 8, 0],
+              }
+            : {
+                scale: 1,
+                rotate: 0,
+              }
+        }
+        transition={{ duration: 0.32 }}
+        className="relative z-10 inline-flex"
+      >
+        <ThumbsUp className="h-4 w-4" fill={liked ? "currentColor" : "none"} />
+      </motion.span>
+
+      <span className="relative z-10">{liked ? "Curtido" : "Curtir"}</span>
+
+      {likesCount > 0 && (
+        <motion.span
+          key={likesCount}
+          initial={{ y: -3, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          className="relative z-10 text-[11px] opacity-80"
+        >
+          {likesCount}
+        </motion.span>
+      )}
+    </motion.button>
+  );
+}
+
+function normalizeQuestionForModel(
+  question: ForumQuestaoLinkable,
+): ModelQuestao {
+  const alternativas = safeArray(question.alternativas)
+    .slice()
+    .sort((a, b) => {
+      const ordemA = Number(a.ordem ?? 0);
+      const ordemB = Number(b.ordem ?? 0);
+
+      if (ordemA !== ordemB) return ordemA - ordemB;
+
+      return String(a.letra ?? "").localeCompare(String(b.letra ?? ""));
+    })
+    .map((alternativa, index) => ({
+      id: alternativa.id,
+      letra: alternativa.letra ?? String.fromCharCode(65 + index),
+      texto: alternativa.texto ?? "",
+    }));
+
+  return {
+    id: question.id,
+    tipo: question.tipo ?? "objetiva",
+    enunciado: question.enunciado ?? "",
+    alternativas,
+    alternativa_correta_id: Number(question.alternativa_correta_id ?? 0),
+    gabarito_video: question.gabarito_video ?? null,
+    gabarito_comentado_texto: question.gabarito_comentado_texto ?? null,
+    dificuldade: question.dificuldade ?? null,
+    adaptado: question.adaptado ?? null,
+    topicos: safeArray(question.topicos).map((topico) => ({
+      id: topico.id,
+      nome: topico.nome,
+    })),
+    prova: question.prova ?? null,
+  };
+}
+
+function shouldZoomImage(target: HTMLElement) {
+  if (target.tagName !== "IMG") return false;
+
+  const isInsideZoomScope =
+    target.closest(".markdown-body") ||
+    target.closest("[data-zoom-scope='forum']") ||
+    target.closest("[data-zoom-scope='forum-question']");
+
+  const isInsideForbiddenArea =
+    target.closest("button") ||
+    target.closest("nav") ||
+    target.closest("[role='menu']") ||
+    target.closest("[role='dialog']");
+
+  return Boolean(isInsideZoomScope && !isInsideForbiddenArea);
+}
+
+function MarkdownBlock({
+  body,
+  className = "",
+}: {
+  body: string;
+  className?: string;
+}) {
+  const [processedBody, setProcessedBody] = useState(body ?? "");
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function run() {
+      try {
+        const html = await processMarkdown(body ?? "");
+
+        if (!cancelled) {
+          setProcessedBody(html);
+        }
+      } catch {
+        if (!cancelled) {
+          setProcessedBody(body ?? "");
+        }
+      }
+    }
+
+    run();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [body]);
+
+  return (
+    <div
+      data-zoom-scope="forum"
+      className={[
+        "markdown-body wmde-markdown wmde-markdown-color break-words text-sm leading-relaxed text-slate-800 dark:text-slate-100 sm:text-base",
+        "[&_img]:my-3 [&_img]:max-h-[70vh] [&_img]:max-w-full [&_img]:cursor-zoom-in [&_img]:rounded-xl [&_img]:border [&_img]:border-slate-200 dark:[&_img]:border-white/10 [&_img]:object-contain",
+        className,
+      ].join(" ")}
+      style={
+        {
+          "--color-canvas-default": "transparent",
+          "--color-fg-default": "currentColor",
+        } as CSSProperties
+      }
+      dangerouslySetInnerHTML={{
+        __html: processedBody,
+      }}
+    />
+  );
+}
+
+function MarkdownEditorBox({
+  initialContent,
+  onChange,
+  placeholder,
+  editorKey,
+}: {
+  initialContent: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  editorKey: string;
+}) {
+  return (
+    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-[#050B1A]">
+      <MarkdownEditor
+        key={editorKey}
+        initialContent={initialContent}
+        onChange={(content: string) => {
+          onChange(content ?? "");
+        }}
+      />
+    </div>
+  );
+}
+
+function LinkedQuestionFallback({
+  question,
+}: {
+  question: ForumQuestaoLinkable;
+}) {
+  const [showFullQuestion, setShowFullQuestion] = useState(true);
+  const [showTopics, setShowTopics] = useState(false);
+  const [processedEnunciado, setProcessedEnunciado] = useState(
+    question.enunciado ?? "",
+  );
+  const [processedAlternativas, setProcessedAlternativas] = useState<
+    Record<number, string>
+  >({});
+  const [isProcessing, setIsProcessing] = useState(true);
+
+  const alternativas = useMemo(() => {
+    return safeArray(question.alternativas)
+      .slice()
+      .sort((a, b) => {
+        const ordemA = Number(a.ordem ?? 0);
+        const ordemB = Number(b.ordem ?? 0);
+
+        if (ordemA !== ordemB) return ordemA - ordemB;
+
+        return String(a.letra ?? "").localeCompare(String(b.letra ?? ""));
+      });
+  }, [question.alternativas]);
+
+  const topicos = safeArray(question.topicos);
+  const difficultyLabel = getDifficultyLabel(question.dificuldade);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function run() {
+      setIsProcessing(true);
+
+      try {
+        const html = await processMarkdown(question.enunciado ?? "");
+        const alternativasMap: Record<number, string> = {};
+
+        for (const alternativa of alternativas) {
+          alternativasMap[alternativa.id] = await markdownProcessorAlternativas(
+            alternativa.texto ?? "",
+          );
+        }
+
+        if (!cancelled) {
+          setProcessedEnunciado(html);
+          setProcessedAlternativas(alternativasMap);
+        }
+      } catch {
+        if (!cancelled) {
+          setProcessedEnunciado(question.enunciado ?? "");
+
+          const fallback: Record<number, string> = {};
+
+          for (const alternativa of alternativas) {
+            fallback[alternativa.id] = alternativa.texto ?? "";
+          }
+
+          setProcessedAlternativas(fallback);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsProcessing(false);
+        }
+      }
+    }
+
+    run();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [question.id, question.enunciado, alternativas]);
+
+  return (
+    <section
+      data-zoom-scope="forum-question"
+      className="overflow-hidden rounded-2xl border border-blue-200 bg-white shadow-xl dark:border-blue-500/30 dark:bg-[#050B1A]"
+    >
+      <header className="border-b border-blue-200 bg-gradient-to-r from-[#0E00D0] to-[#2563eb] px-4 py-4 sm:px-5 dark:border-white/10 dark:from-[#0E00D0] dark:to-[#111827]">
+        <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-100/80">
+          Questão associada
+        </p>
+
+        <div className="mt-2 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <h2 className="text-lg font-bold text-slate-950 dark:text-white sm:text-xl">
+            Questão #{question.id}
+          </h2>
+
+          <div className="flex flex-wrap gap-2">
+            {question.prova?.sigla && (
+              <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white">
+                {question.prova.sigla}
+              </span>
+            )}
+
+            {question.prova?.ano && (
+              <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white">
+                {question.prova.ano}
+              </span>
+            )}
+
+            {question.prova?.banca?.sigla && (
+              <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white">
+                {question.prova.banca.sigla}
+              </span>
+            )}
+
+            {difficultyLabel && (
+              <span
+                className={[
+                  "rounded-full border px-3 py-1 text-xs font-bold",
+                  getDifficultyClass(question.dificuldade),
+                ].join(" ")}
+              >
+                {difficultyLabel}
+              </span>
+            )}
+          </div>
+        </div>
+      </header>
+
+      <div className="border-b border-slate-200 bg-slate-50 px-4 py-3 sm:px-5 dark:border-white/10 dark:bg-[#0B1220]">
+        <div className="grid grid-cols-1 gap-2 sm:flex sm:items-center sm:justify-between">
+          <button
+            type="button"
+            onClick={() => setShowFullQuestion((current) => !current)}
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-slate-950 dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10"
+          >
+            {showFullQuestion ? (
+              <>
+                Ocultar questão <ChevronUp className="h-4 w-4" />
+              </>
+            ) : (
+              <>
+                Mostrar questão <ChevronDown className="h-4 w-4" />
+              </>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setShowTopics((current) => !current)}
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-slate-950 dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10"
+          >
+            {showTopics ? (
+              <>
+                Ocultar tópicos <ChevronUp className="h-4 w-4" />
+              </>
+            ) : (
+              <>
+                Ver tópicos <ChevronDown className="h-4 w-4" />
+              </>
+            )}
+          </button>
+        </div>
+
+        <AnimatePresence>
+          {showTopics && (
+            <motion.div
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.2 }}
+              className="mt-3 flex flex-wrap gap-2"
+            >
+              {topicos.length > 0 ? (
+                topicos.map((topico) => (
+                  <span
+                    key={topico.id}
+                    className="rounded-full bg-blue-900/70 px-3 py-1 text-xs font-semibold text-blue-100"
+                  >
+                    {topico.assunto?.frente?.nome
+                      ? `${topico.assunto.frente.nome} · ${topico.nome}`
+                      : topico.nome}
+                  </span>
+                ))
+              ) : (
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                  Sem tópicos cadastrados
+                </span>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      <AnimatePresence initial={false}>
+        {showFullQuestion && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.25 }}
+            className="overflow-hidden"
+          >
+            <div className="space-y-4 px-3 py-4 sm:px-5">
+              {isProcessing ? (
+                <div className="space-y-3">
+                  <div className="h-4 w-2/3 animate-pulse rounded bg-slate-200 dark:bg-white/10" />
+                  <div className="h-4 w-full animate-pulse rounded bg-slate-200 dark:bg-white/10" />
+                  <div className="h-4 w-5/6 animate-pulse rounded bg-slate-200 dark:bg-white/10" />
+                </div>
+              ) : (
+                <>
+                  <div
+                    className="markdown-body wmde-markdown wmde-markdown-color break-words rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm leading-relaxed text-slate-800 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-100 sm:text-base [&_img]:my-3 [&_img]:max-h-[70vh] [&_img]:max-w-full [&_img]:cursor-zoom-in [&_img]:rounded-xl [&_img]:border [&_img]:border-slate-200 dark:[&_img]:border-white/10 [&_img]:object-contain"
+                    style={
+                      {
+                        "--color-canvas-default": "transparent",
+                        "--color-fg-default": "currentColor",
+                      } as CSSProperties
+                    }
+                    dangerouslySetInnerHTML={{
+                      __html: processedEnunciado,
+                    }}
+                  />
+
+                  {alternativas.length > 0 ? (
+                    <div className="space-y-2">
+                      {alternativas.map((alternativa, index) => {
+                        const isCorrect =
+                          alternativa.id === question.alternativa_correta_id;
+
+                        return (
+                          <div
+                            key={alternativa.id}
+                            className={[
+                              "flex gap-3 rounded-xl border p-3 text-sm transition sm:text-base",
+                              isCorrect
+                                ? "border-green-400 bg-green-50 dark:border-green-500/40 dark:bg-green-500/10"
+                                : "border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.03]",
+                            ].join(" ")}
+                          >
+                            <div
+                              className={[
+                                "flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border text-sm font-bold",
+                                isCorrect
+                                  ? "border-green-400 bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100"
+                                  : "border-slate-300 bg-slate-100 text-slate-700 dark:border-slate-500 dark:bg-slate-800 dark:text-white",
+                              ].join(" ")}
+                            >
+                              {String(
+                                alternativa.letra ??
+                                  String.fromCharCode(65 + index),
+                              ).toUpperCase()}
+                            </div>
+
+                            <div
+                              className="markdown-body wmde-markdown wmde-markdown-color min-w-0 flex-1 break-words text-slate-800 dark:text-slate-100 [&_img]:my-3 [&_img]:max-h-[70vh] [&_img]:max-w-full [&_img]:cursor-zoom-in [&_img]:rounded-xl [&_img]:border [&_img]:border-slate-200 dark:[&_img]:border-white/10 [&_img]:object-contain"
+                              style={
+                                {
+                                  "--color-canvas-default": "transparent",
+                                  "--color-fg-default": "currentColor",
+                                } as CSSProperties
+                              }
+                              dangerouslySetInnerHTML={{
+                                __html:
+                                  processedAlternativas[alternativa.id] ??
+                                  alternativa.texto,
+                              }}
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="rounded-xl border border-yellow-300 bg-yellow-50 px-4 py-3 text-xs text-yellow-800 dark:border-yellow-500/20 dark:bg-yellow-500/10 dark:text-yellow-100 sm:text-sm">
+                      Esta questão chegou ao fórum sem alternativas carregadas.
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </section>
+  );
+}
+
+function LinkedQuestionCard({ question }: { question: ForumQuestaoLinkable }) {
+  const hasAlternatives = safeArray(question.alternativas).length > 0;
+
+  if (!hasAlternatives) {
+    return <LinkedQuestionFallback question={question} />;
+  }
+
+  return (
+    <section
+      data-zoom-scope="forum-question"
+      className="overflow-hidden rounded-2xl border border-blue-200 bg-white shadow-xl dark:border-blue-500/30 dark:bg-[#050B1A]"
+    >
+      <header className="border-b border-blue-200 bg-gradient-to-r from-[#0E00D0] to-[#2563eb] px-4 py-4 sm:px-5 dark:border-white/10 dark:from-[#0E00D0] dark:to-[#111827]">
+        <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-100/80">
+          Questão associada
+        </p>
+
+        <div className="mt-2 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <h2 className="text-lg font-bold text-slate-950 dark:text-white sm:text-xl">
+            Questão #{question.id}
+          </h2>
+
+          <div className="flex flex-wrap gap-2">
+            {question.prova?.sigla && (
+              <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white">
+                {question.prova.sigla}
+              </span>
+            )}
+
+            {question.prova?.ano && (
+              <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white">
+                {question.prova.ano}
+              </span>
+            )}
+
+            {question.prova?.banca?.sigla && (
+              <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white">
+                {question.prova.banca.sigla}
+              </span>
+            )}
+          </div>
+        </div>
+      </header>
+
+      <div className="px-0 py-0">
+        <ModelQuestions
+          question={normalizeQuestionForModel(question) as any}
+          singleMode
+          showEmptyState={false}
+          className="!min-h-0 [&>div>div]:!max-w-none [&>div>div]:!p-0 sm:[&>div>div]:!p-3 lg:[&>div>div]:!p-4"
+        />
+      </div>
+    </section>
+  );
+}
+
+function LinkedLessonCard({ lesson }: { lesson: ForumCourseLinkable }) {
+  const duration = formatDurationFromSeconds(lesson.duration_in_seconds);
+
+  return (
+    <section className="overflow-hidden rounded-2xl border border-purple-200 bg-white shadow-xl dark:border-purple-500/30 dark:bg-[#050B1A]">
+      <header className="border-b border-purple-200 bg-gradient-to-r from-[#0E00D0] via-[#2563eb] to-[#111827] px-4 py-4 sm:px-5 dark:border-white/10 dark:from-[#0E00D0] dark:via-[#1A0BFF] dark:to-[#111827]">
+        <p className="text-xs font-bold uppercase tracking-[0.18em] text-purple-100/80">
+          Aula relacionada
+        </p>
+
+        <div className="mt-2 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <h2 className="text-lg font-bold text-slate-950 dark:text-white sm:text-xl">
+            {lesson.title ?? `Aula #${lesson.id}`}
+          </h2>
+
+          <div className="flex flex-wrap gap-2">
+            <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white">
+              Aula #{lesson.id}
+            </span>
+
+            {lesson.content_type && (
+              <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold capitalize text-white">
+                {lesson.content_type}
+              </span>
+            )}
+
+            {duration && (
+              <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white">
+                {duration}
+              </span>
+            )}
+          </div>
+        </div>
+      </header>
+
+      {lesson.content_url ? (
+        <div className="p-3 sm:p-5">
+          <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-black pt-[56.25%] dark:border-white/10">
+            <iframe
+              src={lesson.content_url}
+              className="absolute left-0 top-0 h-full w-full border-0"
+              allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture"
+              allowFullScreen
+              title={`Vídeo: ${lesson.title ?? `Aula #${lesson.id}`}`}
+            />
+          </div>
+
+          <p className="mt-3 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+            Esta dúvida está relacionada a esta aula. Assista ao vídeo para
+            entender melhor o contexto.
+          </p>
+        </div>
+      ) : (
+        <div className="p-4 sm:p-5">
+          <div className="rounded-xl border border-yellow-300 bg-yellow-50 px-4 py-3 text-sm text-yellow-800 dark:border-yellow-500/20 dark:bg-yellow-500/10 dark:text-yellow-100">
+            Esta aula está vinculada à dúvida, mas o link do player não veio no
+            retorno da API.
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function ReplyCard({
+  reply,
+  token,
+  isBest,
+  isAuthor,
+  canMarkBest,
+  onMarkBest,
+  onDelete,
+  onStartEdit,
+  isEditing,
+  editValue,
+  onEditChange,
+  onCancelEdit,
+  onSaveEdit,
+  isActionLoading,
+}: {
+  reply: ForumReply;
+  token: string;
+  isBest: boolean;
+  isAuthor: boolean;
+  canMarkBest: boolean;
+  onMarkBest: () => void;
+  onDelete: () => void;
+  onStartEdit: () => void;
+  isEditing: boolean;
+  editValue: string;
+  onEditChange: (value: string) => void;
+  onCancelEdit: () => void;
+  onSaveEdit: () => void;
+  isActionLoading: boolean;
+}) {
+  return (
+    <article
+      className={[
+        "rounded-2xl border p-4 shadow-lg sm:p-5",
+        isBest
+          ? "border-green-400 bg-green-50 dark:border-green-500/40 dark:bg-green-500/10"
+          : "border-slate-200 bg-white dark:border-white/10 dark:bg-[#0B1220]",
+      ].join(" ")}
+    >
+      <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex min-w-0 items-start gap-3">
+          <ForumAuthorAvatar author={reply.author} sizeClassName="h-10 w-10" />
+
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="truncate font-semibold text-slate-950 dark:text-white">
+                <AnimatedRoleName
+                  name={reply.author?.name ?? "Usuário"}
+                  roles={getAuthorRoles(reply.author)}
+                  role={getAuthorPrimaryRole(reply.author)}
+                  level={getAuthorLevel(reply.author)}
+                  levelTitle={getAuthorLevelTitle(reply.author)}
+                  nameClassName="text-sm"
+                />
+              </p>
+
+              {isBest && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-1 text-xs font-bold text-green-700 dark:bg-green-500/20 dark:text-green-200">
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  Melhor resposta
+                </span>
+              )}
+            </div>
+
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              {formatDate(reply.created_at)}
+            </p>
+          </div>
+        </div>
+
+        {(canMarkBest || isAuthor) && !isEditing && (
+          <ActionMenu>
+            {canMarkBest && !isBest && (
+              <button
+                type="button"
+                onClick={onMarkBest}
+                disabled={isActionLoading}
+                className="inline-flex w-full items-center justify-start gap-2 rounded-xl px-3 py-2 text-left text-xs font-bold text-green-700 transition hover:bg-green-50 disabled:cursor-not-allowed disabled:opacity-50 dark:text-green-200 dark:hover:bg-green-500/10"
+              >
+                {isActionLoading ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                )}
+                Marcar melhor
+              </button>
+            )}
+
+            {isAuthor && (
+              <>
+                <button
+                  type="button"
+                  onClick={onStartEdit}
+                  disabled={isActionLoading}
+                  className="cursor-pointer inline-flex w-full items-center justify-start gap-2 rounded-xl px-3 py-2 text-left text-xs font-bold text-blue-700 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50 dark:text-blue-200 dark:hover:bg-blue-500/10"
+                >
+                  <Edit3 className="h-3.5 w-3.5" />
+                  Editar
+                </button>
+
+                <button
+                  type="button"
+                  onClick={onDelete}
+                  disabled={isActionLoading}
+                  className="cursor-pointer inline-flex w-full items-center justify-start gap-2 rounded-xl px-3 py-2 text-left text-xs font-bold text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 dark:text-red-200 dark:hover:bg-red-500/10"
+                >
+                  {isActionLoading ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-3.5 w-3.5" />
+                  )}
+                  Apagar
+                </button>
+              </>
+            )}
+          </ActionMenu>
+        )}
+      </div>
+
+      {isEditing ? (
+        <div className="space-y-3">
+          <MarkdownEditorBox
+            editorKey={`edit-reply-${reply.id}-${isEditing ? "on" : "off"}`}
+            initialContent={editValue}
+            onChange={onEditChange}
+            placeholder="Edite sua resposta..."
+          />
+
+          <div className="grid grid-cols-1 gap-2 sm:flex sm:justify-end">
+            <button
+              type="button"
+              onClick={onCancelEdit}
+              className="cursor-pointer inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50 hover:text-slate-950 dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10 sm:w-auto"
+            >
+              Cancelar
+            </button>
+
+            <button
+              type="button"
+              onClick={onSaveEdit}
+              disabled={isActionLoading || !editValue.trim()}
+              className="cursor-pointer inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#0E00D0] px-4 py-3 text-sm font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+            >
+              {isActionLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Salvando...
+                </>
+              ) : (
+                "Salvar resposta"
+              )}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <MarkdownBlock body={reply.body} />
+
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <ForumReplyLikeButton
+              token={token}
+              replyId={reply.id}
+              initialLiked={Boolean(reply.liked_by_me)}
+              initialCount={reply.likes_count ?? 0}
+            />
+          </div>
+        </>
+      )}
+    </article>
+  );
+}
+
+export default function ForumThreadPage() {
+  const params = useParams();
+  const router = useRouter();
+  const { data: session, status } = useSession();
+
+  const token = useMemo(() => getTokenFromSession(session), [session]);
+  const currentUserId = useMemo(() => getUserIdFromSession(session), [session]);
+
+  const slug = useMemo(() => {
+    const raw = params?.slug;
+
+    if (Array.isArray(raw)) return raw[0] ?? "";
+
+    return raw ? String(raw) : "";
+  }, [params]);
+
+  const [thread, setThread] = useState<ForumThread | null>(null);
+  const [replyBody, setReplyBody] = useState("");
+  const [editingThread, setEditingThread] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+  const [editBody, setEditBody] = useState("");
+  const [editingReplyId, setEditingReplyId] = useState<number | null>(null);
+  const [editReplyBody, setEditReplyBody] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const [isPostingReply, setIsPostingReply] = useState(false);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [zoomedImageUrl, setZoomedImageUrl] = useState<string | null>(null);
+
+  const isThreadAuthor =
+    Boolean(thread && currentUserId) &&
+    Number(thread?.user_id) === Number(currentUserId);
+
+  const fetchThread = useCallback(async () => {
+    if (status === "loading") return;
+
+    if (!slug) {
+      setErrorMessage("Tópico não encontrado.");
+      setIsLoading(false);
+      return;
+    }
+
+    if (!token) {
+      setErrorMessage("Usuário não autenticado. Faça login novamente.");
+      setIsLoading(false);
+      return;
+    }
+
+    setIsLoading(true);
+    setErrorMessage(null);
+
+    try {
+      const response = await api.get(`/forum/threads/${slug}`, {
+        headers: authHeaders(token),
+      });
+
+      const data = response.data?.thread ?? response.data;
+
+      setThread(data);
+      setEditTitle(data?.title ?? "");
+      setEditBody(data?.body ?? "");
+    } catch (error: any) {
+      console.error("Erro ao carregar tópico do fórum:", error);
+
+      setErrorMessage(
+        error?.response?.data?.message ??
+          "Não foi possível carregar este tópico.",
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  }, [slug, status, token]);
+
+  useEffect(() => {
+    fetchThread();
+  }, [fetchThread]);
+
   useEffect(() => {
     const handleImageClick = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
 
-      // Verificar se o clique foi em uma imagem
-      if (target.tagName === "IMG") {
-        // Verificar se NÃO está em um menu do usuário, notificações, ou nav
-        const isInUserMenu =
-          target.closest('[class*="UserMenu"]') ||
-          target.closest('[class*="user-menu"]') ||
-          target.closest('[class*="notification"]') ||
-          target.closest("nav") ||
-          target.closest("button") ||
-          target.closest('[role="menu"]') ||
-          target.closest('[role="dialog"]');
+      if (!shouldZoomImage(target)) return;
 
-        // Verificar se está no conteúdo do fórum (thread ou respostas)
-        const isInForumContent =
-          target.closest(".markdown-body") ||
-          target.closest('[class*="thread"]') ||
-          target.closest('[class*="reply"]') ||
-          target.closest('[class*="forum"]');
+      const src = target.getAttribute("src");
 
-        // Só abrir lightbox se estiver no conteúdo do fórum e NÃO em um menu
-        if (isInForumContent && !isInUserMenu) {
-          const src = target.getAttribute("src");
-          if (src) {
-            setZoomedImageUrl(src);
-            event.preventDefault();
-            event.stopPropagation();
-          }
-        }
+      if (src) {
+        setZoomedImageUrl(src);
+        event.preventDefault();
+        event.stopPropagation();
       }
     };
 
-    // Usar capture: true para pegar o evento antes dos menus
     document.addEventListener("click", handleImageClick, true);
 
     return () => {
@@ -117,1050 +1424,640 @@ useEffect(() => {
     };
   }, []);
 
-  // Efeito 2: Processar o conteúdo sempre que o thread mudar
-  useEffect(() => {
-    if (thread) {
-      processThreadContent();
-    }
-  }, [thread]);
-
-  const processThreadContent = async () => {
+  function startEditThread() {
     if (!thread) return;
 
-    setProcessingContent(true);
-    try {
-      // Processar o conteúdo da thread principal
-      const processedThread = await processMarkdown(thread.body);
-      setThreadHtml(processedThread);
-
-      // Processar o conteúdo de cada resposta
-      const repliesHtmlMap: Record<number, string> = {};
-      if (thread.replies?.length) {
-        for (const reply of thread.replies) {
-          const processedReply = await processMarkdown(reply.body);
-          repliesHtmlMap[reply.id] = processedReply;
-        }
-      }
-      setRepliesHtml(repliesHtmlMap);
-    } catch (error) {
-      console.error("Erro ao processar conteúdo Markdown:", error);
-    } finally {
-      setProcessingContent(false);
-    }
-  };
-
-  const handlePostReply = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!replyBody.trim() || !session?.laravelToken) return;
-
-    setPosting(true);
-    try {
-      await postForumReply(session.laravelToken, threadId, replyBody);
-      setReplyBody("");
-      await loadThread();
-    } catch (error) {
-      console.error("Erro ao postar resposta:", error);
-    } finally {
-      setPosting(false);
-    }
-  };
-
-  const handleMarkBestReply = async (replyId: number) => {
-    if (!session?.laravelToken) return;
-
-    setActionLoading(`mark-${replyId}`);
-    try {
-      await markBestReply(session.laravelToken, threadId, replyId);
-      await loadThread();
-    } catch (error) {
-      console.error("Erro ao marcar melhor resposta:", error);
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
-  const handleReopenThread = async () => {
-    if (!session?.laravelToken) return;
-
-    setActionLoading("reopen");
-    try {
-      await reopenThread(session.laravelToken, threadId);
-      await loadThread();
-    } catch (error) {
-      console.error("Erro ao reabrir thread:", error);
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
-  const openDeleteThreadModal = () => {
-  setDeleteModal({
-    open: true,
-    type: "thread",
-  });
-};
-
-const openDeleteReplyModal = (replyId: number) => {
-  setDeleteModal({
-    open: true,
-    type: "reply",
-    replyId,
-  });
-};
-
-const closeDeleteModal = () => {
-  setDeleteModal({
-    open: false,
-    type: null,
-  });
-};
-
-
-  const handleCloseThread = async () => {
-    if (!session?.laravelToken) return;
-
-    setActionLoading("close");
-
-    try {
-      await closeForumThread(session.laravelToken, threadId);
-      await loadThread();
-    } catch (error) {
-      console.error("Erro ao fechar tópico:", error);
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
-  const startEditThread = () => {
-    if (!thread) return;
-
-    setEditThreadTitle(thread.title);
-    setEditThreadBody(thread.body);
-    setEditingThread(true);
-  };
-
-  const cancelEditThread = () => {
-    setEditingThread(false);
-    setEditThreadTitle("");
-    setEditThreadBody("");
-  };
-
-  const handleUpdateThread = async () => {
-    if (!session?.laravelToken || !thread) return;
-
-    setActionLoading("edit-thread");
-
-    try {
-      await updateForumThread(session.laravelToken, threadId, {
-        title: editThreadTitle,
-        body: editThreadBody,
-      });
-
-      setEditingThread(false);
-      setEditThreadTitle("");
-      setEditThreadBody("");
-      await loadThread();
-    } catch (error) {
-      console.error("Erro ao editar tópico:", error);
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
-  const startEditReply = (reply: ForumReply) => {
-    setEditingReplyId(reply.id);
-    setEditReplyBody(reply.body);
-  };
-
-  const cancelEditReply = () => {
     setEditingReplyId(null);
     setEditReplyBody("");
-  };
 
-  const handleUpdateReply = async (replyId: number) => {
-    if (!session?.laravelToken) return;
+    setEditTitle(thread.title ?? "");
+    setEditBody(thread.body ?? "");
+    setEditingThread(true);
+  }
+
+  function cancelEditThread() {
+    setEditingThread(false);
+    setEditTitle("");
+    setEditBody("");
+  }
+
+  function startEditReply(reply: ForumReply) {
+    setEditingThread(false);
+    setEditTitle("");
+    setEditBody("");
+
+    setEditReplyBody(reply.body ?? "");
+    setEditingReplyId(reply.id);
+  }
+
+  function cancelEditReply() {
+    setEditingReplyId(null);
+    setEditReplyBody("");
+  }
+
+  async function handlePostReply(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!thread || !replyBody.trim() || isPostingReply) return;
+
+    if (!token) {
+      alert("Usuário não autenticado. Faça login novamente.");
+      return;
+    }
+
+    setIsPostingReply(true);
+
+    try {
+      await api.post(
+        `/forum/threads/${thread.id}/replies`,
+        {
+          body: replyBody.trim(),
+        },
+        {
+          headers: authHeaders(token),
+        },
+      );
+
+      setReplyBody("");
+      await fetchThread();
+    } catch (error: any) {
+      console.error("Erro ao responder tópico:", error);
+
+      alert(
+        error?.response?.data?.message ??
+          "Não foi possível enviar sua resposta.",
+      );
+    } finally {
+      setIsPostingReply(false);
+    }
+  }
+
+  async function handleUpdateThread(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!thread || !editTitle.trim() || !editBody.trim()) return;
+
+    setActionLoading("update-thread");
+
+    try {
+      const response = await api.put(
+        `/forum/threads/${thread.id}`,
+        {
+          title: editTitle.trim(),
+          body: editBody.trim(),
+        },
+        {
+          headers: authHeaders(token),
+        },
+      );
+
+      const updated = response.data?.thread ?? response.data;
+
+      setThread(updated);
+      setEditingThread(false);
+      setEditTitle("");
+      setEditBody("");
+    } catch (error: any) {
+      console.error("Erro ao editar tópico:", error);
+
+      alert(
+        error?.response?.data?.message ??
+          "Não foi possível editar esta dúvida.",
+      );
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleUpdateReply(replyId: number) {
+    if (!thread || !editReplyBody.trim()) return;
 
     setActionLoading(`edit-reply-${replyId}`);
 
     try {
-      await updateForumReply(
-        session.laravelToken,
-        threadId,
-        replyId,
-        editReplyBody,
+      await api.put(
+        `/forum/threads/${thread.id}/replies/${replyId}`,
+        {
+          body: editReplyBody.trim(),
+        },
+        {
+          headers: authHeaders(token),
+        },
       );
 
       setEditingReplyId(null);
       setEditReplyBody("");
-      await loadThread();
-    } catch (error) {
+      await fetchThread();
+    } catch (error: any) {
       console.error("Erro ao editar resposta:", error);
+
+      alert(
+        error?.response?.data?.message ??
+          "Não foi possível editar esta resposta.",
+      );
     } finally {
       setActionLoading(null);
     }
-  };
-
-  const handleConfirmDelete = async () => {
-    if (!session?.laravelToken || !deleteModal.type) return;
-
-    if (deleteModal.type === "thread") {
-      setActionLoading("delete-thread");
-
-      try {
-        await deleteForumThread(session.laravelToken, threadId);
-        closeDeleteModal();
-        router.push("/forum");
-      } catch (error) {
-        console.error("Erro ao apagar dúvida:", error);
-      } finally {
-        setActionLoading(null);
-      }
-
-      return;
-    }
-
-    if (deleteModal.type === "reply" && deleteModal.replyId) {
-      const replyId = deleteModal.replyId;
-
-      setActionLoading(`delete-reply-${replyId}`);
-
-      try {
-        await deleteForumReply(session.laravelToken, threadId, replyId);
-        closeDeleteModal();
-        await loadThread();
-      } catch (error) {
-        console.error("Erro ao apagar resposta:", error);
-      } finally {
-        setActionLoading(null);
-      }
-    }
-  };
-
-  // Verificar autenticação
-  if (status === "unauthenticated") {
-    return (
-      <div className="min-h-screen bg-[#00091A] text-white flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4">Acesso Negado</h1>
-          <p className="text-gray-400 mb-6">
-            Você precisa estar logado para ver esta discussão.
-          </p>
-          <button
-            onClick={() => router.push("/login")}
-            className="bg-[#0E00D0] hover:bg-blue-700 px-6 py-3 rounded-lg transition-colors"
-          >
-            Fazer Login
-          </button>
-        </div>
-      </div>
-    );
   }
 
-  if (status === "loading" || loading) {
-    return (
-      <div className="min-h-screen bg-[#00091A] text-white">
-        <div className="animate-pulse">
-          <div className="h-20 bg-[#1B1F27]"></div>
-          <div className="container mx-auto px-4 lg:px-40 py-8 space-y-6">
-            <div className="h-8 bg-[#1B1F27] rounded w-1/4"></div>
-            <div className="space-y-4">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="h-32 bg-[#1B1F27] rounded"></div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  async function handleCloseThread() {
+    if (!thread) return;
 
-  if (!thread) {
-    return (
-      <div className="min-h-screen bg-[#00091A] text-white flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4">Tópico não encontrado</h1>
-          <button
-            onClick={() => router.push("/forum")}
-            className="bg-[#0E00D0] hover:bg-blue-700 px-6 py-3 rounded-lg transition-colors"
-          >
-            Voltar ao Fórum
-          </button>
-        </div>
-      </div>
-    );
-  }
+    setActionLoading("close-thread");
 
-  const isAuthor = session?.user?.id === thread.author.id.toString();
-  const linkable = thread.linkable as CourseContent | null;
+    try {
+      const response = await api.post(
+        `/forum/threads/${thread.id}/close`,
+        {},
+        {
+          headers: authHeaders(token),
+        },
+      );
 
-  // Função para formatar a duração
-  const formatDuration = (seconds: number) => {
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    if (minutes >= 60) {
-      const hours = Math.floor(minutes / 60);
-      const remainingMinutes = minutes % 60;
-      return `${hours}h ${remainingMinutes}min`;
+      setThread(response.data?.thread ?? response.data);
+    } catch (error: any) {
+      console.error("Erro ao fechar tópico:", error);
+
+      alert(
+        error?.response?.data?.message ??
+          "Não foi possível fechar esta dúvida.",
+      );
+    } finally {
+      setActionLoading(null);
     }
-    return `${minutes}min ${remainingSeconds > 0 ? `${remainingSeconds}s` : ""}`;
-  };
+  }
+
+  async function handleReopenThread() {
+    if (!thread) return;
+
+    setActionLoading("reopen-thread");
+
+    try {
+      const response = await api.post(
+        `/forum/threads/${thread.id}/reopen`,
+        {},
+        {
+          headers: authHeaders(token),
+        },
+      );
+
+      setThread(response.data?.thread ?? response.data);
+    } catch (error: any) {
+      console.error("Erro ao reabrir tópico:", error);
+
+      alert(
+        error?.response?.data?.message ??
+          "Não foi possível reabrir esta dúvida.",
+      );
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleDeleteThread() {
+    if (!thread) return;
+
+    const confirmed = window.confirm(
+      "Tem certeza que deseja apagar esta dúvida?",
+    );
+
+    if (!confirmed) return;
+
+    setActionLoading("delete-thread");
+
+    try {
+      await api.delete(`/forum/threads/${thread.id}`, {
+        headers: authHeaders(token),
+      });
+
+      router.push("/forum");
+    } catch (error: any) {
+      console.error("Erro ao apagar tópico:", error);
+
+      alert(
+        error?.response?.data?.message ??
+          "Não foi possível apagar esta dúvida.",
+      );
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleMarkBestReply(replyId: number) {
+    if (!thread) return;
+
+    setActionLoading(`best-${replyId}`);
+
+    try {
+      await api.post(
+        `/forum/threads/${thread.id}/replies/${replyId}/best`,
+        {},
+        {
+          headers: authHeaders(token),
+        },
+      );
+
+      await fetchThread();
+    } catch (error: any) {
+      console.error("Erro ao marcar melhor resposta:", error);
+
+      alert(
+        error?.response?.data?.message ??
+          "Não foi possível marcar a melhor resposta.",
+      );
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleDeleteReply(replyId: number) {
+    if (!thread) return;
+
+    const confirmed = window.confirm(
+      "Tem certeza que deseja apagar esta resposta?",
+    );
+
+    if (!confirmed) return;
+
+    setActionLoading(`delete-reply-${replyId}`);
+
+    try {
+      await api.delete(`/forum/threads/${thread.id}/replies/${replyId}`, {
+        headers: authHeaders(token),
+      });
+
+      await fetchThread();
+    } catch (error: any) {
+      console.error("Erro ao apagar resposta:", error);
+
+      alert(
+        error?.response?.data?.message ??
+          "Não foi possível apagar esta resposta.",
+      );
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  const replies: ForumReply[] = safeArray<ForumReply>(thread?.replies);
+
+  const linkedQuestion: ForumQuestaoLinkable | null =
+    isQuestaoThread(thread) && isForumQuestaoLinkable(thread?.linkable)
+      ? thread.linkable
+      : null;
+
+  const linkedLesson: ForumCourseLinkable | null =
+    isCourseThread(thread) && isForumCourseLinkable(thread?.linkable)
+      ? thread.linkable
+      : null;
+
+  useDocumentTitle(thread?.title ?? "Fórum");
 
   return (
-    <div className="min-h-screen bg-[#00091A] text-white">
-      {/* Header */}
-      <div className="px-8 py-6 border-gray-700 bg-[#1B1F27]">
-        <div className="container mx-auto">
-          <button
-            onClick={() => router.push("/forum")}
-            className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors mb-4 group"
-          >
-            <motion.div
-              whileHover={{ x: -5 }}
-              transition={{ type: "spring", stiffness: 400, damping: 25 }}
-            >
-              <svg
-                className="w-6 h-6"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M10 19l-7-7m0 0l7-7m-7 7h18"
-                />
-              </svg>
-            </motion.div>
-            Voltar para o Fórum
-          </button>
-
-          <h1 className="text-lg font-bold">Discussão da Dúvida</h1>
-        </div>
-      </div>
-
-      {/* Conteúdo Principal */}
-      <div className="container mx-auto px-4 lg:px-40 py-8">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          className="space-y-6"
+    <div className="min-h-screen bg-[#F8F8F8] text-slate-950 dark:bg-[#00091A] dark:text-white">
+      <main className="mx-auto w-full max-w-6xl px-3 py-4 sm:px-6 lg:px-8">
+        <button
+          type="button"
+          onClick={() => router.push("/forum")}
+          className="cursor-pointer mb-4 inline-flex min-h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 hover:text-slate-950 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10 dark:hover:text-white"
         >
-          {/* Tópico Principal - Estilo igual às respostas */}
-          <div
-            className={`border rounded-xl p-6 bg-[#0F172A] ${thread.best_reply_id ? "border-yellow-500/50 bg-gradient-to-br from-yellow-500/5 to-transparent relative overflow-hidden" : "border-[#2F3541]"}`}
-          >
-            {thread.best_reply_id && (
-              <div className="absolute top-0 right-0">
-                <div className="bg-yellow-500 text-yellow-900 text-xs font-bold px-3 py-1 rounded-bl-lg">
-                  MELHOR RESPOSTA
-                </div>
-              </div>
-            )}
+          <ArrowLeft className="h-4 w-4" />
+          Voltar ao fórum
+        </button>
 
-            <div className="flex items-start gap-4">
-              {/* Autor - Estilo igual às respostas */}
-              <div className="flex-shrink-0">
-                <div
-                  className={`w-12 h-12 rounded-full flex items-center justify-center border-2 ${
-                    thread.best_reply_id
-                      ? "border-yellow-500 bg-yellow-500/20"
-                      : "border-[#2F3541] bg-[#1B1F27]"
-                  }`}
-                >
-                  {thread.author.avatar ? (
-                    <img
-                      src={thread.author.avatar}
-                      alt={thread.author.name}
-                      className="w-10 h-10 rounded-full"
-                    />
-                  ) : (
-                    <span
-                      className={`text-base font-bold ${
-                        thread.best_reply_id
-                          ? "text-yellow-300"
-                          : "text-gray-300"
-                      }`}
-                    >
-                      {thread.author.name.charAt(0).toUpperCase()}
-                    </span>
-                  )}
-                </div>
-              </div>
+        {isLoading ? (
+          <div className="space-y-4">
+            <div className="h-28 animate-pulse rounded-2xl bg-slate-200 dark:bg-white/10" />
+            <div className="h-80 animate-pulse rounded-2xl bg-slate-200 dark:bg-white/10" />
+            <div className="h-32 animate-pulse rounded-2xl bg-slate-200 dark:bg-white/10" />
+          </div>
+        ) : errorMessage ? (
+          <div className="rounded-2xl border border-red-300 bg-red-50 p-5 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200">
+            {errorMessage}
+          </div>
+        ) : !thread ? (
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm dark:border-white/10 dark:bg-white/[0.03]">
+            <h1 className="text-xl font-bold text-slate-950 dark:text-white">
+              Tópico não encontrado
+            </h1>
 
-              <div className="flex-1">
-                <div className="flex flex-wrap items-center gap-3 mb-4">
-                  <h4 className="font-bold text-white">{thread.author.name}</h4>
+            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+              O tópico solicitado não existe ou não está disponível.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-5">
+            <motion.article
+              initial={{ opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.25 }}
+              className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl dark:border-white/10 dark:bg-[#0B1220]"
+            >
+              <header className="border-b border-slate-200 px-4 py-4 sm:px-6 sm:py-5 dark:border-white/10">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="min-w-0 flex-1">
+                    {editingThread ? (
+                      <form onSubmit={handleUpdateThread} className="space-y-3">
+                        <input
+                          value={editTitle}
+                          onChange={(event) => setEditTitle(event.target.value)}
+                          placeholder="Título da dúvida"
+                          className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-lg font-bold text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-[#0E00D0] dark:border-white/10 dark:bg-[#050B1A] dark:text-white dark:placeholder:text-slate-500 sm:text-2xl"
+                        />
 
-                  <span className="text-sm text-gray-400">
-                    {new Date(thread.created_at).toLocaleDateString("pt-BR", {
-                      day: "2-digit",
-                      month: "short",
-                      year: "numeric",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </span>
+                        <MarkdownEditorBox
+                          editorKey={`edit-thread-${thread.id}-${editingThread ? "on" : "off"}`}
+                          initialContent={editBody}
+                          onChange={setEditBody}
+                          placeholder="Edite o corpo da dúvida..."
+                        />
 
-                  {/* Botão Reabrir (se autor) */}
-                  {isAuthor && (
-                    <div className="ml-auto flex items-center gap-2">
-                      {!thread.is_closed && (
-                        <>
+                        <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-row">
                           <button
-                            onClick={startEditThread}
-                            disabled={editingThread}
-                            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-blue-500/20 text-blue-300 border border-blue-500/30 hover:bg-blue-500/30 disabled:opacity-50 transition-colors text-xs"
+                            type="submit"
+                            disabled={
+                              actionLoading === "update-thread" ||
+                              !editTitle.trim() ||
+                              !editBody.trim()
+                            }
+                            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#0E00D0] px-4 py-3 text-sm font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
                           >
-                            <svg
-                              className="w-3 h-3"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"
-                              />
-                            </svg>
-                            Editar
+                            {actionLoading === "update-thread" ? (
+                              <>
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                Salvando...
+                              </>
+                            ) : (
+                              "Salvar alterações"
+                            )}
                           </button>
 
                           <button
-                            onClick={handleCloseThread}
-                            disabled={actionLoading === "close"}
-                            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-500/20 text-red-300 border border-red-500/30 hover:bg-red-500/30 disabled:opacity-50 transition-colors text-xs"
+                            type="button"
+                            onClick={cancelEditThread}
+                            className="inline-flex w-full items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50 hover:text-slate-950 dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10 sm:w-auto"
                           >
-                            <svg
-                              className="w-3 h-3"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M5 13l4 4L19 7"
-                              />
-                            </svg>
-                            {actionLoading === "close"
-                              ? "Fechando..."
-                              : "Fechar"}
+                            Cancelar
                           </button>
+                        </div>
+                      </form>
+                    ) : (
+                      <>
+                        <h1 className="break-words text-xl font-bold leading-tight text-slate-950 dark:text-white sm:text-2xl lg:text-3xl">
+                          {thread.title}
+                        </h1>
 
-                          <button
-                            onClick={openDeleteThreadModal}
-                            disabled={actionLoading === "delete-thread"}
-                            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-600/20 text-red-300 border border-red-600/30 hover:bg-red-600/30 disabled:opacity-50 transition-colors text-xs"
-                          >
-                            <svg
-                              className="w-3 h-3"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7h6m2 0H7m3 0V5a2 2 0 012-2h0a2 2 0 012 2v2"
-                              />
-                            </svg>
-
-                            {actionLoading === "delete-thread"
-                              ? "Apagando..."
-                              : "Apagar"}
-                          </button>
-                        </>
-                      )}
-
-                      {thread.is_closed && (
-                        <button
-                          onClick={handleReopenThread}
-                          disabled={actionLoading === "reopen"}
-                          className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-yellow-500/20 text-yellow-300 border border-yellow-500/30 hover:bg-yellow-500/30 disabled:opacity-50 transition-colors text-xs"
-                        >
-                          <svg
-                            className="w-3 h-3"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400 sm:text-sm">
+                          <span className="inline-flex min-w-0 items-center gap-2">
+                            <ForumAuthorAvatar
+                              author={thread.author}
+                              sizeClassName="h-8 w-8"
                             />
-                          </svg>
-                          {actionLoading === "reopen"
-                            ? "Reabrindo..."
-                            : "Reabrir"}
-                        </button>
+
+                            <span className="min-w-0 truncate">
+                              <AnimatedRoleName
+                                name={thread.author?.name ?? "Usuário"}
+                                roles={getAuthorRoles(thread.author)}
+                                role={getAuthorPrimaryRole(thread.author)}
+                                level={getAuthorLevel(thread.author)}
+                                levelTitle={getAuthorLevelTitle(thread.author)}
+                                nameClassName="text-xs sm:text-sm"
+                              />
+                            </span>
+                          </span>
+
+                          <span>•</span>
+
+                          <span>{formatDate(thread.created_at)}</span>
+
+                          <span>•</span>
+
+                          <span
+                            className={
+                              thread.is_closed
+                                ? "inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-1 text-red-700 dark:bg-red-500/10 dark:text-red-300"
+                                : "inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-1 text-green-700 dark:bg-green-500/10 dark:text-green-300"
+                            }
+                          >
+                            {thread.is_closed ? (
+                              <>
+                                <Lock className="h-3.5 w-3.5" />
+                                Fechado
+                              </>
+                            ) : (
+                              <>
+                                <MessageCircle className="h-3.5 w-3.5" />
+                                Aberto
+                              </>
+                            )}
+                          </span>
+
+                          {linkedQuestion && (
+                            <>
+                              <span>•</span>
+
+                              <span className="rounded-full bg-blue-50 px-2 py-1 font-semibold text-blue-700 dark:bg-blue-500/10 dark:text-blue-200">
+                                Questão #{linkedQuestion.id}
+                              </span>
+                            </>
+                          )}
+
+                          {linkedLesson && (
+                            <>
+                              <span>•</span>
+
+                              <span className="rounded-full bg-purple-50 px-2 py-1 font-semibold text-purple-700 dark:bg-purple-500/10 dark:text-purple-200">
+                                Aula #{linkedLesson.id}
+                              </span>
+                            </>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  {!editingThread && (
+                    <div className="flex items-start justify-end gap-2 lg:min-w-[140px]">
+                      <ForumThreadLikeButton
+                        token={token}
+                        threadId={thread.id}
+                        initialLiked={Boolean(thread.liked_by_me)}
+                        initialCount={thread.likes_count ?? 0}
+                      />
+
+                      {isThreadAuthor && (
+                        <ActionMenu>
+                          {!thread.is_closed ? (
+                            <>
+                              <button
+                                type="button"
+                                onClick={startEditThread}
+                                className="inline-flex w-full items-center justify-start gap-2 rounded-xl px-3 py-2 text-left text-xs font-bold text-blue-700 transition hover:bg-blue-50 dark:text-blue-200 dark:hover:bg-blue-500/10"
+                              >
+                                <Edit3 className="h-3.5 w-3.5" />
+                                Editar
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={handleCloseThread}
+                                disabled={actionLoading === "close-thread"}
+                                className="inline-flex w-full items-center justify-start gap-2 rounded-xl px-3 py-2 text-left text-xs font-bold text-yellow-700 transition hover:bg-yellow-50 disabled:opacity-50 dark:text-yellow-200 dark:hover:bg-yellow-500/10"
+                              >
+                                {actionLoading === "close-thread" ? (
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                ) : (
+                                  <Lock className="h-3.5 w-3.5" />
+                                )}
+                                Fechar
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={handleReopenThread}
+                              disabled={actionLoading === "reopen-thread"}
+                              className="inline-flex w-full items-center justify-start gap-2 rounded-xl px-3 py-2 text-left text-xs font-bold text-green-700 transition hover:bg-green-50 disabled:opacity-50 dark:text-green-200 dark:hover:bg-green-500/10"
+                            >
+                              {actionLoading === "reopen-thread" ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <Unlock className="h-3.5 w-3.5" />
+                              )}
+                              Reabrir
+                            </button>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={handleDeleteThread}
+                            disabled={actionLoading === "delete-thread"}
+                            className="inline-flex w-full items-center justify-start gap-2 rounded-xl px-3 py-2 text-left text-xs font-bold text-red-700 transition hover:bg-red-50 disabled:opacity-50 dark:text-red-200 dark:hover:bg-red-500/10"
+                          >
+                            {actionLoading === "delete-thread" ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Trash2 className="h-3.5 w-3.5" />
+                            )}
+                            Apagar
+                          </button>
+                        </ActionMenu>
                       )}
                     </div>
                   )}
                 </div>
+              </header>
 
-                {editingThread ? (
-                  <div className="space-y-4 mb-4">
-                    <input
-                      value={editThreadTitle}
-                      onChange={(e) => setEditThreadTitle(e.target.value)}
-                      className="w-full bg-[#020617] border border-[#4A5260] rounded-lg px-4 py-3 text-white placeholder:text-gray-500 outline-none focus:border-blue-500"
-                      placeholder="Título da dúvida"
-                    />
-
-                    <div className="rounded-lg overflow-hidden border border-[#4A5260]">
-                      <MarkdownEditor
-                        initialContent={editThreadBody}
-                        onChange={(content) => setEditThreadBody(content)}
-                      />
-                    </div>
-
-                    <div className="flex justify-end gap-2">
-                      <button
-                        type="button"
-                        onClick={cancelEditThread}
-                        className="px-4 py-2 rounded-lg bg-gray-500/20 text-gray-300 border border-gray-500/30 hover:bg-gray-500/30 transition-colors text-sm"
-                      >
-                        Cancelar
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={handleUpdateThread}
-                        disabled={
-                          actionLoading === "edit-thread" ||
-                          !editThreadTitle.trim() ||
-                          !editThreadBody.trim()
-                        }
-                        className="px-4 py-2 rounded-lg bg-blue-500/20 text-blue-300 border border-blue-500/30 hover:bg-blue-500/30 disabled:opacity-50 transition-colors text-sm"
-                      >
-                        {actionLoading === "edit-thread"
-                          ? "Salvando..."
-                          : "Salvar edição"}
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    {/* Título da dúvida */}
-                    <h2 className="text-2xl font-bold text-white mb-4">
-                      {thread.title}
-                    </h2>
-
-                    {/* Conteúdo Markdown */}
-                    <div className="bg-[#1B1F27] rounded-lg p-4 border border-[#2F3541] mb-4">
-                      {processingContent ? (
-                        <div className="flex items-center justify-center py-8">
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-400 mr-2"></div>
-                          <span className="text-sm text-gray-400">
-                            Processando...
-                          </span>
-                        </div>
-                      ) : (
-                        <div className="markdown-body wmde-markdown wmde-markdown-color">
-                          <div
-                            dangerouslySetInnerHTML={{ __html: threadHtml }}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  </>
+              <div className="space-y-4 px-3 py-4 sm:px-6 sm:py-5">
+                {linkedQuestion && (
+                  <LinkedQuestionCard question={linkedQuestion} />
                 )}
 
-                {/* Status */}
-                <div className="flex gap-2 mt-4">
-                  {thread.is_closed && (
-                    <span className="bg-green-500/20 text-green-300 px-2 py-1 rounded text-xs border border-green-500/30">
-                      Resolvida
-                    </span>
-                  )}
-                  {thread.best_reply_id && (
-                    <span className="bg-yellow-500/20 text-yellow-300 px-2 py-1 rounded text-xs border border-yellow-500/30">
-                      Melhor resposta selecionada
-                    </span>
-                  )}
-                  {thread.linkable_type && (
-                    <span className="bg-[#1B1F27] px-3 py-1 rounded-lg border border-[#2F3541] text-xs">
-                      {thread.linkable_type === "App\\Models\\CourseContent"
-                        ? "Aula"
-                        : "Questão"}{" "}
-                      #{thread.linkable_id}
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
+                {linkedLesson && <LinkedLessonCard lesson={linkedLesson} />}
 
-          {/* Aula Relacionada (se existir) - Bloco separado */}
-          {linkable &&
-            thread.linkable_type === "App\\Models\\CourseContent" && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
-                className="border border-[#2F3541] rounded-xl p-6 bg-[#0F172A]"
-              >
-                <div className="flex items-center gap-2 mb-6">
-                  <div className="w-1 h-6 bg-[#0E00D0] rounded-full"></div>
-                  <h3 className="text-lg font-bold text-white">
-                    Aula Relacionada
-                  </h3>
-                </div>
-
-                {/* Título da aula acima do vídeo */}
-                <div className="mb-6">
-                  <h4 className="text-xl font-bold text-white mb-2">
-                    {linkable.title}
-                  </h4>
-                  <div className="flex items-center gap-4 text-sm text-gray-400">
-                    <span className="flex items-center gap-1">
-                      <svg
-                        className="w-4 h-4"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                        />
-                      </svg>
-                      {formatDuration(linkable.duration_in_seconds)}
-                    </span>
-                    <span>•</span>
-                    <span className="capitalize">{linkable.content_type}</span>
+                {!editingThread && (
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-5 dark:border-white/10 dark:bg-white/[0.03]">
+                    <MarkdownBlock body={thread.body} />
                   </div>
-                </div>
+                )}
+              </div>
+            </motion.article>
 
-                {/* Player de Vídeo */}
-                <div className="relative pt-[56.25%] overflow-hidden bg-black rounded-lg border border-[#2F3541] mb-4">
-                  <iframe
-                    src={linkable.content_url}
-                    className="absolute top-0 left-0 w-full h-full border-0"
-                    allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture"
-                    allowFullScreen
-                    title={`Vídeo: ${linkable.title}`}
-                  />
-                </div>
+            <section className="space-y-3 sm:space-y-4">
+              <div className="flex items-center justify-between px-1">
+                <h2 className="text-lg font-bold text-slate-950 dark:text-white sm:text-xl">
+                  Respostas
+                </h2>
 
-                <div className="text-gray-300 text-sm leading-relaxed">
-                  <p>
-                    Esta dúvida está relacionada a esta aula. Assista ao vídeo
-                    para entender melhor o contexto.
-                  </p>
-                </div>
-              </motion.div>
-            )}
-
-          {/* Respostas */}
-          <div className="space-y-6">
-            <div className="border-b border-[#2F3541] pb-4">
-              <h3 className="text-lg font-bold text-white">
-                Respostas
-                <span className="ml-2 px-2.5 py-0.5 bg-[#1B1F27] text-sm font-medium rounded-full border border-[#2F3541]">
-                  {thread.replies?.length || 0}
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 dark:bg-white/10 dark:text-slate-300">
+                  {replies.length}
                 </span>
-              </h3>
-            </div>
+              </div>
 
-            <AnimatePresence>
-              {thread.replies && thread.replies.length > 0 ? (
-                thread.replies.map((reply: ForumReply, index: number) => {
-                  const isReplyAuthor =
-                    session?.user?.id === reply.author.id.toString();
-
-                  return (
-                    <motion.div
-                      key={reply.id}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.4, delay: index * 0.1 }}
-                      className={`border rounded-xl p-6 ${
-                        reply.id === thread.best_reply_id
-                          ? "border-yellow-500/50 bg-gradient-to-br from-yellow-500/5 to-transparent relative overflow-hidden"
-                          : "border-[#2F3541] bg-[#0F172A]"
-                      }`}
-                    >
-                      {reply.id === thread.best_reply_id && (
-                        <div className="absolute top-0 right-0">
-                          <div className="bg-yellow-500 text-yellow-900 text-xs font-bold px-3 py-1 rounded-bl-lg">
-                            MELHOR RESPOSTA
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="flex items-start gap-4">
-                        <div className="flex-shrink-0">
-                          <div
-                            className={`w-12 h-12 rounded-full flex items-center justify-center border-2 ${
-                              reply.id === thread.best_reply_id
-                                ? "border-yellow-500 bg-yellow-500/20"
-                                : "border-[#2F3541] bg-[#1B1F27]"
-                            }`}
-                          >
-                            {reply.author.avatar ? (
-                              <img
-                                src={reply.author.avatar}
-                                alt={reply.author.name}
-                                className="w-10 h-10 rounded-full"
-                              />
-                            ) : (
-                              <span
-                                className={`text-base font-bold ${
-                                  reply.id === thread.best_reply_id
-                                    ? "text-yellow-300"
-                                    : "text-gray-300"
-                                }`}
-                              >
-                                {reply.author.name.charAt(0).toUpperCase()}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="flex-1">
-                          <div className="flex flex-wrap items-center gap-3 mb-4">
-                            <h4 className="font-bold text-white">
-                              {reply.author.name}
-                            </h4>
-
-                            <span className="text-sm text-gray-400">
-                              {new Date(reply.created_at).toLocaleDateString(
-                                "pt-BR",
-                                {
-                                  day: "2-digit",
-                                  month: "short",
-                                  year: "numeric",
-                                  hour: "2-digit",
-                                  minute: "2-digit",
-                                },
-                              )}
-                            </span>
-
-                            <div className="ml-auto flex items-center gap-2">
-                              {isReplyAuthor && editingReplyId !== reply.id && (
-                                <button
-                                  onClick={() => startEditReply(reply)}
-                                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-blue-500/20 text-blue-300 border border-blue-500/30 hover:bg-blue-500/30 transition-colors text-xs"
-                                >
-                                  <svg
-                                    className="w-3 h-3"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                  >
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      strokeWidth={2}
-                                      d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"
-                                    />
-                                  </svg>
-                                  Editar
-                                </button>
-                              )}
-
-                              {isReplyAuthor && (
-                                <button
-                                  onClick={() => openDeleteReplyModal(reply.id)}
-                                  disabled={
-                                    actionLoading === `delete-reply-${reply.id}`
-                                  }
-                                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-600/20 text-red-300 border border-red-600/30 hover:bg-red-600/30 disabled:opacity-50 transition-colors text-xs"
-                                >
-                                  <svg
-                                    className="w-3 h-3"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                  >
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      strokeWidth={2}
-                                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7h6m2 0H7m3 0V5a2 2 0 012-2h0a2 2 0 012 2v2"
-                                    />
-                                  </svg>
-
-                                  {actionLoading === `delete-reply-${reply.id}`
-                                    ? "Apagando..."
-                                    : "Apagar"}
-                                </button>
-                              )}
-
-                              {isAuthor &&
-                                !thread.is_closed &&
-                                reply.id !== thread.best_reply_id && (
-                                  <button
-                                    onClick={() =>
-                                      handleMarkBestReply(reply.id)
-                                    }
-                                    disabled={
-                                      actionLoading === `mark-${reply.id}`
-                                    }
-                                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-green-500/20 text-green-300 border border-green-500/30 hover:bg-green-500/30 disabled:opacity-50 transition-colors text-xs"
-                                  >
-                                    <svg
-                                      className="w-3 h-3"
-                                      fill="none"
-                                      stroke="currentColor"
-                                      viewBox="0 0 24 24"
-                                    >
-                                      <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={2}
-                                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                                      />
-                                    </svg>
-                                    {actionLoading === `mark-${reply.id}`
-                                      ? "Marcando..."
-                                      : "Melhor resposta"}
-                                  </button>
-                                )}
-                            </div>
-                          </div>
-
-                          <div className="bg-[#1B1F27] rounded-lg p-4 border border-[#2F3541]">
-                            {editingReplyId === reply.id ? (
-                              <div className="space-y-4">
-                                <div className="rounded-lg overflow-hidden border border-[#4A5260]">
-                                  <MarkdownEditor
-                                    initialContent={editReplyBody}
-                                    onChange={(content) =>
-                                      setEditReplyBody(content)
-                                    }
-                                  />
-                                </div>
-
-                                <div className="flex justify-end gap-2">
-                                  <button
-                                    type="button"
-                                    onClick={cancelEditReply}
-                                    className="px-4 py-2 rounded-lg bg-gray-500/20 text-gray-300 border border-gray-500/30 hover:bg-gray-500/30 transition-colors text-sm"
-                                  >
-                                    Cancelar
-                                  </button>
-
-                                  <button
-                                    type="button"
-                                    onClick={() => handleUpdateReply(reply.id)}
-                                    disabled={
-                                      actionLoading ===
-                                        `edit-reply-${reply.id}` ||
-                                      !editReplyBody.trim()
-                                    }
-                                    className="px-4 py-2 rounded-lg bg-blue-500/20 text-blue-300 border border-blue-500/30 hover:bg-blue-500/30 disabled:opacity-50 transition-colors text-sm"
-                                  >
-                                    {actionLoading === `edit-reply-${reply.id}`
-                                      ? "Salvando..."
-                                      : "Salvar edição"}
-                                  </button>
-                                </div>
-                              </div>
-                            ) : processingContent ? (
-                              <div className="flex items-center justify-center py-8">
-                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-400 mr-2"></div>
-                                <span className="text-sm text-gray-400">
-                                  Processando...
-                                </span>
-                              </div>
-                            ) : repliesHtml[reply.id] ? (
-                              <div
-                                className="markdown-body wmde-markdown wmde-markdown-color text-sm"
-                                dangerouslySetInnerHTML={{
-                                  __html: repliesHtml[reply.id],
-                                }}
-                              />
-                            ) : (
-                              <div
-                                dangerouslySetInnerHTML={{ __html: reply.body }}
-                              />
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </motion.div>
-                  );
-                })
+              {replies.length === 0 ? (
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 text-center text-sm text-slate-500 shadow-sm dark:border-white/10 dark:bg-[#0B1220] dark:text-slate-400">
+                  Ainda não há respostas neste tópico.
+                </div>
               ) : (
-                <div className="text-center py-12 text-gray-400 border border-[#2F3541] rounded-xl bg-[#0F172A]">
-                  <svg
-                    className="w-16 h-16 mx-auto mb-4 text-gray-600"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
-                    />
-                  </svg>
-                  <h4 className="text-lg font-semibold mb-2">
-                    Nenhuma resposta ainda
-                  </h4>
-                  <p>Seja o primeiro a responder esta dúvida!</p>
-                </div>
-              )}
-            </AnimatePresence>
-          </div>
-
-          {/* Formulário de Resposta */}
-          {!thread.is_closed && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, delay: 0.3 }}
-              className="border border-[#2F3541] rounded-xl p-6 bg-[#0F172A]"
-            >
-              <h3 className="text-lg font-bold text-white mb-6">
-                Sua Resposta
-              </h3>
-
-              <form onSubmit={handlePostReply} className="space-y-4">
-                <div className="rounded-lg overflow-hidden border border-[#4A5260]">
-                  <MarkdownEditor
-                    initialContent={replyBody}
-                    onChange={(content) => setReplyBody(content)}
+                replies.map((reply) => (
+                  <ReplyCard
+                    key={reply.id}
+                    reply={reply}
+                    token={token}
+                    isBest={thread.best_reply_id === reply.id}
+                    isAuthor={Number(reply.user_id) === Number(currentUserId)}
+                    canMarkBest={
+                      isThreadAuthor &&
+                      !thread.is_closed &&
+                      Number(reply.user_id) !== Number(currentUserId)
+                    }
+                    isEditing={editingReplyId === reply.id}
+                    editValue={editReplyBody}
+                    onEditChange={setEditReplyBody}
+                    onStartEdit={() => startEditReply(reply)}
+                    onCancelEdit={cancelEditReply}
+                    onSaveEdit={() => handleUpdateReply(reply.id)}
+                    isActionLoading={
+                      actionLoading === `best-${reply.id}` ||
+                      actionLoading === `delete-reply-${reply.id}` ||
+                      actionLoading === `edit-reply-${reply.id}`
+                    }
+                    onMarkBest={() => handleMarkBestReply(reply.id)}
+                    onDelete={() => handleDeleteReply(reply.id)}
                   />
-                </div>
+                ))
+              )}
+            </section>
 
-                <div className="flex justify-end">
+            {!thread.is_closed && !editingThread && editingReplyId === null && (
+              <form
+                onSubmit={handlePostReply}
+                className="rounded-2xl border border-slate-200 bg-white p-3 shadow-xl dark:border-white/10 dark:bg-[#0B1220] sm:p-5"
+              >
+                <label
+                  htmlFor="reply-body"
+                  className="mb-2 block text-sm font-semibold text-slate-950 dark:text-white"
+                >
+                  Responder em Markdown
+                </label>
+
+                <MarkdownEditorBox
+                  editorKey={`new-reply-${thread.id}`}
+                  initialContent={replyBody}
+                  onChange={setReplyBody}
+                  placeholder="Escreva sua resposta em Markdown..."
+                />
+
+                <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:justify-end">
                   <button
                     type="submit"
-                    disabled={posting || !replyBody.trim()}
-                    className="px-6 py-3 rounded-lg bg-[#0E00D0] hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 hover:scale-105 active:scale-95 font-medium"
+                    disabled={isPostingReply || !replyBody.trim()}
+                    className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#0E00D0] px-4 py-3 text-sm font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
                   >
-                    {posting ? (
-                      <span className="flex items-center gap-2">
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                        Publicando...
-                      </span>
+                    {isPostingReply ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Enviando...
+                      </>
                     ) : (
-                      "Publicar Resposta"
+                      <>
+                        <Send className="h-4 w-4" />
+                        Enviar resposta
+                      </>
                     )}
                   </button>
                 </div>
               </form>
-            </motion.div>
-          )}
+            )}
 
-          {thread.is_closed && !thread.replies?.length && (
-            <div className="text-center py-12 border border-[#2F3541] rounded-xl bg-gradient-to-br from-green-500/5 to-transparent">
-              <svg
-                className="w-20 h-20 mx-auto mb-4 text-green-500"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-              <h3 className="text-2xl font-bold text-green-400 mb-3">
-                Dúvida Resolvida!
-              </h3>
-              <p className="text-gray-300 max-w-md mx-auto">
-                Esta discussão foi marcada como resolvida pelo autor.
-                {thread.best_reply_id &&
-                  " Uma resposta foi selecionada como a melhor solução."}
-              </p>
-            </div>
-          )}
-        </motion.div>
-      </div>
-
-      {deleteModal.open && (
-        <div className="fixed inset-0 z-[9998] flex items-center justify-center px-4">
-          <div
-            className="absolute inset-0 bg-black/70 backdrop-blur-sm"
-            onClick={actionLoading ? undefined : closeDeleteModal}
-          />
-
-          <div className="relative z-[9999] w-full max-w-md rounded-2xl border border-red-500/30 bg-[#0F172A] shadow-2xl overflow-hidden">
-            <div className="p-6">
-              <div className="flex items-start gap-4">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-red-500/15 border border-red-500/30">
-                  <svg
-                    className="h-6 w-6 text-red-300"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
-                    />
-                  </svg>
-                </div>
-
-                <div className="flex-1">
-                  <h3 className="text-lg font-bold text-white">
-                    {deleteModal.type === "thread"
-                      ? "Apagar dúvida?"
-                      : "Apagar resposta?"}
-                  </h3>
-
-                  <p className="mt-2 text-sm leading-6 text-gray-300">
-                    {deleteModal.type === "thread"
-                      ? "Esta dúvida será removida do fórum. As respostas vinculadas a ela também deixarão de aparecer."
-                      : "Esta resposta será removida da discussão. Caso ela seja a melhor resposta, a dúvida poderá voltar ao estado aberto."}
-                  </p>
-
-                  <p className="mt-3 text-xs text-red-300/90">
-                    Esta ação não deve ser executada sem plena certeza.
-                  </p>
-                </div>
+            {thread.is_closed && (
+              <div className="rounded-2xl border border-red-300 bg-red-50 p-4 text-sm font-medium text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200">
+                Esta dúvida está fechada e não aceita novas respostas.
               </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-3 border-t border-[#2F3541] bg-[#020617]/60 px-6 py-4">
-              <button
-                type="button"
-                onClick={closeDeleteModal}
-                disabled={!!actionLoading}
-                className="rounded-lg border border-[#4A5260] bg-[#1B1F27] px-4 py-2 text-sm text-gray-300 hover:bg-[#252B36] disabled:opacity-50 transition-colors"
-              >
-                Cancelar
-              </button>
-
-              <button
-                type="button"
-                onClick={handleConfirmDelete}
-                disabled={
-                  actionLoading === "delete-thread" ||
-                  actionLoading === `delete-reply-${deleteModal.replyId}`
-                }
-                className="rounded-lg border border-red-500/40 bg-red-600/20 px-4 py-2 text-sm font-semibold text-red-200 hover:bg-red-600/30 disabled:opacity-50 transition-colors"
-              >
-                {actionLoading === "delete-thread" ||
-                actionLoading === `delete-reply-${deleteModal.replyId}`
-                  ? "Apagando..."
-                  : deleteModal.type === "thread"
-                    ? "Apagar dúvida"
-                    : "Apagar resposta"}
-              </button>
-            </div>
+            )}
           </div>
-        </div>
-      )}
+        )}
+      </main>
 
       {zoomedImageUrl && (
         <ImageLightbox
@@ -1170,6 +2067,4 @@ const closeDeleteModal = () => {
       )}
     </div>
   );
-};
-
-export default ThreadDetail;
+}

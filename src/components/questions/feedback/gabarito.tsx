@@ -114,17 +114,17 @@ export const GabaritoQuestao: React.FC<GabaritoQuestaoProps> = ({
         animate={{ opacity: 1, y: 0 }}
         className="flex justify-center my-6"
       >
-        <div className="bg-[#0e1525] rounded-2xl shadow-2xl w-full max-w-3xl border border-gray-800 overflow-hidden">
+        <div className="bg-white dark:bg-[#0e1525] rounded-2xl shadow-2xl w-full max-w-3xl border border-gray-200 dark:border-gray-800 overflow-hidden">
           <div className="p-8 text-center">
             <div className="flex flex-col items-center justify-center gap-4">
-              <div className="p-4 bg-yellow-900/20 rounded-full border border-yellow-700">
-                <AlertCircle className="w-12 h-12 text-yellow-500" />
+              <div className="p-4 bg-yellow-100 dark:bg-yellow-900/20 rounded-full border border-yellow-300 dark:border-yellow-700">
+                <AlertCircle className="w-12 h-12 text-yellow-600 dark:text-yellow-500" />
               </div>
               <div>
-                <h3 className="text-white text-lg font-semibold mb-2">
+                <h3 className="text-gray-950 dark:text-white text-lg font-semibold mb-2">
                   Gabarito não disponível
                 </h3>
-                <p className="text-gray-400">
+                <p className="text-gray-600 dark:text-gray-400">
                   Esta questão ainda não possui gabarito comentado.
                 </p>
               </div>
@@ -142,17 +142,17 @@ export const GabaritoQuestao: React.FC<GabaritoQuestaoProps> = ({
       transition={{ duration: 0.4, delay: 0.1 }}
       className="flex justify-center my-6"
     >
-      <div className="bg-[#0e1525] rounded-2xl shadow-2xl w-full max-w-3xl border border-gray-800 overflow-hidden">
+      <div className="bg-white dark:bg-[#0e1525] rounded-2xl shadow-2xl w-full max-w-3xl border border-gray-200 dark:border-gray-800 overflow-hidden">
 
         {/* Aba superior - condicional */}
-        <div className="flex border-b border-gray-700 text-sm font-medium">
+        <div className="flex border-b border-gray-200 dark:border-gray-700 text-sm font-medium">
           {hasVideo && (
             <button 
               onClick={() => setActiveTab('video')}
               className={`cursor-pointer px-6 py-3 transition-colors flex items-center gap-2 ${
                 activeTab === 'video' 
-                  ? 'text-white bg-[#131b2d] border-b-2 border-pink-500' 
-                  : 'text-gray-400 hover:text-white'
+                  ? 'text-gray-950 dark:text-white bg-gray-100 dark:bg-[#131b2d] border-b-2 border-pink-500' 
+                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-950 dark:hover:text-white'
               }`}
             >
               <Video className="w-4 h-4" />
@@ -165,8 +165,8 @@ export const GabaritoQuestao: React.FC<GabaritoQuestaoProps> = ({
               onClick={() => setActiveTab('texto')}
               className={`cursor-pointer px-6 py-3 transition-colors flex items-center gap-2 ${
                 activeTab === 'texto' 
-                  ? 'text-white bg-[#131b2d] border-b-2 border-pink-500' 
-                  : 'text-gray-400 hover:text-white'
+                  ? 'text-gray-950 dark:text-white bg-gray-100 dark:bg-[#131b2d] border-b-2 border-pink-500' 
+                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-950 dark:hover:text-white'
               }`}
             >
               <FileText className="w-4 h-4" />
@@ -199,8 +199,8 @@ export const GabaritoQuestao: React.FC<GabaritoQuestaoProps> = ({
               </div>
               
               {/* Legenda informativa */}
-              <div className="p-4 bg-blue-900/20 border-t border-blue-700/30">
-                <p className="text-blue-300 text-sm text-center">
+              <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border-t border-blue-200 dark:border-blue-700/30">
+                <p className="text-blue-700 dark:text-blue-300 text-sm text-center">
                   Assista ao vídeo para entender a resolução completa desta questão.
                 </p>
               </div>
@@ -219,25 +219,25 @@ export const GabaritoQuestao: React.FC<GabaritoQuestaoProps> = ({
               {isProcessing ? (
                 // Skeleton durante o processamento
                 <div className="animate-pulse">
-                  <div className="bg-[#131b2d] rounded-lg p-6 border border-gray-700">
-                    <div className="h-6 bg-gray-700 rounded w-1/3 mb-6"></div>
+                  <div className="bg-gray-50 dark:bg-[#131b2d] rounded-lg p-6 border border-gray-200 dark:border-gray-700">
+                    <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-1/3 mb-6"></div>
                     <div className="space-y-4">
-                      <div className="h-4 bg-gray-700 rounded w-full"></div>
-                      <div className="h-4 bg-gray-700 rounded w-5/6"></div>
-                      <div className="h-4 bg-gray-700 rounded w-4/6"></div>
-                      <div className="h-4 bg-gray-700 rounded w-3/4"></div>
+                      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-full"></div>
+                      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-5/6"></div>
+                      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-4/6"></div>
+                      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
                     </div>
                   </div>
                 </div>
               ) : hasText ? (
                 // Gabarito processado com markdown
-                <div className="bg-[#131b2d] rounded-lg p-6 border border-gray-700">
-                  <h3 className="text-white text-lg font-semibold mb-4 flex items-center gap-2">
+                <div className="bg-gray-50 dark:bg-[#131b2d] rounded-lg p-6 border border-gray-200 dark:border-gray-700">
+                  <h3 className="text-gray-950 dark:text-white text-lg font-semibold mb-4 flex items-center gap-2">
                     <FileText className="w-5 h-5" />
                     Explicação Detalhada
                   </h3>
                   <div
-                    className="text-gray-300 leading-relaxed markdown-body wmde-markdown wmde-markdown-color"
+                    className="text-gray-700 dark:text-gray-300 leading-relaxed markdown-body wmde-markdown wmde-markdown-color"
                     style={{
                       '--color-canvas-default': 'transparent',
                       '--color-fg-default': 'currentColor'
@@ -246,28 +246,28 @@ export const GabaritoQuestao: React.FC<GabaritoQuestaoProps> = ({
                   />
                   
                   {/* Dica extra */}
-                  <div className="mt-6 p-4 bg-blue-900/20 rounded-lg border border-blue-700">
-                    <div className="flex items-center gap-2 text-blue-300 font-semibold mb-2">
+                  <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-700">
+                    <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300 font-semibold mb-2">
                       <AlertCircle className="w-4 h-4" />
                       Dica Importante
                     </div>
-                    <p className="text-blue-200 text-sm">
+                    <p className="text-blue-800 dark:text-blue-200 text-sm">
                       Lembre-se, antes falhar do que ser um fracassado!
                     </p>
                   </div>
                 </div>
               ) : (
                 // Mensagem quando não há gabarito de texto (mas há vídeo)
-                <div className="bg-[#131b2d] rounded-lg p-8 border border-gray-700 text-center">
+                <div className="bg-gray-50 dark:bg-[#131b2d] rounded-lg p-8 border border-gray-200 dark:border-gray-700 text-center">
                   <div className="flex flex-col items-center justify-center gap-4">
-                    <div className="p-3 bg-yellow-900/20 rounded-full border border-yellow-700">
-                      <AlertCircle className="w-8 h-8 text-yellow-500" />
+                    <div className="p-3 bg-yellow-100 dark:bg-yellow-900/20 rounded-full border border-yellow-300 dark:border-yellow-700">
+                      <AlertCircle className="w-8 h-8 text-yellow-600 dark:text-yellow-500" />
                     </div>
                     <div>
-                      <h4 className="text-white font-semibold mb-2">
+                      <h4 className="text-gray-950 dark:text-white font-semibold mb-2">
                         Gabarito em texto não disponível
                       </h4>
-                      <p className="text-gray-400 text-sm mb-4">
+                      <p className="text-gray-600 dark:text-gray-400 text-sm mb-4">
                         Esta questão não possui explicação escrita.
                       </p>
                       {hasVideo && (

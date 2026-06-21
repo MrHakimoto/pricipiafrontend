@@ -1,3 +1,4 @@
+// lib/course/course.ts
 import { api } from "../axios";
 
 export const getModuloContents = async (moduloId: string, session: string) => {

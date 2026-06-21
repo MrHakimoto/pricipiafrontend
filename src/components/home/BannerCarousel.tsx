@@ -162,7 +162,7 @@ export default function BannerCarousel() {
 
   if (loading) {
     return (
-      <div className="relative w-full h-48 bg-gradient-to-r from-blue-700 to-blue-900 rounded-2xl overflow-hidden mt-5">
+      <div className="relative mt-2 h-36 w-full overflow-hidden rounded-3xl bg-gradient-to-r from-blue-700 to-blue-900 shadow-sm sm:h-44 lg:h-52">
         <div className="absolute inset-0 flex items-center justify-center">
           <div className="text-lg font-semibold text-white">Carregando...</div>
         </div>
@@ -188,7 +188,7 @@ export default function BannerCarousel() {
 
   return (
     <div 
-      className="relative w-full h-48 rounded-2xl overflow-hidden mt-5 cursor-pointer group"
+      className="group relative mt-2 h-36 w-full cursor-pointer overflow-hidden rounded-3xl shadow-sm sm:h-44 lg:h-52"
       onClick={() => handleBannerClick(currentBanner)}
       onMouseEnter={() => setShowTitle(true)}
       onMouseLeave={() => setShowTitle(false)}

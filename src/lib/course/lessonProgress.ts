@@ -52,23 +52,19 @@ export const sendHeartbeat = async (courseContentId: number, timestamp: number, 
  * @receives (Recebe em caso de falha na validação - 403 Forbidden)
  * - Promise<{ message: string }> // "É necessário assistir pelo menos 60% da aula."
  */
-export const markLessonCompleted = async (courseContentId: number, token: string) => {
-  if (!courseContentId) throw new Error("ID do conteúdo da aula é obrigatório.");
-  if (!token) throw new Error("Token não fornecido.");
+export async function markLessonCompleted(lessonId: number, token: string) {
+  const response = await api.post(
+    `/contents/${lessonId}/complete`,
+    {},
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
 
-  try {
-    // O 2º argumento (payload) é um objeto vazio
-    const response = await api.post(`/aulas/${courseContentId}/concluir`, {}, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    
-    return response.data;
-  } catch (error: any) {
-    console.error("Erro ao concluir aula:", error.response?.data || error.message);
-    // Lança o erro para que a UI possa mostrar a mensagem (ex: "Assista 60%")
-    throw error;
-  }
-};
+  return response.data;
+}
 
 /**
  * Marca uma aula como "Não Concluída".
@@ -77,20 +73,16 @@ export const markLessonCompleted = async (courseContentId: number, token: string
  * @param {number|string} courseContentId - O ID da aula (course_content).
  * @param {string} token - O token de autenticação (Bearer token).
  */
-export const markLessonUncompleted = async (courseContentId: number, token: string) => {
-  if (!courseContentId) throw new Error("ID do conteúdo da aula é obrigatório.");
-  if (!token) throw new Error("Token não fornecido.");
+export async function markLessonUncompleted(lessonId: number, token: string) {
+  const response = await api.post(
+    `/contents/${lessonId}/uncomplete`,
+    {},
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
 
-  try {
-    // O 2º argumento (payload) é um objeto vazio
-    const response = await api.post(`/aulas/${courseContentId}/desconcluir`, {}, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    
-    return response.data;
-  } catch (error: any) {
-    console.error("Erro ao desmarcar aula:", error.response?.data || error.message);
-    // Lança o erro para que a UI possa mostrar a mensagem
-    throw error;
-  }
-};
+  return response.data;
+}

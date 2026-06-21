@@ -26,19 +26,6 @@ type KaTeXRenderError = {
 };
 
 /* ============================================================
- ✅ CORRIGIR FONTES KaTeX
-============================================================ */
-
-function fixMathrmClasses(html: string): string {
-  return html
-    .replace(/class="mord mathnormal"/g, 'class="mord mathrm"')
-    .replace(/class="([^"]*?)mathnormal([^"]*?)"/g, 'class="$1mathrm$2"')
-    .replace(/class="([^"]*?)mathit([^"]*?)"/g, 'class="$1mathrm$2"')
-    .replace(/class="mordmathrm"/g, 'class="mordmathrm"')
-    .replace(/class="(\w+)mathrm"/g, 'class="$1mathrm"');
-}
-
-/* ============================================================
  ✅ GERADOR DE SLUGS
 ============================================================ */
 
@@ -82,7 +69,7 @@ function processImagesWithContainer(html: string): string {
 }
 
 /* ============================================================
- ✅ PLUGIN: ÂNCORAS EM HEADINGS (TIPAGEM CORRIGIDA)
+ ✅ PLUGIN: ÂNCORAS EM HEADINGS
 ============================================================ */
 
 function headingAnchors() {
@@ -119,7 +106,7 @@ function headingAnchors() {
             properties: {
               href: `#${slug}`,
               target: '_blank',
-              tabindex: '-1',
+              tabIndex: '-1',
               'aria-hidden': 'true'
             },
             children: [
@@ -148,7 +135,7 @@ function headingAnchors() {
 }
 
 /* ============================================================
- ✅ PLUGIN: BLOCO DE CÓDIGO SIMPLES (TIPAGEM CORRIGIDA)
+ ✅ PLUGIN: BLOCO DE CÓDIGO SIMPLES
 ============================================================ */
 
 function simpleCodeBlocks() {
@@ -197,24 +184,62 @@ function simpleCodeBlocks() {
 }
 
 /* ============================================================
+ ✅ DETECTA FÓRMULA DISPLAY/BLOCO
+============================================================ */
+
+function shouldUseDisplayMode(formula: string): boolean {
+  return (
+    formula.includes('\n') ||
+    /\\begin\{(array|cases|pmatrix|bmatrix|Bmatrix|vmatrix|Vmatrix|matrix|aligned|gathered|alignedat)\}/.test(formula) ||
+    formula.includes('\\displaystyle')
+  );
+}
+
+/* ============================================================
+ ✅ NORMALIZA FÓRMULA
+============================================================ */
+
+function normalizeLatexFormula(formula: string): string {
+  /*
+    NÃO trocar "\\\\" por "\\".
+
+    Em LaTeX/KaTeX, "\\" é sintaxe legítima para quebra de linha
+    em array, cases, matrix, pmatrix etc.
+
+    Exemplo necessário:
+    \text{Objeto} & \text{Expressão}\\
+  */
+  return formula.trim();
+}
+
+/* ============================================================
  ✅ KaTeX ENTRE CRASES
 ============================================================ */
 
 function processBacktickKaTeX(content: string): string {
-  return content.replace(/`\$\$([\s\S]*?)\$\$`/g, (_match, formula: string) => {
+  return content.replace(/`\$\$([\s\S]*?)\$\$`/g, (_match: string, formula: string) => {
     try {
-      const katexHTML = katex.renderToString(formula.trim(), {
+      const cleanFormula = normalizeLatexFormula(formula);
+      const displayMode = shouldUseDisplayMode(cleanFormula);
+
+      const katexHTML = katex.renderToString(cleanFormula, {
         throwOnError: false,
-        displayMode: false,
-        strict: false
+        displayMode,
+        strict: false,
+        output: 'html'
       });
 
-      const corrected = fixMathrmClasses(katexHTML);
-      return `<code style="background: transparent; padding: 0px 2px;">${corrected}</code>`;
+      if (displayMode) {
+        return `<div class="math-display">${katexHTML}</div>`;
+      }
+
+      return `<span class="math-inline">${katexHTML}</span>`;
     } catch (error) {
       const err = error as KaTeXRenderError;
+
       console.error('Erro ao renderizar KaTeX:', err);
-      return `<code style="color:red;">Erro KaTeX: ${formula}</code>`;
+
+      return `<span class="math-inline-error">Erro KaTeX: ${formula}</span>`;
     }
   });
 }
@@ -259,33 +284,39 @@ function escapeNonBacktickMath(content: string): string {
 export async function markdownProcessorAlternativas(content: string): Promise<string> {
   try {
     console.log('Processando Markdown...');
-    
+
     // 1. Processar fórmulas entre crases
     let processedContent = processBacktickKaTeX(content);
-    
+
     // 2. Escapar fórmulas sem crases
     processedContent = escapeNonBacktickMath(processedContent);
-    
+
     // 3. Processar blocos KaTeX especiais (```KaTeX)
     const katexBlocks: string[] = [];
 
     processedContent = processedContent.replace(
       /```KaTeX\s*\n([\s\S]*?)```/gi,
-      (_match, formula: string) => {
+      (_match: string, formula: string) => {
         try {
-          const katexHTML = katex.renderToString(formula.trim(), {
+          const cleanFormula = normalizeLatexFormula(formula);
+
+          const katexHTML = katex.renderToString(cleanFormula, {
             throwOnError: false,
             displayMode: true,
+            strict: false,
             output: 'html'
           });
 
-          const correctedHTML = fixMathrmClasses(katexHTML);
-          katexBlocks.push(correctedHTML);
+          katexBlocks.push(katexHTML);
 
           return `\n\n<!-- KATEX_BLOCK_${katexBlocks.length - 1} -->\n\n`;
         } catch (error) {
           const err = error as KaTeXRenderError;
-          katexBlocks.push(`<span style="color: red;">Erro KaTeX: ${err.message}</span>`);
+
+          katexBlocks.push(
+            `<span class="math-inline-error">Erro KaTeX: ${err.message}</span>`
+          );
+
           return `\n\n<!-- KATEX_BLOCK_${katexBlocks.length - 1} -->\n\n`;
         }
       }
@@ -295,7 +326,9 @@ export async function markdownProcessorAlternativas(content: string): Promise<st
     const file = await unified()
       .use(remarkParse)
       .use(remarkGfm)
-      .use(remarkRehype, { allowDangerousHtml: true })
+      .use(remarkRehype, {
+        allowDangerousHtml: true
+      })
       .use(simpleCodeBlocks)
       .use(headingAnchors)
       .use(rehypeStringify, {
@@ -306,35 +339,43 @@ export async function markdownProcessorAlternativas(content: string): Promise<st
 
     let html = String(file);
 
-    // 5. Restaurar blocos KaTeX especiais com o formato EXATO desejado
+    // 5. Restaurar blocos KaTeX especiais
     katexBlocks.forEach((block, index) => {
-      const katexHTML = `<pre class="" style="background-color: transparent;"><code class="[&_.newline]:h-[8px] [&_.katex-display]:my-0" style="background: transparent; font-size: 105%; text-align: center; padding: 2px 0px; overflow: hidden;">${block}</code><div></div></pre>`;
-      
       html = html.replace(
         `<!-- KATEX_BLOCK_${index} -->`,
-        katexHTML
+        `<div class="math-display katex-block">${block}</div>`
       );
     });
 
     // 6. Pós-processamento
     html = processImagesWithContainer(html);
-    html = fixMathrmClasses(html);
-    html = html.replace(/<a href="([^"]+)"(?!.*target=)/g, '<a target="_blank" href="$1"');
+
+    // NÃO alterar classes internas do KaTeX.
+    // Não usar fixMathrmClasses.
+    // O KaTeX precisa preservar mathnormal, mathit, mathbb, mathrm etc.
+
+    html = html.replace(
+      /<a href="([^"]+)"(?![^>]*target=)/g,
+      '<a target="_blank" rel="noopener noreferrer" href="$1"'
+    );
 
     // 7. Adicionar container final com estilos
     return `
-<div class="markdown-body wmde-markdown wmde-markdown-color" 
+<div class="markdown-body wmde-markdown wmde-markdown-color"
      style="
-     --color-canvas-default: transparent;
-            --color-fg-default: currentColor;
-            font-size: 0.875rem;
-            line-height: 1.25rem;">
+       --color-canvas-default: transparent;
+       --color-fg-default: currentColor;
+       font-size: 0.875rem;
+       line-height: 1.25rem;
+     ">
   ${html}
 </div>`;
-    
+
   } catch (error) {
     const err = error as Error;
+
     console.error('Erro ao processar Markdown:', err);
+
     return `<div style="color: red; padding: 20px; border: 1px solid red;">
       <strong>Erro:</strong> ${err.message}
     </div>`;

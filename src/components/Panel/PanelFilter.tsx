@@ -1,306 +1,902 @@
+// components/Panel/PanelFilter.tsx
 "use client";
 
-import { useEffect, useState } from "react";
-import { api } from '@/lib/axios';
+import { useEffect, useMemo, useState } from "react";
+import { api } from "@/lib/axios";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { HeadlessMultiSelect } from '@/components/ui/HeadlessMultiSelect';
+import { HeadlessMultiSelect } from "@/components/ui/HeadlessMultiSelect";
 
-// Padrão: Definindo um tipo para as opções, para garantir consistência.
 type FilterOption = {
-    id: number;
-    nome: string;
+  id: number | string;
+  nome: string;
 };
+
+type QuestionStatus = "all" | "solved" | "not-solved";
+type CorrectStatus = "all" | "correct" | "incorrect";
 
 type FilterPanelProps = {
-    initialSelectedFronts?: FilterOption[];
-    initialSelectedExams?: FilterOption[];
-    initialSelectedSubjects?: FilterOption[];
-    initialSelectedTopics?: FilterOption[];
-    initialSelectedYears?: FilterOption[];
-    initialWantsComments?: boolean;
-    initialQuestionStatus?: string;
-    initialCorrectStatus?: string;
-    // Props para as OPÇÕES pré-carregadas na página de resultados
-    subjectOptions?: FilterOption[];
-    topicOptions?: FilterOption[];
+  initialSelectedFronts?: FilterOption[];
+  initialSelectedExams?: FilterOption[];
+  initialSelectedSubjects?: FilterOption[];
+  initialSelectedTopics?: FilterOption[];
+  initialSelectedYears?: FilterOption[];
+
+  initialWantsComments?: boolean;
+  initialQuestionStatus?: QuestionStatus | string;
+  initialCorrectStatus?: CorrectStatus | string;
+
+  subjectOptions?: FilterOption[];
+  topicOptions?: FilterOption[];
+  yearOptions?: FilterOption[];
+
+  submitLabel?: string;
+  onSubmitFilters?: (payload: FilterPanelPayload) => void;
 };
 
+export type FilterPanelPayload = {
+  frentes: string[];
+  provas: string[];
+  assuntos: string[];
+  topicos: string[];
+  anos: string[];
+  com_comentarios: boolean;
+  status: QuestionStatus;
+  acerto: CorrectStatus;
+};
+
+function safeArray<T>(value: T[] | undefined | null): T[] {
+  return Array.isArray(value) ? value : [];
+}
+
+function normalizeFilterOptions(value: unknown): FilterOption[] {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+
+      const option = item as Partial<FilterOption>;
+
+      const id = option.id;
+      const nome = option.nome;
+
+      if (
+        (typeof id !== "number" && typeof id !== "string") ||
+        typeof nome !== "string"
+      ) {
+        return null;
+      }
+
+      return {
+        id,
+        nome,
+      };
+    })
+    .filter((item): item is FilterOption => Boolean(item));
+}
+
+function normalizeQuestionStatus(value?: string): QuestionStatus {
+  if (value === "solved" || value === "not-solved") return value;
+  return "all";
+}
+
+function normalizeCorrectStatus(
+  value?: string,
+  questionStatus?: QuestionStatus,
+): CorrectStatus {
+  if (questionStatus === "not-solved") return "all";
+  if (value === "correct" || value === "incorrect") return value;
+  return "all";
+}
+
+function optionIdToString(id: number | string): string {
+  return String(id).trim();
+}
+
+function optionIdsKey(options: FilterOption[] | undefined | null): string {
+  return safeArray(options)
+    .map((option) => optionIdToString(option.id))
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b))
+    .join(",");
+}
+
+function sameId(a: FilterOption, b: FilterOption): boolean {
+  return optionIdToString(a.id) === optionIdToString(b.id);
+}
+
+function keepOnlyExistingOptions(
+  selected: FilterOption[],
+  available: FilterOption[],
+): FilterOption[] {
+  const safeSelected = safeArray(selected);
+  const safeAvailable = safeArray(available);
+
+  if (safeAvailable.length === 0) return safeSelected;
+
+  return safeSelected.filter((item) =>
+    safeAvailable.some((option) => sameId(option, item)),
+  );
+}
+
+function getButtonClass(active: boolean, variant: "blue" | "green" | "red") {
+  const base =
+    "rounded-md border px-3 py-3 text-base font-medium transition disabled:cursor-not-allowed disabled:opacity-45";
+
+  if (!active) {
+    return `${base} border-gray-700 bg-[#2A303C] text-gray-400 hover:border-gray-500 hover:text-white`;
+  }
+
+  if (variant === "green") {
+    return `${base} border-green-500 bg-green-600 text-white`;
+  }
+
+  if (variant === "red") {
+    return `${base} border-red-500 bg-red-600 text-white`;
+  }
+
+  return `${base} border-[#0E00D0] bg-[#0E00D0] text-white`;
+}
+
+function authHeaders(token?: string) {
+  if (!token) return {};
+
+  return {
+    Authorization: `Bearer ${String(token)
+      .replace(/^Bearer\s+/i, "")
+      .trim()}`,
+  };
+}
+
 export const FilterPanel = ({
-    initialSelectedFronts,
-    initialSelectedExams,
-    initialSelectedSubjects,
-    initialSelectedTopics,
-    initialSelectedYears,
-    initialWantsComments,
-    initialQuestionStatus,
-    initialCorrectStatus,
-    subjectOptions,
-    topicOptions
+  initialSelectedFronts,
+  initialSelectedExams,
+  initialSelectedSubjects,
+  initialSelectedTopics,
+  initialSelectedYears,
+  initialWantsComments = false,
+  initialQuestionStatus = "all",
+  initialCorrectStatus = "all",
+  subjectOptions,
+  topicOptions,
+  yearOptions,
+  submitLabel = "Buscar",
+  onSubmitFilters,
 }: FilterPanelProps) => {
-    const router = useRouter();
-    const { data: session } = useSession();
+  const router = useRouter();
+  const { data: session } = useSession();
 
-    // --- Estados para VALORES SELECIONADOS ---
-    const [selectedFronts, setSelectedFronts] = useState<FilterOption[]>(initialSelectedFronts || []);
-    const [selectedExams, setSelectedExams] = useState<FilterOption[]>(initialSelectedExams || []);
-    const [selectedSubjects, setSelectedSubjects] = useState<FilterOption[]>(initialSelectedSubjects || []);
-    const [selectedTopics, setSelectedTopics] = useState<FilterOption[]>(initialSelectedTopics || []);
-    const [selectedYears, setSelectedYears] = useState<FilterOption[]>(initialSelectedYears || []);
-    const [wantsComments, setWantsComments] = useState(initialWantsComments || false);
-    const [questionStatus, setQuestionStatus] = useState(initialQuestionStatus || "all");
-    const [correctStatus, setCorrectStatus] = useState(initialCorrectStatus || "all");
+  const laravelToken = useMemo(() => {
+    return (session as any)?.laravelToken as string | undefined;
+  }, [session]);
 
-    // --- Estados para as OPÇÕES disponíveis ---
-    const [fronts, setFronts] = useState<FilterOption[]>([]);
-    const [subjects, setSubjects] = useState<FilterOption[]>(subjectOptions || []);
-    const [topics, setTopics] = useState<FilterOption[]>(topicOptions || []);
-    const [exams, setExams] = useState<FilterOption[]>([]);
-    const [years, setYears] = useState<FilterOption[]>([]);
+  const initialFrontsKey = optionIdsKey(initialSelectedFronts);
+  const initialExamsKey = optionIdsKey(initialSelectedExams);
+  const initialSubjectsKey = optionIdsKey(initialSelectedSubjects);
+  const initialTopicsKey = optionIdsKey(initialSelectedTopics);
+  const initialYearsKey = optionIdsKey(initialSelectedYears);
 
-    // --- Estados de Carregamento (Loading) ---
-    const [isSubjectsLoading, setIsSubjectsLoading] = useState(false);
-    const [isTopicsLoading, setIsTopicsLoading] = useState(false);
-    const [isFrenteLoading, setIsFremteLoading] = useState(false);
-    const [isProvaLoading, setIsProvaLoading] = useState(false);
+  const subjectOptionsKey = optionIdsKey(subjectOptions);
+  const topicOptionsKey = optionIdsKey(topicOptions);
+  const yearOptionsKey = optionIdsKey(yearOptions);
 
+  const [selectedFronts, setSelectedFrontsState] = useState<FilterOption[]>(
+    () => safeArray(initialSelectedFronts),
+  );
 
-    // Efeito para buscar dados iniciais (NÃO dependentes)
-    useEffect(() => {
-        if (session && session.laravelToken) {
-            const fetchInitialOptions = async () => {
-                setIsFremteLoading(true);
-                setIsProvaLoading(true);
-                try {
-                    const [frontsResponse, examsResponse] = await Promise.all([
-                        api.get('/filtros/frentes', { headers: { Authorization: `Bearer ${session.laravelToken}` } }),
-                        api.get('/filtros/provas', { headers: { Authorization: `Bearer ${session.laravelToken}` } })
-                    ]);
-                    setFronts(frontsResponse.data);
-                    setExams(examsResponse.data);
-                    setIsFremteLoading(false)
-                    setIsProvaLoading(false);
-                } catch (error) {
-                    console.error("Erro ao buscar filtros iniciais:", error);
-                }
-            };
+  const [selectedExams, setSelectedExamsState] = useState<FilterOption[]>(() =>
+    safeArray(initialSelectedExams),
+  );
 
-            const generateYears = () => {
-                const currentYear = new Date().getFullYear();
-                const startYear = 2010;
-                const yearsArray = Array.from({ length: currentYear - startYear + 1 }, (_, i) => {
-                    const year = currentYear - i;
-                    return { id: year, nome: String(year) };
-                });
-                setYears(yearsArray);
-            };
+  const [selectedSubjects, setSelectedSubjectsState] = useState<FilterOption[]>(
+    () => safeArray(initialSelectedSubjects),
+  );
 
-            fetchInitialOptions();
-            generateYears();
+  const [selectedTopics, setSelectedTopicsState] = useState<FilterOption[]>(
+    () => safeArray(initialSelectedTopics),
+  );
+
+  const [selectedYears, setSelectedYearsState] = useState<FilterOption[]>(() =>
+    safeArray(initialSelectedYears),
+  );
+
+  const normalizedInitialQuestionStatus = normalizeQuestionStatus(
+    initialQuestionStatus,
+  );
+
+  const normalizedInitialCorrectStatus = normalizeCorrectStatus(
+    initialCorrectStatus,
+    normalizedInitialQuestionStatus,
+  );
+
+  const [wantsComments, setWantsComments] = useState<boolean>(
+    Boolean(initialWantsComments),
+  );
+
+  const [questionStatus, setQuestionStatus] = useState<QuestionStatus>(
+    normalizedInitialQuestionStatus,
+  );
+
+  const [correctStatus, setCorrectStatus] = useState<CorrectStatus>(
+    normalizedInitialCorrectStatus,
+  );
+
+  const [fronts, setFronts] = useState<FilterOption[]>([]);
+  const [subjects, setSubjects] = useState<FilterOption[]>(() =>
+    safeArray(subjectOptions),
+  );
+  const [topics, setTopics] = useState<FilterOption[]>(() =>
+    safeArray(topicOptions),
+  );
+  const [exams, setExams] = useState<FilterOption[]>([]);
+  const [years, setYears] = useState<FilterOption[]>(() =>
+    safeArray(yearOptions),
+  );
+
+  const [isSubjectsLoading, setIsSubjectsLoading] = useState(false);
+  const [isTopicsLoading, setIsTopicsLoading] = useState(false);
+  const [isFrontLoading, setIsFrontLoading] = useState(false);
+  const [isExamLoading, setIsExamLoading] = useState(false);
+  const [isYearsLoading, setIsYearsLoading] = useState(false);
+
+  function setSelectedFronts(value: FilterOption[] | undefined | null) {
+    setSelectedFrontsState(safeArray(value));
+  }
+
+  function setSelectedExams(value: FilterOption[] | undefined | null) {
+    setSelectedExamsState(safeArray(value));
+  }
+
+  function setSelectedSubjects(value: FilterOption[] | undefined | null) {
+    setSelectedSubjectsState(safeArray(value));
+  }
+
+  function setSelectedTopics(value: FilterOption[] | undefined | null) {
+    setSelectedTopicsState(safeArray(value));
+  }
+
+  function setSelectedYears(value: FilterOption[] | undefined | null) {
+    setSelectedYearsState(safeArray(value));
+  }
+
+  useEffect(() => {
+    setSelectedFrontsState(safeArray(initialSelectedFronts));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialFrontsKey]);
+
+  useEffect(() => {
+    setSelectedExamsState(safeArray(initialSelectedExams));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialExamsKey]);
+
+  useEffect(() => {
+    setSelectedSubjectsState(safeArray(initialSelectedSubjects));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialSubjectsKey]);
+
+  useEffect(() => {
+    setSelectedTopicsState(safeArray(initialSelectedTopics));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialTopicsKey]);
+
+  useEffect(() => {
+    setSelectedYearsState(safeArray(initialSelectedYears));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialYearsKey]);
+
+  useEffect(() => {
+    setWantsComments(Boolean(initialWantsComments));
+  }, [initialWantsComments]);
+
+  useEffect(() => {
+    const nextQuestionStatus = normalizeQuestionStatus(initialQuestionStatus);
+    const nextCorrectStatus = normalizeCorrectStatus(
+      initialCorrectStatus,
+      nextQuestionStatus,
+    );
+
+    setQuestionStatus(nextQuestionStatus);
+    setCorrectStatus(nextCorrectStatus);
+  }, [initialQuestionStatus, initialCorrectStatus]);
+
+  useEffect(() => {
+    setSubjects(safeArray(subjectOptions));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subjectOptionsKey]);
+
+  useEffect(() => {
+    setTopics(safeArray(topicOptions));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [topicOptionsKey]);
+
+  useEffect(() => {
+    setYears(safeArray(yearOptions));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [yearOptionsKey]);
+
+  /**
+   * Busca frentes e GRUPOS de provas.
+   *
+   * Antes:
+   * /filtros/provas
+   *
+   * Agora:
+   * /filtros/provas-grupos
+   */
+  useEffect(() => {
+    if (!laravelToken) return;
+
+    let cancelled = false;
+
+    async function fetchInitialOptions() {
+      setIsFrontLoading(true);
+      setIsExamLoading(true);
+
+      try {
+        const [frontsResponse, examsResponse] = await Promise.all([
+          api.get("/filtros/frentes", {
+            headers: authHeaders(laravelToken),
+          }),
+          api.get("/filtros/provas-grupos", {
+            headers: authHeaders(laravelToken),
+          }),
+        ]);
+
+        if (cancelled) return;
+
+        setFronts(safeArray(frontsResponse.data));
+        setExams(safeArray(examsResponse.data));
+      } catch (error) {
+        console.error("Erro ao buscar filtros iniciais:", error);
+
+        if (!cancelled) {
+          setFronts([]);
+          setExams([]);
         }
-    }, [session]);
-
-    // Efeito de CASCATA para INTERAÇÃO DO USUÁRIO com Frentes
-    useEffect(() => {
-        // Se `subjectOptions` existe, a carga é controlada pela página pai. Este efeito não deve rodar.
-        if (subjectOptions) return;
-
-        setSubjects([]);
-        setSelectedSubjects([]);
-        if (selectedFronts.length > 0 && session) {
-            const frontIdsString = selectedFronts.map(front => front.id).join(',');
-            const fetchSubjects = async () => {
-                setIsSubjectsLoading(true);
-                try {
-                    const response = await api.get(`/filtros/assuntos?frentes=${frontIdsString}`, {
-                        headers: { Authorization: `Bearer ${session.laravelToken}` },
-                    });
-                    setSubjects(response.data);
-                } catch (error) {
-                    console.error("Erro ao buscar assuntos:", error);
-                } finally {
-                    setIsSubjectsLoading(false);
-                }
-            };
-            fetchSubjects();
+      } finally {
+        if (!cancelled) {
+          setIsFrontLoading(false);
+          setIsExamLoading(false);
         }
-    }, [selectedFronts, session, subjectOptions]);
+      }
+    }
 
-    // Efeito de CASCATA para INTERAÇÃO DO USUÁRIO com Assuntos
-    useEffect(() => {
-        // Se `topicOptions` existe, a carga é controlada pela página pai.
-        if (topicOptions) return;
+    fetchInitialOptions();
 
-        setTopics([]);
-        setSelectedTopics([]);
-        if (selectedSubjects.length > 0 && session) {
-            const subjectIdsString = selectedSubjects.map(subject => subject.id).join(',');
-            const fetchTopics = async () => {
-                setIsTopicsLoading(true);
-                try {
-                    const response = await api.get(`/filtros/topicos?assuntos=${subjectIdsString}`, {
-                        headers: { Authorization: `Bearer ${session.laravelToken}` },
-                    });
-                    setTopics(response.data);
-                } catch (error) {
-                    console.error("Erro ao buscar tópicos:", error);
-                } finally {
-                    setIsTopicsLoading(false);
-                }
-            };
-            fetchTopics();
+    return () => {
+      cancelled = true;
+    };
+  }, [laravelToken]);
+
+  /**
+   * Cascata: frente -> assunto.
+   */
+  useEffect(() => {
+    if (!laravelToken) return;
+
+    const safeSelectedFronts = safeArray(selectedFronts);
+
+    if (safeSelectedFronts.length === 0) {
+      const initialSubjects = safeArray(subjectOptions);
+      const initialTopics = safeArray(topicOptions);
+
+      setSubjects(initialSubjects);
+
+      if (initialSubjects.length === 0) {
+        setSelectedSubjectsState([]);
+        setTopics(initialTopics);
+
+        if (initialTopics.length === 0) {
+          setSelectedTopicsState([]);
         }
-    }, [selectedSubjects, session, topicOptions]);
+      }
 
-    const handleSearch = () => {
-        const pathSegments: string[] = [];
+      return;
+    }
 
-        const addMultiSelectToPath = (key: string, items: FilterOption[]) => {
-            if (items.length > 0) {
-                pathSegments.push(key);
-                pathSegments.push(items.map(item => item.id).join(','));
-            }
-        };
+    let cancelled = false;
 
-        addMultiSelectToPath('frente', selectedFronts);
-        addMultiSelectToPath('prova', selectedExams);
-        addMultiSelectToPath('assunto', selectedSubjects);
-        addMultiSelectToPath('topico', selectedTopics);
-        addMultiSelectToPath('ano', selectedYears);
+    const frontIdsString = safeSelectedFronts
+      .map((front) => optionIdToString(front.id))
+      .join(",");
 
-        const queryParams = new URLSearchParams();
+    async function fetchSubjects() {
+      setIsSubjectsLoading(true);
 
-        if (wantsComments) queryParams.append('com_comentarios', 'true');
-        if (questionStatus !== 'all') queryParams.append('status', questionStatus);
-        if (correctStatus !== 'all') queryParams.append('acerto', correctStatus);
+      try {
+        const response = await api.get("/filtros/assuntos", {
+          params: { frentes: frontIdsString },
+          headers: authHeaders(laravelToken),
+        });
 
-        const finalPath = pathSegments.join('/');
-        const searchUrl = finalPath ? `/exercicios/s/${finalPath}` : '/exercicios/s';
-        const queryString = queryParams.toString();
-        const finalUrl = `${searchUrl}${queryString ? `?${queryString}` : ''}`;
+        if (cancelled) return;
 
-        router.push(finalUrl);
+        const availableSubjects = normalizeFilterOptions(response.data);
+
+        setSubjects(availableSubjects);
+        setSelectedSubjectsState((current) =>
+          keepOnlyExistingOptions(safeArray(current), availableSubjects),
+        );
+      } catch (error) {
+        console.error("Erro ao buscar assuntos:", error);
+
+        if (!cancelled) {
+          setSubjects([]);
+          setSelectedSubjectsState([]);
+          setTopics([]);
+          setSelectedTopicsState([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsSubjectsLoading(false);
+        }
+      }
+    }
+
+    fetchSubjects();
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    optionIdsKey(selectedFronts),
+    laravelToken,
+    subjectOptionsKey,
+    topicOptionsKey,
+  ]);
+
+  /**
+   * Cascata: assunto -> tópico.
+   */
+  useEffect(() => {
+    if (!laravelToken) return;
+
+    const safeSelectedSubjects = safeArray(selectedSubjects);
+
+    if (safeSelectedSubjects.length === 0) {
+      const initialTopics = safeArray(topicOptions);
+
+      setTopics(initialTopics);
+
+      if (initialTopics.length === 0) {
+        setSelectedTopicsState([]);
+      }
+
+      return;
+    }
+
+    let cancelled = false;
+
+    const subjectIdsString = safeSelectedSubjects
+      .map((subject) => optionIdToString(subject.id))
+      .join(",");
+
+    async function fetchTopics() {
+      setIsTopicsLoading(true);
+
+      try {
+        const response = await api.get("/filtros/topicos", {
+          params: { assuntos: subjectIdsString },
+          headers: authHeaders(laravelToken),
+        });
+
+        if (cancelled) return;
+
+        const availableTopics = normalizeFilterOptions(response.data);
+
+        setTopics(availableTopics);
+        setSelectedTopicsState((current) =>
+          keepOnlyExistingOptions(safeArray(current), availableTopics),
+        );
+      } catch (error) {
+        console.error("Erro ao buscar tópicos:", error);
+
+        if (!cancelled) {
+          setTopics([]);
+          setSelectedTopicsState([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsTopicsLoading(false);
+        }
+      }
+    }
+
+    fetchTopics();
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [optionIdsKey(selectedSubjects), laravelToken, topicOptionsKey]);
+
+  /**
+   * Cascata: prova -> ano.
+   *
+   * Se selecionar ENEM, busca:
+   * /filtros/anos-provas?provas=ENEM
+   *
+   * Se selecionar ENEM,FUVEST, busca:
+   * /filtros/anos-provas?provas=ENEM,FUVEST
+   */
+  useEffect(() => {
+    if (!laravelToken) return;
+
+    let cancelled = false;
+
+    const safeSelectedExams = safeArray(selectedExams);
+
+    async function fetchYears() {
+      setIsYearsLoading(true);
+
+      try {
+        const provaSiglas = safeSelectedExams
+          .map((exam) => optionIdToString(exam.id))
+          .filter(Boolean)
+          .join(",");
+
+        const response = await api.get("/filtros/anos-provas", {
+          params: provaSiglas ? { provas: provaSiglas } : {},
+          headers: authHeaders(laravelToken),
+        });
+
+        if (cancelled) return;
+
+        const availableYears = normalizeFilterOptions(response.data);
+
+        setYears(availableYears);
+        setSelectedYearsState((current) =>
+          keepOnlyExistingOptions(safeArray(current), availableYears),
+        );
+      } catch (error) {
+        console.error("Erro ao buscar anos por prova:", error);
+
+        if (!cancelled) {
+          setYears([]);
+          setSelectedYearsState([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsYearsLoading(false);
+        }
+      }
+    }
+
+    fetchYears();
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [optionIdsKey(selectedExams), laravelToken]);
+
+  function handleQuestionStatusClick(nextStatus: QuestionStatus) {
+    setQuestionStatus((current) => {
+      const resolvedStatus = current === nextStatus ? "all" : nextStatus;
+
+      if (resolvedStatus === "not-solved" || resolvedStatus === "all") {
+        setCorrectStatus("all");
+      }
+
+      return resolvedStatus;
+    });
+  }
+
+  function handleCorrectStatusClick(nextStatus: CorrectStatus) {
+    if (questionStatus === "not-solved") return;
+
+    setCorrectStatus((current) => {
+      const resolvedStatus = current === nextStatus ? "all" : nextStatus;
+
+      if (resolvedStatus !== "all") {
+        setQuestionStatus("solved");
+      }
+
+      return resolvedStatus;
+    });
+  }
+
+  function clearAllFilters() {
+    setSelectedFrontsState([]);
+    setSelectedExamsState([]);
+    setSelectedSubjectsState([]);
+    setSelectedTopicsState([]);
+    setSelectedYearsState([]);
+
+    setSubjects(safeArray(subjectOptions));
+    setTopics(safeArray(topicOptions));
+    setYears(safeArray(yearOptions));
+
+    setWantsComments(false);
+    setQuestionStatus("all");
+    setCorrectStatus("all");
+  }
+
+  function getCurrentPayload(): FilterPanelPayload {
+    const toIds = (items: FilterOption[]) =>
+      safeArray(items)
+        .map((item) => optionIdToString(item.id))
+        .filter(Boolean);
+
+    return {
+      frentes: toIds(selectedFronts),
+      provas: toIds(selectedExams),
+      assuntos: toIds(selectedSubjects),
+      topicos: toIds(selectedTopics),
+      anos: toIds(selectedYears),
+      com_comentarios: wantsComments,
+      status: questionStatus,
+      acerto: questionStatus === "not-solved" ? "all" : correctStatus,
+    };
+  }
+
+  function handleSearch() {
+    const payload = getCurrentPayload();
+
+    if (onSubmitFilters) {
+      onSubmitFilters(payload);
+      return;
+    }
+
+    const pathSegments: string[] = [];
+
+    const addMultiSelectToPath = (key: string, items: string[]) => {
+      if (items.length === 0) return;
+
+      pathSegments.push(key);
+      pathSegments.push(
+        items.map((item) => encodeURIComponent(item)).join(","),
+      );
     };
 
-    return (
-        <div className="bg-[#1D232D] rounded-lg shadow-md p-6 mb-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-6">
+    addMultiSelectToPath("frente", payload.frentes);
+    addMultiSelectToPath("prova", payload.provas);
+    addMultiSelectToPath("assunto", payload.assuntos);
+    addMultiSelectToPath("topico", payload.topicos);
+    addMultiSelectToPath("ano", payload.anos);
 
-                {/* Coluna 1: Frente + Prova */}
-                <div className="flex flex-col gap-4">
-                    <div>
-                        <label className="block text-base font-medium text-white mb-2">Frente(s)</label>
-                        <HeadlessMultiSelect
-                            placeholder="Selecione a(s) frente(s)"
-                            options={fronts}
-                            selectedOptions={selectedFronts}
-                            onChange={setSelectedFronts}
-                            isLoading={isFrenteLoading}
+    const queryParams = new URLSearchParams();
 
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-base font-medium text-white mb-2">Prova(s)</label>
-                        <HeadlessMultiSelect
-                            placeholder="Selecione a(s) prova(s)"
-                            options={exams}
-                            selectedOptions={selectedExams}
-                            onChange={setSelectedExams}
-                            isLoading={isProvaLoading}
-                        />
-                    </div>
-                </div>
+    if (payload.com_comentarios) {
+      queryParams.set("com_comentarios", "true");
+    }
 
-                {/* Coluna 2: Assunto + Ano */}
-                <div className="flex flex-col gap-4">
-                    <div>
-                        <label className="block text-base font-medium text-white mb-2">Assunto(s)</label>
-                        <HeadlessMultiSelect
-                            placeholder="Selecione o(s) assunto(s)"
-                            options={subjects}
-                            selectedOptions={selectedSubjects}
-                            onChange={setSelectedSubjects}
-                            disabled={selectedFronts.length === 0 || isSubjectsLoading}
+    if (payload.status !== "all") {
+      queryParams.set("status", payload.status);
+    }
 
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-base font-medium text-white mb-2">Ano(s)</label>
-                        <HeadlessMultiSelect
-                            placeholder="Selecione o(s) ano(s)"
-                            options={years}
-                            selectedOptions={selectedYears}
-                            onChange={setSelectedYears}
-                        />
-                    </div>
-                </div>
+    if (payload.status !== "not-solved" && payload.acerto !== "all") {
+      queryParams.set("acerto", payload.acerto);
+    }
 
-                {/* Coluna 3: Tópico + Opções */}
-                <div className="flex flex-col gap-4">
-                    <div>
-                        <label className="block text-base font-medium text-white mb-2">Tópico(s)</label>
-                        <HeadlessMultiSelect
-                            placeholder="Selecione o(s) tópico(s)"
-                            options={topics}
-                            selectedOptions={selectedTopics}
-                            onChange={setSelectedTopics}
-                            disabled={selectedSubjects.length === 0 || isTopicsLoading}
-                            isLoading={isTopicsLoading}
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-base font-medium text-white mb-2">Opções</label>
-                        <div className="flex items-center bg-[#2A303C] border border-gray-700 rounded-md p-3 h-full">
-                            <input
-                                id="gabarito-comentado"
-                                type="checkbox"
-                                checked={wantsComments}
-                                onChange={(e) => setWantsComments(e.target.checked)}
-                                className="h-5 w-5 rounded bg-gray-700 border-gray-600 text-blue-500 focus:ring-blue-600"
-                            />
-                            <label htmlFor="gabarito-comentado" className="cursor-pointer ml-3 text-base font-medium text-gray-300">
-                                Gabarito comentado
-                            </label>
-                        </div>
-                    </div>
-                </div>
+    queryParams.set("page", "1");
 
-                {/* Coluna 4: Questões que (botões) */}
-                <div className="flex flex-col h-full">
-                    <label className="block text-base font-medium text-white mb-2">Questões que</label>
-                    <div className="grid grid-cols-2 gap-2 h-full">
-                        <button
-                            className={`p-3 rounded-md text-base ${questionStatus === "not-solved" ? "bg-[#0E00D0] text-white" : "bg-[#2A303C] text-gray-400 border border-gray-700"}`}
-                            onClick={() => setQuestionStatus("not-solved")}
-                        >
-                            Não resolvi
-                        </button>
-                        <button
-                            className={`p-3 rounded-md text-base ${questionStatus === "solved" ? "bg-[#0E00D0] text-white" : "bg-[#2A303C] text-gray-400 border border-gray-700"}`}
-                            onClick={() => setQuestionStatus("solved")}
-                        >
-                            Resolvi
-                        </button>
-                        <button
-                            className={`p-3 rounded-md text-base ${correctStatus === "correct" ? "bg-green-600 text-white" : "bg-[#2A303C] text-gray-400 border border-gray-700"}`}
-                            onClick={() => setCorrectStatus("correct")}
-                        >
-                            Acertei
-                        </button>
-                        <button
-                            className={`p-3 rounded-md text-base ${correctStatus === "incorrect" ? "bg-red-600 text-white" : "bg-[#2A303C] text-gray-400 border border-gray-700"}`}
-                            onClick={() => setCorrectStatus("incorrect")}
-                        >
-                            Errei
-                        </button>
-                    </div>
-                </div>
-                <button onClick={handleSearch} className="w-full cursor-pointer py-1 bg-[#0E00D0] hover:bg-[#1a00ff] text-white font-medium rounded-md">
-                    Buscar
-                </button>
-            </div>
+    const finalPath = pathSegments.join("/");
+    const searchUrl = finalPath
+      ? `/exercicios/s/${finalPath}`
+      : "/exercicios/s";
 
+    const queryString = queryParams.toString();
 
+    router.push(`${searchUrl}${queryString ? `?${queryString}` : ""}`);
+  }
+
+  const safeSelectedFronts = safeArray(selectedFronts);
+  const safeSelectedSubjects = safeArray(selectedSubjects);
+  const safeSelectedExams = safeArray(selectedExams);
+
+  const safeSubjects = safeArray(subjects);
+  const safeTopics = safeArray(topics);
+  const safeYears = safeArray(years);
+
+  const isSubjectDisabled =
+    isSubjectsLoading ||
+    (safeSelectedFronts.length === 0 && safeSubjects.length === 0);
+
+  const isTopicDisabled =
+    isTopicsLoading ||
+    (safeSelectedSubjects.length === 0 && safeTopics.length === 0);
+
+  const isYearDisabled = isYearsLoading || safeYears.length === 0;
+
+  const isCorrectDisabled = questionStatus === "not-solved";
+
+  return (
+    <div className="mb-6 rounded-lg bg-[#1D232D] p-6 shadow-md">
+      <div className="mb-6 grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-4">
+        {/* Coluna 1: Frente + Prova */}
+        <div className="flex flex-col gap-4">
+          <div>
+            <label className="mb-2 block text-base font-medium text-white">
+              Frente(s)
+            </label>
+
+            <HeadlessMultiSelect
+              placeholder="Selecione a(s) frente(s)"
+              options={safeArray(fronts)}
+              selectedOptions={safeSelectedFronts}
+              onChange={setSelectedFronts}
+              isLoading={isFrontLoading}
+            />
+          </div>
+
+          <div>
+            <label className="mb-2 block text-base font-medium text-white">
+              Prova(s)
+            </label>
+
+            <HeadlessMultiSelect
+              placeholder="Ex.: ENEM, FUVEST, UNICAMP"
+              options={safeArray(exams)}
+              selectedOptions={safeSelectedExams}
+              onChange={setSelectedExams}
+              isLoading={isExamLoading}
+            />
+          </div>
         </div>
-    );
+
+        {/* Coluna 2: Assunto + Ano */}
+        <div className="flex flex-col gap-4">
+          <div>
+            <label className="mb-2 block text-base font-medium text-white">
+              Assunto(s)
+            </label>
+
+            <HeadlessMultiSelect
+              placeholder="Selecione o(s) assunto(s)"
+              options={safeSubjects}
+              selectedOptions={safeSelectedSubjects}
+              onChange={setSelectedSubjects}
+              disabled={isSubjectDisabled}
+              isLoading={isSubjectsLoading}
+            />
+          </div>
+
+          <div>
+            <label className="mb-2 block text-base font-medium text-white">
+              Ano(s)
+            </label>
+
+            <HeadlessMultiSelect
+              placeholder={
+                safeSelectedExams.length > 0
+                  ? "Anos disponíveis da(s) prova(s)"
+                  : "Selecione o(s) ano(s)"
+              }
+              options={safeYears}
+              selectedOptions={safeArray(selectedYears)}
+              onChange={setSelectedYears}
+              disabled={isYearDisabled}
+              isLoading={isYearsLoading}
+            />
+          </div>
+        </div>
+
+        {/* Coluna 3: Tópico + Opções */}
+        <div className="flex flex-col gap-4">
+          <div>
+            <label className="mb-2 block text-base font-medium text-white">
+              Tópico(s)
+            </label>
+
+            <HeadlessMultiSelect
+              placeholder="Selecione o(s) tópico(s)"
+              options={safeTopics}
+              selectedOptions={safeArray(selectedTopics)}
+              onChange={setSelectedTopics}
+              disabled={isTopicDisabled}
+              isLoading={isTopicsLoading}
+            />
+          </div>
+
+          <div>
+            <label className="mb-2 block text-base font-medium text-white">
+              Opções
+            </label>
+
+            <label
+              htmlFor="gabarito-comentado"
+              className={`flex h-12 cursor-pointer items-center rounded-md border p-3 transition ${
+                wantsComments
+                  ? "border-[#0E00D0] bg-[#0E00D0]/10"
+                  : "border-gray-700 bg-[#2A303C] hover:border-gray-500"
+              }`}
+            >
+              <input
+                id="gabarito-comentado"
+                type="checkbox"
+                checked={wantsComments}
+                onChange={(event) => setWantsComments(event.target.checked)}
+                className="h-5 w-5 cursor-pointer rounded border-gray-600 bg-gray-700 text-[#0E00D0] accent-[#0E00D0] focus:ring-2 focus:ring-[#0E00D0] focus:ring-offset-0"
+              />
+
+              <span
+                className={`ml-3 text-base font-medium ${
+                  wantsComments ? "text-white" : "text-gray-300"
+                }`}
+              >
+                Gabarito comentado
+              </span>
+            </label>
+          </div>
+        </div>
+
+        {/* Coluna 4: Questões que */}
+        <div className="flex h-full flex-col">
+          <label className="mb-2 block text-base font-medium text-white">
+            Questões que
+          </label>
+
+          <div className="grid h-full grid-cols-2 gap-2">
+            <button
+              type="button"
+              className={getButtonClass(
+                questionStatus === "not-solved",
+                "blue",
+              )}
+              onClick={() => handleQuestionStatusClick("not-solved")}
+            >
+              Não resolvi
+            </button>
+
+            <button
+              type="button"
+              className={getButtonClass(questionStatus === "solved", "blue")}
+              onClick={() => handleQuestionStatusClick("solved")}
+            >
+              Resolvi
+            </button>
+
+            <button
+              type="button"
+              disabled={isCorrectDisabled}
+              className={getButtonClass(correctStatus === "correct", "green")}
+              onClick={() => handleCorrectStatusClick("correct")}
+              title={
+                isCorrectDisabled
+                  ? "Questões não resolvidas não podem ser filtradas como certas."
+                  : undefined
+              }
+            >
+              Acertei
+            </button>
+
+            <button
+              type="button"
+              disabled={isCorrectDisabled}
+              className={getButtonClass(correctStatus === "incorrect", "red")}
+              onClick={() => handleCorrectStatusClick("incorrect")}
+              title={
+                isCorrectDisabled
+                  ? "Questões não resolvidas não podem ser filtradas como erradas."
+                  : undefined
+              }
+            >
+              Errei
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={handleSearch}
+          className="cursor-pointer inline-flex h-10 min-w-[92px] items-center justify-center rounded-md bg-[#0E00D0] px-4 text-sm font-semibold text-white transition hover:bg-[#1A0DFF] disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {submitLabel}
+        </button>
+
+        <button
+          type="button"
+          onClick={clearAllFilters}
+          className="cursor-pointer inline-flex h-10 min-w-[92px] items-center justify-center rounded-md border border-[#303A4F] bg-[#202735] px-4 text-sm font-semibold text-slate-300 transition hover:border-slate-500 hover:text-white"
+        >
+          Limpar
+        </button>
+      </div>
+    </div>
+  );
 };
