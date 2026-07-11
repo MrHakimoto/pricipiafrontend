@@ -535,27 +535,28 @@ export default function ConteudoPage() {
           </div>
         </div>
 
-        {isMobile ||
-          (!showAside && (
-            <button
-              type="button"
-              onClick={() => setShowAside(!showAside)}
-              aria-label={showAside ? "Ocultar aulas" : "Mostrar aulas"}
-              title={showAside ? "Ocultar aulas" : "Mostrar aulas"}
-              className="cursor-pointer
-        mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center
-        rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm
-        transition hover:bg-slate-50 active:scale-95
-        dark:border-white/10 dark:bg-white/10 dark:text-white dark:hover:bg-white/15
-      "
-            >
-              {showAside ? (
-                <PanelRightClose className="h-5 w-5" />
-              ) : (
-                <PanelRightOpen className="h-5 w-5" />
-              )}
-            </button>
-          ))}
+        {(!showAside || isMobile) && (
+          <button
+            type="button"
+            onClick={() => setShowAside(!showAside)}
+            aria-label={showAside ? "Ocultar aulas" : "Mostrar aulas"}
+            title={showAside ? "Ocultar aulas" : "Mostrar aulas"}
+            className="
+      mt-0.5 inline-flex h-10 w-10 shrink-0 cursor-pointer
+      items-center justify-center rounded-xl
+      border border-slate-200 bg-white text-slate-700 shadow-sm
+      transition hover:bg-slate-50 active:scale-95
+      dark:border-white/10 dark:bg-white/10 dark:text-white
+      dark:hover:bg-white/15
+    "
+          >
+            {showAside ? (
+              <PanelRightClose className="h-5 w-5" />
+            ) : (
+              <PanelRightOpen className="h-5 w-5" />
+            )}
+          </button>
+        )}
       </div>
 
       {/* CONTEÚDO DINÂMICO */}
